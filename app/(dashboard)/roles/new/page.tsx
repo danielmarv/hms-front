@@ -1,3 +1,4 @@
+
 "use client"
 
 import type React from "react"
@@ -12,12 +13,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Loader2, Save } from "lucide-react"
-
-interface Permission {
-  _id: string
-  key: string
-  description: string
-}
+import { usePermissions, Permission } from "@/hooks/use-permissions"
 
 export default function NewRolePage() {
   const router = useRouter()
@@ -25,37 +21,27 @@ export default function NewRolePage() {
   const [description, setDescription] = useState("")
   const [permissions, setPermissions] = useState<Permission[]>([])
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([])
-  const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const { isLoading, getAllPermissions } = usePermissions()
 
   useEffect(() => {
     const fetchPermissions = async () => {
       try {
-        const accessToken = localStorage.getItem("accessToken")
-        if (!accessToken) return
-
-        const response = await fetch("/api/permissions", {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          setPermissions(data)
+        const data = await getAllPermissions()
+        if (data) { // Ensure data exists in the ApiResponse
+          setPermissions(data) // Assuming the API directly returns Permission[]
         } else {
           throw new Error("Failed to fetch permissions")
         }
       } catch (error) {
-        console.error("Error fetching permissions:", error)
         toast.error("Failed to load permissions")
-      } finally {
-        setIsLoading(false)
       }
     }
-
+  
     fetchPermissions()
-  }, [])
+  }, [getAllPermissions])
+  
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -111,17 +97,18 @@ export default function NewRolePage() {
   }
 
   // Group permissions by category (based on prefix)
-  const groupedPermissions = permissions.reduce(
+  const groupedPermissions = (permissions.data || []).reduce(
     (groups, permission) => {
-      const category = permission.key.split("_")[0] || "other"
+      const category = permission.key.split("_")[0] || "other";
       if (!groups[category]) {
-        groups[category] = []
+        groups[category] = [];
       }
-      groups[category].push(permission)
-      return groups
+      groups[category].push(permission);
+      return groups;
     },
-    {} as Record<string, Permission[]>,
-  )
+    {} as Record<string, typeof permissions.data>
+  );
+  
 
   return (
     <div className="space-y-6">
