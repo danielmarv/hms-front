@@ -8,7 +8,7 @@ import { useAuth } from "@/hooks/use-auth"
 import { Sidebar } from "@/components/dashboard/sidebar"
 import { Toaster } from "sonner"
 import { Loader2 } from "lucide-react"
-import { AuthDebugger } from "@/components/auth-debugger"
+// import { AuthDebugger } from "@/components/auth-debugger"
 import { isAuthenticated } from "@/utils/auth-utils"
 
 export default function DashboardLayout({
@@ -66,7 +66,7 @@ export default function DashboardLayout({
         <div className="h-full p-4 md:p-6">{children}</div>
       </main>
       <Toaster position="top-right" />
-      <AuthDebugger />
+      {/* <AuthDebugger /> */}
     </div>
   )
 }
