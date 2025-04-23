@@ -21,6 +21,15 @@ export type RegisterData = {
   phone?: string
 }
 
+// Debug function to check token state
+const debugTokens = () => {
+  if (typeof window !== "undefined") {
+    console.log("LocalStorage accessToken:", localStorage.getItem("accessToken"))
+    console.log("LocalStorage refreshToken:", localStorage.getItem("refreshToken"))
+    console.log("Cookie token:", Cookies.get("token"))
+  }
+}
+
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -28,34 +37,79 @@ export function useAuth() {
   const { request } = useApi()
   const router = useRouter()
 
+  // Set tokens in both localStorage and cookies
+  const setTokens = (accessToken: string, refreshToken: string, userData: User) => {
+    console.log("Setting tokens...")
+
+    // Set in localStorage
+    localStorage.setItem("accessToken", accessToken)
+    localStorage.setItem("refreshToken", refreshToken)
+    localStorage.setItem("user", JSON.stringify(userData))
+
+    // Set in cookies with explicit options
+    // Use path="/" to ensure the cookie is available across the entire site
+    Cookies.set("token", accessToken, {
+      expires: 7, // 7 days
+      path: "/",
+      sameSite: "lax", // Changed from strict to lax for better compatibility
+    })
+
+    // Also set a session cookie as backup
+    document.cookie = `token=${accessToken}; path=/; max-age=${60 * 60 * 24 * 7}; samesite=lax`
+
+    debugTokens()
+  }
+
+  // Clear tokens from both localStorage and cookies
+  const clearTokens = () => {
+    console.log("Clearing tokens...")
+
+    // Clear localStorage
+    localStorage.removeItem("accessToken")
+    localStorage.removeItem("refreshToken")
+    localStorage.removeItem("user")
+
+    // Clear cookies
+    Cookies.remove("token", { path: "/" })
+    document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
+
+    debugTokens()
+  }
+
   const checkAuth = useCallback(async () => {
+    console.log("Checking authentication...")
+    debugTokens()
+
     try {
       // Check both localStorage and cookies
       const accessToken = localStorage.getItem("accessToken") || Cookies.get("token")
 
       if (!accessToken) {
+        console.log("No token found")
         setIsLoading(false)
         return false
       }
 
+      console.log("Token found, verifying with API...")
       const { data, error } = await request<User>("/auth/me", "GET", undefined, false)
 
       if (error || !data) {
+        console.log("Token invalid or expired, trying to refresh...")
         // Try to refresh token
         const refreshed = await refreshAccessToken()
         if (!refreshed) {
-          // If refresh failed, clear storage
-          localStorage.removeItem("accessToken")
-          localStorage.removeItem("refreshToken")
-          Cookies.remove("token")
+          console.log("Refresh failed, clearing tokens")
+          clearTokens()
           setIsAuthenticated(false)
           setUser(null)
           setIsLoading(false)
           return false
         }
+        console.log("Token refreshed successfully")
         return true
       }
 
+      console.log("Authentication successful")
       setUser(data)
       setIsAuthenticated(true)
       setIsLoading(false)
@@ -67,8 +121,18 @@ export function useAuth() {
     }
   }, [request])
 
+  // Check auth on initial load and when window gets focus
   useEffect(() => {
     checkAuth()
+
+    // Re-check auth when window gets focus
+    const handleFocus = () => {
+      console.log("Window focused, re-checking auth")
+      checkAuth()
+    }
+
+    window.addEventListener("focus", handleFocus)
+    return () => window.removeEventListener("focus", handleFocus)
   }, [checkAuth])
 
   const login = async (email: string, password: string) => {
@@ -84,18 +148,8 @@ export function useAuth() {
         throw new Error(error || "Login failed")
       }
 
-      // Store tokens in both localStorage and cookies
-      localStorage.setItem("accessToken", data.accessToken)
-      localStorage.setItem("refreshToken", data.refreshToken)
-      localStorage.setItem("user", JSON.stringify(data.user))
-
-      // Set cookie for middleware authentication
-      // Set secure and httpOnly in production
-      Cookies.set("token", data.accessToken, {
-        expires: 7, // 7 days
-        path: "/",
-        sameSite: "strict",
-      })
+      // Store tokens
+      setTokens(data.accessToken, data.refreshToken, data.user)
 
       // Set user data
       setUser(data.user)
@@ -123,17 +177,8 @@ export function useAuth() {
         throw new Error(error || "Registration failed")
       }
 
-      // Store tokens in both localStorage and cookies
-      localStorage.setItem("accessToken", data.accessToken)
-      localStorage.setItem("refreshToken", data.refreshToken)
-      localStorage.setItem("user", JSON.stringify(data.user))
-
-      // Set cookie for middleware authentication
-      Cookies.set("token", data.accessToken, {
-        expires: 7,
-        path: "/",
-        sameSite: "strict",
-      })
+      // Store tokens
+      setTokens(data.accessToken, data.refreshToken, data.user)
 
       // Set user data
       setUser(data.user)
@@ -160,11 +205,7 @@ export function useAuth() {
       console.error("Logout error:", error)
     } finally {
       // Clear storage and state regardless of API response
-      localStorage.removeItem("accessToken")
-      localStorage.removeItem("refreshToken")
-      localStorage.removeItem("user")
-      Cookies.remove("token")
-
+      clearTokens()
       setUser(null)
       setIsAuthenticated(false)
       setIsLoading(false)
@@ -235,7 +276,7 @@ export function useAuth() {
         return false
       }
 
-      const { data, error } = await request<{ accessToken: string }>(
+      const { data, error } = await request<{ accessToken: string; user: User }>(
         "/auth/refresh-token",
         "POST",
         { refreshToken },
@@ -246,21 +287,20 @@ export function useAuth() {
         return false
       }
 
+      // Update access token but keep the same refresh token
       localStorage.setItem("accessToken", data.accessToken)
       Cookies.set("token", data.accessToken, {
         expires: 7,
         path: "/",
-        sameSite: "strict",
+        sameSite: "lax",
       })
+      document.cookie = `token=${data.accessToken}; path=/; max-age=${60 * 60 * 24 * 7}; samesite=lax`
 
-      // Fetch user data with new token
-      const userResponse = await request<User>("/auth/me", "GET", undefined, false)
-
-      if (userResponse.error || !userResponse.data) {
-        return false
+      if (data.user) {
+        setUser(data.user)
+        localStorage.setItem("user", JSON.stringify(data.user))
       }
 
-      setUser(userResponse.data)
       setIsAuthenticated(true)
       return true
     } catch (error) {

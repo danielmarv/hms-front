@@ -1,59 +1,51 @@
 "use client"
 
 import type React from "react"
+
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { useAuth } from "@/contexts/auth-context"
-import { useUserAccess } from "@/hooks/use-user-access"
+import { useAuth } from "@/hooks/use-auth"
 import { Sidebar } from "@/components/dashboard/sidebar"
 import { Toaster } from "sonner"
 import { Loader2 } from "lucide-react"
+import { AuthDebugger } from "@/components/auth-debugger"
+import { isAuthenticated } from "@/utils/auth-utils"
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const { isLoading, isAuthenticated, user } = useAuth()
-  const { getUserDefaultHotel } = useUserAccess()
+  const { isLoading, isAuthenticated: authState, user, checkAuth } = useAuth()
   const router = useRouter()
-  const [defaultHotel, setDefaultHotel] = useState<{ id: string; name: string } | undefined>()
-  const [isLoadingHotel, setIsLoadingHotel] = useState(true)
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
 
   useEffect(() => {
-    // Redirect to login if not authenticated
-    if (!isLoading && !isAuthenticated) {
-      router.push("/login")
-    }
+    const verifyAuth = async () => {
+      console.log("Dashboard layout mounted, checking auth")
 
-    // Fetch user's default hotel
-    const fetchDefaultHotel = async () => {
-      try {
-        if (!user) return
-
-        const { data } = await getUserDefaultHotel(user.id)
-
-        if (data && data.hotel) {
-          setDefaultHotel({
-            id: data.hotel._id,
-            name: data.hotel.name,
-          })
-        }
-      } catch (error) {
-        console.error("Error fetching default hotel:", error)
-      } finally {
-        setIsLoadingHotel(false)
+      // First check if we have a token
+      if (!isAuthenticated()) {
+        console.log("No token found, redirecting to login")
+        router.push("/auth/login")
+        return
       }
+
+      // Then verify with the API
+      const authValid = await checkAuth()
+      if (!authValid) {
+        console.log("Auth check failed, redirecting to login")
+        router.push("/auth/login")
+      }
+
+      setIsCheckingAuth(false)
     }
 
-    if (isAuthenticated && user) {
-      fetchDefaultHotel()
-    } else {
-      setIsLoadingHotel(false)
-    }
-  }, [isLoading, isAuthenticated, router, user, getUserDefaultHotel])
+    verifyAuth()
+  }, [router, checkAuth])
 
-  if (isLoading || isLoadingHotel) {
+  // Show loading state while checking auth
+  if (isLoading || isCheckingAuth) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -61,17 +53,20 @@ export default function DashboardLayout({
     )
   }
 
-  if (!isAuthenticated) {
+  // If not authenticated after checking, don't render anything
+  // (the useEffect will redirect)
+  if (!authState) {
     return null
   }
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar defaultHotel={defaultHotel} />
+      <Sidebar user={user} />
       <main className="flex-1 pl-0 lg:pl-72">
         <div className="h-full p-4 md:p-6">{children}</div>
       </main>
       <Toaster position="top-right" />
+      <AuthDebugger />
     </div>
   )
 }
