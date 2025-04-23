@@ -6,10 +6,10 @@ export function middleware(request: NextRequest) {
   // Define public paths that don't require authentication
   const isPublicPath =
     path === "/" ||
-    path === "/auth/login" ||
-    path === "/auth/register" ||
-    path === "/auth/forgot-password" ||
-    path.startsWith("/auth/reset/")
+    path === "/login" ||
+    path === "/register" ||
+    path === "/forgot-password" ||
+    path.startsWith("/reset/")
 
   // Define admin paths that require admin role
   const isAdminPath = path.startsWith("/dashboard/admin")
@@ -19,11 +19,11 @@ export function middleware(request: NextRequest) {
 
   // Redirect to login if accessing protected route without token
   if (!isPublicPath && !token) {
-    return NextResponse.redirect(new URL("/auth/login", request.url))
+    return NextResponse.redirect(new URL("/login", request.url))
   }
 
   // Allow access to public paths even with token (except login/register)
-  if (isPublicPath && token && (path === "/auth/login" || path === "/auth/register")) {
+  if (isPublicPath && token && (path === "/login" || path === "/register")) {
     return NextResponse.redirect(new URL("/dashboard", request.url))
   }
 
