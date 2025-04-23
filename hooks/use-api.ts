@@ -24,7 +24,7 @@ export function useApi() {
   }, [])
 
   const request = useCallback(
-    async <T>(\
+    async <T>(
       endpoint: string,
       method: ApiMethods = "GET",
       data?: any,
