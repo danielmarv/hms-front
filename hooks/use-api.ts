@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react"
 import { toast } from "sonner"
+import Cookies from "js-cookie"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
 
@@ -18,7 +19,7 @@ export function useApi() {
 
   const getToken = useCallback(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("accessToken")
+      return localStorage.getItem("accessToken") || Cookies.get("token") || null
     }
     return null
   }, [])

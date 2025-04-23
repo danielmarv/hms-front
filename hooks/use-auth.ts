@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { useApi } from "./use-api"
+import Cookies from "js-cookie"
 
 export type User = {
   id: string
@@ -29,7 +30,9 @@ export function useAuth() {
 
   const checkAuth = useCallback(async () => {
     try {
-      const accessToken = localStorage.getItem("accessToken")
+      // Check both localStorage and cookies
+      const accessToken = localStorage.getItem("accessToken") || Cookies.get("token")
+
       if (!accessToken) {
         setIsLoading(false)
         return false
@@ -44,6 +47,7 @@ export function useAuth() {
           // If refresh failed, clear storage
           localStorage.removeItem("accessToken")
           localStorage.removeItem("refreshToken")
+          Cookies.remove("token")
           setIsAuthenticated(false)
           setUser(null)
           setIsLoading(false)
@@ -80,9 +84,18 @@ export function useAuth() {
         throw new Error(error || "Login failed")
       }
 
-      // Store tokens
+      // Store tokens in both localStorage and cookies
       localStorage.setItem("accessToken", data.accessToken)
       localStorage.setItem("refreshToken", data.refreshToken)
+      localStorage.setItem("user", JSON.stringify(data.user))
+
+      // Set cookie for middleware authentication
+      // Set secure and httpOnly in production
+      Cookies.set("token", data.accessToken, {
+        expires: 7, // 7 days
+        path: "/",
+        sameSite: "strict",
+      })
 
       // Set user data
       setUser(data.user)
@@ -110,9 +123,17 @@ export function useAuth() {
         throw new Error(error || "Registration failed")
       }
 
-      // Store tokens
+      // Store tokens in both localStorage and cookies
       localStorage.setItem("accessToken", data.accessToken)
       localStorage.setItem("refreshToken", data.refreshToken)
+      localStorage.setItem("user", JSON.stringify(data.user))
+
+      // Set cookie for middleware authentication
+      Cookies.set("token", data.accessToken, {
+        expires: 7,
+        path: "/",
+        sameSite: "strict",
+      })
 
       // Set user data
       setUser(data.user)
@@ -141,10 +162,13 @@ export function useAuth() {
       // Clear storage and state regardless of API response
       localStorage.removeItem("accessToken")
       localStorage.removeItem("refreshToken")
+      localStorage.removeItem("user")
+      Cookies.remove("token")
+
       setUser(null)
       setIsAuthenticated(false)
       setIsLoading(false)
-      router.push("/login")
+      router.push("/auth/login")
       toast.success("Logged out successfully")
     }
   }
@@ -223,6 +247,11 @@ export function useAuth() {
       }
 
       localStorage.setItem("accessToken", data.accessToken)
+      Cookies.set("token", data.accessToken, {
+        expires: 7,
+        path: "/",
+        sameSite: "strict",
+      })
 
       // Fetch user data with new token
       const userResponse = await request<User>("/auth/me", "GET", undefined, false)

@@ -1,42 +1,36 @@
-import { type NextRequest, NextResponse } from "next/server"
-
-// Define paths that don't require authentication
-const publicPaths = ["/login", "/register", "/forgot-password", "/reset-password", "/verify-email"]
+import { NextResponse, type NextRequest } from "next/server"
 
 export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl
+  const path = request.nextUrl.pathname
 
-  // Check if the path is public
-  const isPublicPath = publicPaths.some((path) => pathname === path || pathname.startsWith(`${path}/`))
+  // Define public paths that don't require authentication
+  const isPublicPath =
+    path === "/" ||
+    path === "/auth/login" ||
+    path === "/auth/register" ||
+    path === "/auth/forgot-password" ||
+    path.startsWith("/auth/reset/")
 
-  // Allow access to public paths
-  if (isPublicPath) {
-    return NextResponse.next()
+  // Define admin paths that require admin role
+  const isAdminPath = path.startsWith("/dashboard/admin")
+
+  // Get token from cookies
+  const token = request.cookies.get("token")?.value || ""
+
+  // Redirect to login if accessing protected route without token
+  if (!isPublicPath && !token) {
+    return NextResponse.redirect(new URL("/auth/login", request.url))
   }
 
-  // Check for auth token in localStorage (client-side only)
-  // For server-side middleware, we need to check cookies or headers
-  const token = request.cookies.get("accessToken")?.value || request.headers.get("authorization")?.split(" ")[1]
-
-  // If no token and not a public path, redirect to login
-  if (!token) {
-    const url = new URL("/login", request.url)
-    url.searchParams.set("callbackUrl", encodeURI(request.url))
-    return NextResponse.redirect(url)
+  // Allow access to public paths even with token (except login/register)
+  if (isPublicPath && token && (path === "/auth/login" || path === "/auth/register")) {
+    return NextResponse.redirect(new URL("/dashboard", request.url))
   }
 
   return NextResponse.next()
 }
 
+// Match all routes except for static files, api routes, and _next
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public folder
-     */
-    "/((?!_next/static|_next/image|favicon.ico|public/).*)",
-  ],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
 }
