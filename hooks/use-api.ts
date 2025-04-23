@@ -39,6 +39,7 @@ export function useApi() {
     "Content-Type": "application/json",
   }
 
+  // Ensure we're formatting the Authorization header exactly as expected by the backend
   if (token) {
     headers["Authorization"] = `Bearer ${token}`
   }
@@ -53,6 +54,7 @@ export function useApi() {
   }
 
   try {
+    console.log(`API Request: ${method} ${url}`, token ? "With token" : "No token")
     const response = await fetch(url, options)
     const responseData = await response.json()
 
@@ -61,6 +63,7 @@ export function useApi() {
       if (showToast) {
         toast.error(errorMessage)
       }
+      console.error(`API Error (${response.status}):`, errorMessage)
       return { data: null, error: errorMessage, isLoading: false }
     }
 
@@ -71,6 +74,7 @@ export function useApi() {
     if (showToast) {
       toast.error(errorMessage)
     }
+    console.error("API Request failed:", errorMessage)
     setIsLoading(false)
     return { data: null, error: errorMessage, isLoading: false }
   }

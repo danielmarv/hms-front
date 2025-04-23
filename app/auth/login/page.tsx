@@ -12,7 +12,8 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Loader2 } from "lucide-react"
 import { AuthDebugger } from "@/components/auth-debugger"
-import { isAuthenticated } from "@/utils/auth-utils"
+import { TokenInspector } from "@/components/token-inspector"
+import Cookies from "js-cookie"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -26,7 +27,9 @@ export default function LoginPage() {
   // Check if already authenticated on mount and when auth state changes
   useEffect(() => {
     console.log("Login page mounted, checking auth state")
-    if (isAuthenticated() || authState) {
+    const token = localStorage.getItem("accessToken") || Cookies.get("token")
+
+    if (token || authState) {
       console.log("Already authenticated, redirecting to dashboard")
       router.push("/dashboard")
     }
@@ -107,6 +110,7 @@ export default function LoginPage() {
         </form>
       </Card>
       <AuthDebugger />
+      <TokenInspector />
     </div>
   )
 }

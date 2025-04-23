@@ -25,7 +25,6 @@ export type RegisterData = {
 const debugTokens = () => {
   if (typeof window !== "undefined") {
     console.log("LocalStorage accessToken:", localStorage.getItem("accessToken"))
-    console.log("LocalStorage refreshToken:", localStorage.getItem("refreshToken"))
     console.log("Cookie token:", Cookies.get("token"))
   }
 }
@@ -41,21 +40,17 @@ export function useAuth() {
   const setTokens = (accessToken: string, refreshToken: string, userData: User) => {
     console.log("Setting tokens...")
 
-    // Set in localStorage
+    // Store the raw token without any modifications
     localStorage.setItem("accessToken", accessToken)
     localStorage.setItem("refreshToken", refreshToken)
     localStorage.setItem("user", JSON.stringify(userData))
 
     // Set in cookies with explicit options
-    // Use path="/" to ensure the cookie is available across the entire site
     Cookies.set("token", accessToken, {
       expires: 7, // 7 days
       path: "/",
-      sameSite: "lax", // Changed from strict to lax for better compatibility
+      sameSite: "lax",
     })
-
-    // Also set a session cookie as backup
-    document.cookie = `token=${accessToken}; path=/; max-age=${60 * 60 * 24 * 7}; samesite=lax`
 
     debugTokens()
   }
@@ -71,7 +66,6 @@ export function useAuth() {
 
     // Clear cookies
     Cookies.remove("token", { path: "/" })
-    document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
 
     debugTokens()
   }
@@ -87,6 +81,8 @@ export function useAuth() {
       if (!accessToken) {
         console.log("No token found")
         setIsLoading(false)
+        setIsAuthenticated(false)
+        setUser(null)
         return false
       }
 
@@ -147,6 +143,11 @@ export function useAuth() {
       if (error || !data) {
         throw new Error(error || "Login failed")
       }
+
+      console.log("Login successful, received tokens:", {
+        accessToken: data.accessToken ? "exists" : "missing",
+        refreshToken: data.refreshToken ? "exists" : "missing",
+      })
 
       // Store tokens
       setTokens(data.accessToken, data.refreshToken, data.user)
@@ -294,7 +295,6 @@ export function useAuth() {
         path: "/",
         sameSite: "lax",
       })
-      document.cookie = `token=${data.accessToken}; path=/; max-age=${60 * 60 * 24 * 7}; samesite=lax`
 
       if (data.user) {
         setUser(data.user)
