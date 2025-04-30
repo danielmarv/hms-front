@@ -12,9 +12,11 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Loader2, Save } from "lucide-react"
+import { useHotelChains } from "@/hooks/use-hotel-chains"
 
 export default function NewHotelChainPage() {
   const router = useRouter()
+  const { createChain } = useHotelChains()
   const [formData, setFormData] = useState({
     name: "",
     code: "",
@@ -39,18 +41,21 @@ export default function NewHotelChainPage() {
     setIsSubmitting(true)
 
     try {
-      // In a real app, you would call an API to create the hotel chain
-      // const response = await fetch('/api/chains', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(formData)
-      // })
+      const response = await createChain({
+        name: formData.name,
+        code: formData.code,
+        chainCode: formData.chainCode,
+        description: formData.description,
+        type: formData.type,
+        starRating: Number(formData.starRating),
+      })
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
-      toast.success("Hotel chain created successfully")
-      router.push("/admin/chains")
+      if (response.data) {
+        toast.success("Hotel chain created successfully")
+        router.push("/admin/chains")
+      } else {
+        throw new Error("Failed to create hotel chain")
+      }
     } catch (error) {
       console.error("Error creating hotel chain:", error)
       toast.error("Failed to create hotel chain")
