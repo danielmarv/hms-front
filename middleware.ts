@@ -36,6 +36,8 @@ export function middleware(request: NextRequest) {
   // If it's an admin route, check if the user has the right permissions
   if (isAdminRoute) {
     const isSuperAdmin = userData?.role?.name === "super admin"
+    console.log("User role:", userData?.role?.name)
+    console.log("User permissions:", userData?.role?.permissions)
     const hasAdminPermissions = userData?.role?.permissions?.some(
       (perm: any) =>
         perm.key === "system.super.admin" || perm.key === "system.manage.all" || perm.key.startsWith("hotel.manage"),
