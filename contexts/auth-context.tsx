@@ -20,8 +20,18 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { user, isLoading, isAuthenticated, login, register, logout, forgotPassword, resetPassword, changePassword } =
-    useAuthHook()
+  const {
+    user,
+    isLoading,
+    isAuthenticated,
+    login,
+    register,
+    logout,
+    forgotPassword,
+    resetPassword,
+    changePassword,
+    checkAuth,
+  } = useAuthHook()
 
   return (
     <AuthContext.Provider
@@ -35,10 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         forgotPassword,
         resetPassword,
         changePassword,
-        checkAuth: async () => {
-          // Implement your checkAuth logic here
-          return isAuthenticated
-        },
+        checkAuth,
       }}
     >
       {children}
