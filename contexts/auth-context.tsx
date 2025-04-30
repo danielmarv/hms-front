@@ -14,6 +14,7 @@ type AuthContextType = {
   forgotPassword: (email: string) => Promise<boolean>
   resetPassword: (token: string, password: string) => Promise<boolean>
   changePassword: (currentPassword: string, newPassword: string) => Promise<boolean>
+  checkAuth: () => Promise<boolean>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -34,6 +35,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         forgotPassword,
         resetPassword,
         changePassword,
+        checkAuth: async () => {
+          // Implement your checkAuth logic here
+          return isAuthenticated
+        },
       }}
     >
       {children}
