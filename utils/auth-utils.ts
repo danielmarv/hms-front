@@ -1,46 +1,89 @@
-"use client"
-
+import type { NextRequest } from "next/server"
 import Cookies from "js-cookie"
 
-export const getAuthToken = () => {
-  // Try to get from localStorage first
-  if (typeof window !== "undefined") {
-    const lsToken = localStorage.getItem("accessToken")
-    if (lsToken) return lsToken
+// Check if the user is authenticated
+export function isAuthenticated(request?: NextRequest): boolean {
+  // For server-side (middleware)
+  if (request) {
+    const token = request.cookies.get("token")?.value
+    return !!token
   }
 
-  // Fall back to cookies
-  return Cookies.get("token")
+  // For client-side
+  const token = Cookies.get("token") || localStorage.getItem("accessToken")
+  return !!token
 }
 
-export const setAuthToken = (token: string) => {
-  if (typeof window !== "undefined") {
-    // Set in localStorage
-    localStorage.setItem("accessToken", token)
+// Get user role from localStorage or cookie
+export function getUserRole(): string | null {
+  try {
+    // Try localStorage first
+    const userStr = localStorage.getItem("user")
+    if (userStr) {
+      const user = JSON.parse(userStr)
+      return user?.role?.name || null
+    }
 
-    // Set in cookies
-    Cookies.set("token", token, {
-      expires: 7,
-      path: "/",
-      sameSite: "lax",
-    })
+    // Try cookie as fallback
+    const userCookie = Cookies.get("user")
+    if (userCookie) {
+      const user = JSON.parse(userCookie)
+      return user?.role?.name || null
+    }
 
-    // Also set using document.cookie as a fallback
-    document.cookie = `token=${token}; path=/; max-age=${60 * 60 * 24 * 7}; samesite=lax`
-  }
-}
-
-export const clearAuthToken = () => {
-  if (typeof window !== "undefined") {
-    // Clear from localStorage
-    localStorage.removeItem("accessToken")
-
-    // Clear from cookies
-    Cookies.remove("token", { path: "/" })
-    document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
+    return null
+  } catch (error) {
+    console.error("Error getting user role:", error)
+    return null
   }
 }
 
-export const isAuthenticated = () => {
-  return !!getAuthToken()
+// Check if user has specific permission
+export function hasPermission(permissionKey: string): boolean {
+  try {
+    const userStr = localStorage.getItem("user")
+    if (!userStr) return false
+
+    const user = JSON.parse(userStr)
+
+    // Super admin has all permissions
+    if (user?.role?.name === "super admin") return true
+
+    // Check role permissions
+    const hasRolePermission = user?.role?.permissions?.some((perm: any) => perm.key === permissionKey)
+
+    // Check custom permissions
+    const hasCustomPermission = user?.custom_permissions?.some((perm: any) => perm.key === permissionKey)
+
+    return hasRolePermission || hasCustomPermission || false
+  } catch (error) {
+    console.error("Error checking permission:", error)
+    return false
+  }
+}
+
+// Check if user is super admin
+export function isSuperAdmin(): boolean {
+  return getUserRole() === "super admin"
+}
+
+// Check if user has admin access
+export function hasAdminAccess(): boolean {
+  const isSuperAdminUser = isSuperAdmin()
+
+  if (isSuperAdminUser) return true
+
+  // Check for specific admin permissions
+  const adminPermissions = [
+    "system.manage.all",
+    "hotel.manage.chain",
+    "user.create",
+    "user.update",
+    "user.delete",
+    "role.create",
+    "role.update",
+    "role.delete",
+  ]
+
+  return adminPermissions.some((perm) => hasPermission(perm))
 }

@@ -119,7 +119,7 @@ interface SidebarContentProps {
   user: {
     full_name: string
     email: string
-    role?: string
+    role?: { name: string }
   } | null
   onLogout: () => void
 }
@@ -148,7 +148,7 @@ function MobileSidebar({ routes, user, onLogout }: SidebarContentProps) {
           <div className="grid gap-0.5">
             <div className="text-sm font-medium">{user?.full_name}</div>
             <div className="text-xs text-muted-foreground">{user?.email}</div>
-            {user?.role && <div className="text-xs font-medium text-primary capitalize">{user.role}</div>}
+            {user?.role && <div className="text-xs font-medium text-primary capitalize">{user.role.name}</div>}
           </div>
         </div>
         <Button variant="outline" className="mt-2 w-full justify-start gap-2" onClick={onLogout}>
@@ -184,7 +184,7 @@ function DesktopSidebar({ routes, user, onLogout }: SidebarContentProps) {
           <div className="grid gap-0.5">
             <div className="text-sm font-medium">{user?.full_name}</div>
             <div className="text-xs text-muted-foreground">{user?.email}</div>
-            {user?.role && <div className="text-xs font-medium text-primary capitalize">{user.role}</div>}
+            {user?.role && <div className="text-xs font-medium text-primary capitalize">{user.role.name}</div>}
           </div>
         </div>
         <Button variant="outline" className="mt-2 w-full justify-start gap-2" onClick={onLogout}>

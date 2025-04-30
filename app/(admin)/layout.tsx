@@ -58,16 +58,16 @@ export default function AdminLayout({
     return null
   }
 
-  // Check if user is super admin or has admin permissions
-  const isSuperAdmin = user?.role === "super admin"
-  const hasAdminPermissions = user?.permissions?.some((perm) =>
-    ["manage_hotel", "manage_users", "manage_configuration"].includes(perm),
-  )
+  // // Check if user is super admin or has admin permissions
+  // const isSuperAdmin = user?.role === "super admin"
+  // const hasAdminPermissions = user?.permissions?.some((perm) =>
+  //   ["manage_hotel", "manage_users", "manage_configuration"].includes(perm),
+  // )
 
-  if (!isSuperAdmin && !hasAdminPermissions) {
-    router.push("/dashboard")
-    return null
-  }
+  // if (!isSuperAdmin && !hasAdminPermissions) {
+  //   router.push("/dashboard")
+  //   return null
+  // }
 
   return (
     <div className="flex min-h-screen">
