@@ -11,19 +11,18 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { useAuth } from "@/contexts/auth-context"
 import {
-  Building2,
+  Building,
   ChevronDown,
   CircleUser,
-  Cog,
   Hotel,
   LayoutDashboard,
   LogOut,
   Menu,
-  RefreshCw,
-  Shield,
+  Settings,
   Users,
+  FolderSyncIcon as Sync,
+  Key,
 } from "lucide-react"
-import { hasPermission } from "@/utils/auth-utils"
 
 interface AdminSidebarProps {
   user: any
@@ -34,61 +33,50 @@ export function AdminSidebar({ user }: AdminSidebarProps) {
   const { logout } = useAuth()
   const [open, setOpen] = useState(false)
 
-  // Define routes based on user permissions
   const routes = [
     {
       label: "Dashboard",
       icon: LayoutDashboard,
       href: "/admin",
       active: pathname === "/admin",
-      visible: true,
     },
     {
       label: "Hotel Chains",
-      icon: Building2,
+      icon: Building,
       href: "/admin/chains",
       active: pathname.startsWith("/admin/chains"),
-      visible: hasPermission("hotel.manage.chain") || hasPermission("hotel.view"),
+    },
+    {
+      label: "Hotels",
+      icon: Hotel,
+      href: "/admin/hotels",
+      active: pathname.startsWith("/admin/hotels") && !pathname.includes("/chains"),
     },
     {
       label: "Users",
       icon: Users,
       href: "/admin/users",
       active: pathname.startsWith("/admin/users"),
-      visible: hasPermission("user.view") || hasPermission("user.create") || hasPermission("user.update"),
     },
     {
       label: "Roles & Permissions",
-      icon: Shield,
+      icon: Key,
       href: "/admin/roles",
       active: pathname.startsWith("/admin/roles"),
-      visible: hasPermission("role.view") || hasPermission("role.create") || hasPermission("role.update"),
     },
     {
       label: "Data Synchronization",
-      icon: RefreshCw,
+      icon: Sync,
       href: "/admin/sync",
       active: pathname.startsWith("/admin/sync"),
-      visible: hasPermission("system.manage.configuration"),
     },
     {
-      label: "System Settings",
-      icon: Cog,
+      label: "Settings",
+      icon: Settings,
       href: "/admin/settings",
       active: pathname.startsWith("/admin/settings"),
-      visible: hasPermission("system.manage.all") || hasPermission("system.manage.configuration"),
-    },
-    {
-      label: "Hotel Dashboard",
-      icon: Hotel,
-      href: "/dashboard",
-      active: false,
-      visible: true,
     },
   ]
-
-  // Filter routes based on visibility
-  const visibleRoutes = routes.filter((route) => route.visible)
 
   return (
     <>
@@ -100,11 +88,11 @@ export function AdminSidebar({ user }: AdminSidebarProps) {
           </Button>
         </SheetTrigger>
         <SheetContent side="left" className="w-72 p-0">
-          <MobileSidebar routes={visibleRoutes} user={user} onLogout={logout} />
+          <MobileSidebar routes={routes} user={user} onLogout={logout} />
         </SheetContent>
       </Sheet>
       <aside className="fixed inset-y-0 left-0 z-20 hidden w-72 flex-col border-r bg-background lg:flex">
-        <DesktopSidebar routes={visibleRoutes} user={user} onLogout={logout} />
+        <DesktopSidebar routes={routes} user={user} onLogout={logout} />
       </aside>
     </>
   )
@@ -125,7 +113,7 @@ interface SidebarContentProps {
   user: {
     full_name: string
     email: string
-    role?: { name: string }
+    role?: any
   } | null
   onLogout: () => void
 }
@@ -135,8 +123,8 @@ function MobileSidebar({ routes, user, onLogout }: SidebarContentProps) {
     <div className="flex h-full flex-col">
       <div className="flex h-14 items-center border-b px-4">
         <Link href="/admin" className="flex items-center gap-2 font-semibold">
-          <Shield className="h-6 w-6" />
-          <span>Admin Dashboard</span>
+          <Building className="h-6 w-6" />
+          <span>Hotel Admin</span>
         </Link>
       </div>
       <ScrollArea className="flex-1 py-2">
@@ -154,7 +142,11 @@ function MobileSidebar({ routes, user, onLogout }: SidebarContentProps) {
           <div className="grid gap-0.5">
             <div className="text-sm font-medium">{user?.full_name}</div>
             <div className="text-xs text-muted-foreground">{user?.email}</div>
-            {user?.role && <div className="text-xs font-medium text-primary capitalize">{user.role.name}</div>}
+            {user?.role && (
+              <div className="text-xs font-medium text-primary capitalize">
+                {typeof user.role === "string" ? user.role : user.role.name}
+              </div>
+            )}
           </div>
         </div>
         <Button variant="outline" className="mt-2 w-full justify-start gap-2" onClick={onLogout}>
@@ -171,8 +163,8 @@ function DesktopSidebar({ routes, user, onLogout }: SidebarContentProps) {
     <div className="flex h-full flex-col">
       <div className="flex h-14 items-center border-b px-4">
         <Link href="/admin" className="flex items-center gap-2 font-semibold">
-          <Shield className="h-6 w-6" />
-          <span>Admin Dashboard</span>
+          <Building className="h-6 w-6" />
+          <span>Hotel Admin</span>
         </Link>
       </div>
       <ScrollArea className="flex-1 py-2">
@@ -190,7 +182,11 @@ function DesktopSidebar({ routes, user, onLogout }: SidebarContentProps) {
           <div className="grid gap-0.5">
             <div className="text-sm font-medium">{user?.full_name}</div>
             <div className="text-xs text-muted-foreground">{user?.email}</div>
-            {user?.role && <div className="text-xs font-medium text-primary capitalize">{user.role.name}</div>}
+            {user?.role && (
+              <div className="text-xs font-medium text-primary capitalize">
+                {typeof user.role === "string" ? user.role : user.role.name}
+              </div>
+            )}
           </div>
         </div>
         <Button variant="outline" className="mt-2 w-full justify-start gap-2" onClick={onLogout}>

@@ -51,6 +51,12 @@ export function useAuth() {
       path: "/",
       sameSite: "lax",
     })
+    Cookies.set("refreshToken", refreshToken, {
+      expires: 7, // 7 days
+    })
+    Cookies.set("user", JSON.stringify(userData), {
+      expires: 7, // 7 days
+    })
 
     debugTokens()
   }

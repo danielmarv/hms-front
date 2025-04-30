@@ -8,7 +8,7 @@ import { Toaster } from "sonner"
 import { useAuth } from "@/contexts/auth-context"
 import { AdminSidebar } from "@/components/admin/admin-sidebar"
 import { Loader2 } from "lucide-react"
-import { isAuthenticated, isSuperAdmin, hasAdminAccess } from "@/utils/auth-utils"
+import { isAuthenticated } from "@/utils/auth-utils"
 
 export default function AdminLayout({
   children,
@@ -35,14 +35,6 @@ export default function AdminLayout({
       if (!authValid) {
         console.log("Auth check failed, redirecting to login")
         router.push("/auth/login")
-        return
-      }
-
-      // Check if user has admin access
-      if (!isSuperAdmin() && !hasAdminAccess()) {
-        console.log("User doesn't have admin access, redirecting to dashboard")
-        router.push("/dashboard")
-        return
       }
 
       setIsCheckingAuth(false)
@@ -65,6 +57,17 @@ export default function AdminLayout({
   if (!authState) {
     return null
   }
+
+  // // Check if user is super admin or has admin permissions
+  // const isSuperAdmin = user?.role === "super admin"
+  // const hasAdminPermissions = user?.permissions?.some((perm) =>
+  //   ["manage_hotel", "manage_users", "manage_configuration"].includes(perm),
+  // )
+
+  // if (!isSuperAdmin && !hasAdminPermissions) {
+  //   router.push("/dashboard")
+  //   return null
+  // }
 
   return (
     <div className="flex min-h-screen">
