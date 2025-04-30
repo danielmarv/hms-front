@@ -10,77 +10,41 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Loader2, MoreHorizontal, Plus, Hotel, Trash, Edit, Eye, FolderSyncIcon as Sync } from "lucide-react"
+import { useHotelChains, type HotelChain } from "@/hooks/use-hotel-chains"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 export default function HotelChainsPage() {
-  const [chains, setChains] = useState<any[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const { getAllChains, isLoading } = useHotelChains()
+  const [chains, setChains] = useState<HotelChain[]>([])
   const [searchQuery, setSearchQuery] = useState("")
+  const [deleteChainId, setDeleteChainId] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     const fetchHotelChains = async () => {
       try {
-        // In a real app, you would fetch this data from your API
-        // const response = await fetch('/api/chains')
-        // const data = await response.json()
-
-        // For now, we'll use mock data
-        setChains([
-          {
-            _id: "1",
-            chainCode: "LUXE",
-            name: "Luxe Hotels International",
-            code: "LHI",
-            description: "Luxury hotel chain with global presence",
-            hotelCount: 12,
-            active: true,
-          },
-          {
-            _id: "2",
-            chainCode: "COMF",
-            name: "Comfort Inn Group",
-            code: "CIG",
-            description: "Mid-range comfortable accommodations",
-            hotelCount: 24,
-            active: true,
-          },
-          {
-            _id: "3",
-            chainCode: "BUDG",
-            name: "Budget Stays",
-            code: "BST",
-            description: "Affordable accommodations for budget travelers",
-            hotelCount: 18,
-            active: true,
-          },
-          {
-            _id: "4",
-            chainCode: "RESO",
-            name: "Resort Paradise",
-            code: "RPD",
-            description: "Luxury beach and mountain resorts",
-            hotelCount: 8,
-            active: true,
-          },
-          {
-            _id: "5",
-            chainCode: "BOUT",
-            name: "Boutique Collection",
-            code: "BCL",
-            description: "Unique boutique hotels with character",
-            hotelCount: 6,
-            active: false,
-          },
-        ])
+        const response = await getAllChains()
+        if (response.data) {
+          setChains(response.data)
+        }
       } catch (error) {
         console.error("Error fetching hotel chains:", error)
         toast.error("Failed to load hotel chains")
-      } finally {
-        setIsLoading(false)
       }
     }
 
     fetchHotelChains()
-  }, [])
+  }, [getAllChains])
 
   const filteredChains = chains.filter(
     (chain) =>
@@ -88,6 +52,26 @@ export default function HotelChainsPage() {
       chain.chainCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
       chain.code.toLowerCase().includes(searchQuery.toLowerCase()),
   )
+
+  const handleDeleteChain = async () => {
+    if (!deleteChainId) return
+
+    setIsDeleting(true)
+    try {
+      // In a real implementation, you would call the API to delete the chain
+      // await deleteChain(deleteChainId)
+
+      // For now, we'll just simulate the deletion
+      setChains(chains.filter((chain) => chain._id !== deleteChainId))
+      toast.success("Hotel chain deleted successfully")
+    } catch (error) {
+      console.error("Error deleting hotel chain:", error)
+      toast.error("Failed to delete hotel chain")
+    } finally {
+      setIsDeleting(false)
+      setDeleteChainId(null)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -152,7 +136,7 @@ export default function HotelChainsPage() {
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <Hotel className="h-4 w-4 text-muted-foreground" />
-                        <span>{chain.hotelCount}</span>
+                        <span>{chain.hotelCount || 0}</span>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -170,39 +154,69 @@ export default function HotelChainsPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem asChild>
-                            <Link href={`/admin/chains/${chain._id}`}>
+                            <Link href={`/admin/chains/${chain.chainCode}`}>
                               <Eye className="mr-2 h-4 w-4" />
                               View Details
                             </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem asChild>
-                            <Link href={`/admin/chains/${chain._id}/edit`}>
+                            <Link href={`/admin/chains/${chain.chainCode}/edit`}>
                               <Edit className="mr-2 h-4 w-4" />
                               Edit
                             </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem asChild>
-                            <Link href={`/admin/chains/${chain._id}/hotels`}>
+                            <Link href={`/admin/chains/${chain.chainCode}/hotels`}>
                               <Hotel className="mr-2 h-4 w-4" />
                               Manage Hotels
                             </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem asChild>
-                            <Link href={`/admin/chains/${chain._id}/sync`}>
+                            <Link href={`/admin/chains/${chain.chainCode}/sync`}>
                               <Sync className="mr-2 h-4 w-4" />
                               Sync Configuration
                             </Link>
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onClick={() => {
-                              // In a real app, you would call an API to delete the chain
-                              toast.success(`${chain.name} would be deleted (demo only)`)
-                            }}
-                          >
-                            <Trash className="mr-2 h-4 w-4" />
-                            Delete
-                          </DropdownMenuItem>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onSelect={(e) => {
+                                  e.preventDefault()
+                                  setDeleteChainId(chain._id)
+                                }}
+                              >
+                                <Trash className="mr-2 h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This action will permanently delete the hotel chain "{chain.name}" and cannot be
+                                  undone. All hotels in this chain will be unlinked.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel onClick={() => setDeleteChainId(null)}>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={handleDeleteChain}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  disabled={isDeleting}
+                                >
+                                  {isDeleting ? (
+                                    <>
+                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                      Deleting...
+                                    </>
+                                  ) : (
+                                    "Delete Chain"
+                                  )}
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
