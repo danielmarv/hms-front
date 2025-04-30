@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -10,79 +10,47 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Building, Hotel, Users, Edit, FolderSyncIcon as Sync, Plus, ArrowLeft } from "lucide-react"
+import { useHotelChains, type HotelChain } from "@/hooks/use-hotel-chains"
 
 export default function HotelChainDetailsPage() {
   const params = useParams()
   const router = useRouter()
-  const chainId = params.id as string
-  const [chain, setChain] = useState<any>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState("overview")
+  const searchParams = useSearchParams()
+  const chainCode = params.id as string
+  const [chain, setChain] = useState<HotelChain | null>(null)
+  const { getChainDetails, isLoading } = useHotelChains()
+  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "overview")
 
   useEffect(() => {
     const fetchChainDetails = async () => {
       try {
-        // In a real app, you would fetch this data from your API
-        // const response = await fetch(`/api/chains/${chainId}`)
-        // const data = await response.json()
+        const response = await getChainDetails(chainCode)
+        if (response.data) {
+          setChain(response.data)
 
-        // For now, we'll use mock data
-        setChain({
-          _id: chainId,
-          chainCode: "LUXE",
-          name: "Luxe Hotels International",
-          code: "LHI",
-          description:
-            "Luxury hotel chain with global presence offering premium accommodations and exceptional service across major cities worldwide.",
-          type: "hotel",
-          starRating: 5,
-          active: true,
-          headquarters: {
-            _id: "hq1",
-            name: "Luxe Hotels International HQ",
-            code: "LHI-HQ",
-            location: "New York, USA",
-          },
-          hotels: [
-            { _id: "h1", name: "Luxe New York", code: "LHI-NY", active: true, type: "hotel" },
-            { _id: "h2", name: "Luxe London", code: "LHI-LON", active: true, type: "hotel" },
-            { _id: "h3", name: "Luxe Paris", code: "LHI-PAR", active: true, type: "hotel" },
-            { _id: "h4", name: "Luxe Tokyo", code: "LHI-TKY", active: true, type: "hotel" },
-            { _id: "h5", name: "Luxe Sydney", code: "LHI-SYD", active: true, type: "hotel" },
-            { _id: "h6", name: "Luxe Dubai", code: "LHI-DXB", active: false, type: "resort" },
-          ],
-          sharedConfiguration: {
-            branding: {
-              primaryColor: "#1a73e8",
-              secondaryColor: "#f8f9fa",
-              accentColor: "#fbbc04",
-            },
-            systemSettings: {
-              dateFormat: "MM/DD/YYYY",
-              timeFormat: "12h",
-              currency: {
-                code: "USD",
-                symbol: "$",
-              },
-            },
-          },
-          stats: {
-            totalHotels: 6,
-            activeHotels: 5,
-            totalRooms: 1250,
-            totalUsers: 120,
-          },
-        })
+          // Set the active tab based on URL query parameter or default to "overview"
+          const tabParam = searchParams.get("tab")
+          if (tabParam && ["overview", "hotels", "configuration", "users"].includes(tabParam)) {
+            setActiveTab(tabParam)
+          }
+        } else {
+          toast.error("Failed to load chain details")
+        }
       } catch (error) {
         console.error("Error fetching chain details:", error)
         toast.error("Failed to load chain details")
-      } finally {
-        setIsLoading(false)
       }
     }
 
-    fetchChainDetails()
-  }, [chainId])
+    if (chainCode) {
+      fetchChainDetails()
+    }
+  }, [chainCode, getChainDetails, searchParams])
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value)
+    router.push(`/admin/chains/${chainCode}?tab=${value}`, { scroll: false })
+  }
 
   if (isLoading) {
     return (
@@ -131,19 +99,19 @@ export default function HotelChainDetailsPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" asChild>
-            <Link href={`/admin/chains/${chainId}/edit`}>
+            <Link href={`/admin/chains/${chainCode}/edit`}>
               <Edit className="mr-2 h-4 w-4" />
               Edit Chain
             </Link>
           </Button>
           <Button variant="outline" asChild>
-            <Link href={`/admin/chains/${chainId}/sync`}>
+            <Link href={`/admin/chains/${chainCode}/sync`}>
               <Sync className="mr-2 h-4 w-4" />
               Sync Configuration
             </Link>
           </Button>
           <Button asChild>
-            <Link href={`/admin/chains/${chainId}/hotels/new`}>
+            <Link href={`/admin/chains/${chainCode}/hotels/new`}>
               <Plus className="mr-2 h-4 w-4" />
               Add Hotel
             </Link>
@@ -151,7 +119,7 @@ export default function HotelChainDetailsPage() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="hotels">Hotels</TabsTrigger>
@@ -159,7 +127,7 @@ export default function HotelChainDetailsPage() {
           <TabsTrigger value="users">Users</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-4 pt-4">
+        <TabsContent value="overview" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -169,10 +137,8 @@ export default function HotelChainDetailsPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{chain.stats.totalHotels}</div>
-                <p className="text-xs text-muted-foreground">
-                  {chain.stats.activeHotels} active, {chain.stats.totalHotels - chain.stats.activeHotels} inactive
-                </p>
+                <div className="text-2xl font-bold">{chain.stats?.totalHotels || chain.hotels?.length || 0}</div>
+                <p className="text-xs text-muted-foreground">{chain.stats?.activeHotels || 0} active</p>
               </CardContent>
             </Card>
             <Card>
@@ -183,7 +149,7 @@ export default function HotelChainDetailsPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{chain.stats.totalRooms}</div>
+                <div className="text-2xl font-bold">{chain.stats?.totalRooms || 0}</div>
                 <p className="text-xs text-muted-foreground">Across all properties</p>
               </CardContent>
             </Card>
@@ -195,7 +161,7 @@ export default function HotelChainDetailsPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{chain.stats.totalUsers}</div>
+                <div className="text-2xl font-bold">{chain.stats?.totalUsers || 0}</div>
                 <p className="text-xs text-muted-foreground">With access to chain hotels</p>
               </CardContent>
             </Card>
@@ -215,7 +181,7 @@ export default function HotelChainDetailsPage() {
                 <div>
                   <h3 className="text-sm font-medium">Headquarters</h3>
                   <p>
-                    {chain.headquarters.name} ({chain.headquarters.code})
+                    {chain.headquarters?.name} ({chain.headquarters?.code || chain.code})
                   </p>
                 </div>
                 <div>
@@ -228,14 +194,14 @@ export default function HotelChainDetailsPage() {
                 </div>
                 <div className="md:col-span-2">
                   <h3 className="text-sm font-medium">Description</h3>
-                  <p>{chain.description}</p>
+                  <p>{chain.description || "No description available"}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="hotels" className="space-y-4 pt-4">
+        <TabsContent value="hotels" className="space-y-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
@@ -243,41 +209,58 @@ export default function HotelChainDetailsPage() {
                 <CardDescription>All properties in this hotel chain</CardDescription>
               </div>
               <Button asChild>
-                <Link href={`/admin/chains/${chainId}/hotels/new`}>
+                <Link href={`/admin/chains/${chainCode}/hotels/new`}>
                   <Plus className="mr-2 h-4 w-4" />
                   Add Hotel
                 </Link>
               </Button>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {chain.hotels.map((hotel: any) => (
-                  <Card key={hotel._id} className="overflow-hidden">
-                    <CardHeader className="p-4">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-base">{hotel.name}</CardTitle>
-                        <Badge variant={hotel.active ? "default" : "outline"} className="ml-2">
-                          {hotel.active ? "Active" : "Inactive"}
-                        </Badge>
+              {chain.hotels && chain.hotels.length > 0 ? (
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {chain.hotels.map((hotel) => (
+                    <Card key={hotel._id} className="overflow-hidden">
+                      <CardHeader className="p-4">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-base">{hotel.name}</CardTitle>
+                          <Badge variant={hotel.active ? "default" : "outline"} className="ml-2">
+                            {hotel.active ? "Active" : "Inactive"}
+                          </Badge>
+                        </div>
+                        <CardDescription>{hotel.code}</CardDescription>
+                      </CardHeader>
+                      <CardContent className="p-4 pt-0">
+                        <p className="text-sm capitalize">Type: {hotel.type}</p>
+                        {hotel.isHeadquarters && (
+                          <Badge variant="outline" className="mt-2">
+                            Headquarters
+                          </Badge>
+                        )}
+                      </CardContent>
+                      <div className="flex border-t p-2">
+                        <Button variant="ghost" size="sm" className="w-full" asChild>
+                          <Link href={`/admin/hotels/${hotel._id}`}>View Details</Link>
+                        </Button>
                       </div>
-                      <CardDescription>{hotel.code}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-4 pt-0">
-                      <p className="text-sm capitalize">Type: {hotel.type}</p>
-                    </CardContent>
-                    <div className="flex border-t p-2">
-                      <Button variant="ghost" size="sm" className="w-full" asChild>
-                        <Link href={`/admin/hotels/${hotel._id}`}>View Details</Link>
-                      </Button>
-                    </div>
-                  </Card>
-                ))}
-              </div>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground mb-4">No hotels found in this chain</p>
+                  <Button asChild>
+                    <Link href={`/admin/chains/${chainCode}/hotels/new`}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Hotel
+                    </Link>
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="configuration" className="space-y-4 pt-4">
+        <TabsContent value="configuration" className="space-y-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
@@ -285,105 +268,117 @@ export default function HotelChainDetailsPage() {
                 <CardDescription>Settings shared across all hotels in the chain</CardDescription>
               </div>
               <Button asChild>
-                <Link href={`/admin/chains/${chainId}/configuration/edit`}>
+                <Link href={`/admin/chains/${chainCode}/configuration/edit`}>
                   <Edit className="mr-2 h-4 w-4" />
                   Edit Configuration
                 </Link>
               </Button>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
-                <h3 className="text-sm font-medium mb-2">Branding</h3>
-                <div className="grid gap-4 md:grid-cols-3">
+              {chain.sharedConfiguration ? (
+                <>
                   <div>
-                    <p className="text-xs text-muted-foreground">Primary Color</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <div
-                        className="h-6 w-6 rounded-full border"
-                        style={{ backgroundColor: chain.sharedConfiguration.branding.primaryColor }}
-                      />
-                      <span>{chain.sharedConfiguration.branding.primaryColor}</span>
+                    <h3 className="text-sm font-medium mb-2">Branding</h3>
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Primary Color</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <div
+                            className="h-6 w-6 rounded-full border"
+                            style={{ backgroundColor: chain.sharedConfiguration.branding.primaryColor }}
+                          />
+                          <span>{chain.sharedConfiguration.branding.primaryColor}</span>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Secondary Color</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <div
+                            className="h-6 w-6 rounded-full border"
+                            style={{ backgroundColor: chain.sharedConfiguration.branding.secondaryColor }}
+                          />
+                          <span>{chain.sharedConfiguration.branding.secondaryColor}</span>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Accent Color</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <div
+                            className="h-6 w-6 rounded-full border"
+                            style={{ backgroundColor: chain.sharedConfiguration.branding.accentColor }}
+                          />
+                          <span>{chain.sharedConfiguration.branding.accentColor}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Secondary Color</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <div
-                        className="h-6 w-6 rounded-full border"
-                        style={{ backgroundColor: chain.sharedConfiguration.branding.secondaryColor }}
-                      />
-                      <span>{chain.sharedConfiguration.branding.secondaryColor}</span>
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Accent Color</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <div
-                        className="h-6 w-6 rounded-full border"
-                        style={{ backgroundColor: chain.sharedConfiguration.branding.accentColor }}
-                      />
-                      <span>{chain.sharedConfiguration.branding.accentColor}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
 
-              <div>
-                <h3 className="text-sm font-medium mb-2">System Settings</h3>
-                <div className="grid gap-4 md:grid-cols-3">
                   <div>
-                    <p className="text-xs text-muted-foreground">Date Format</p>
-                    <p>{chain.sharedConfiguration.systemSettings.dateFormat}</p>
+                    <h3 className="text-sm font-medium mb-2">System Settings</h3>
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Date Format</p>
+                        <p>{chain.sharedConfiguration.systemSettings.dateFormat}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Time Format</p>
+                        <p>{chain.sharedConfiguration.systemSettings.timeFormat}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Currency</p>
+                        <p>
+                          {chain.sharedConfiguration.systemSettings.currency.symbol} (
+                          {chain.sharedConfiguration.systemSettings.currency.code})
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Time Format</p>
-                    <p>{chain.sharedConfiguration.systemSettings.timeFormat}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Currency</p>
-                    <p>
-                      {chain.sharedConfiguration.systemSettings.currency.symbol} (
-                      {chain.sharedConfiguration.systemSettings.currency.code})
-                    </p>
-                  </div>
-                </div>
-              </div>
 
-              <div className="pt-2">
-                <Button variant="outline" asChild>
-                  <Link href={`/admin/chains/${chainId}/sync`}>
-                    <Sync className="mr-2 h-4 w-4" />
-                    Sync Configuration to Hotels
-                  </Link>
-                </Button>
-              </div>
+                  <div className="pt-2">
+                    <Button variant="outline" asChild>
+                      <Link href={`/admin/chains/${chainCode}/sync`}>
+                        <Sync className="mr-2 h-4 w-4" />
+                        Sync Configuration to Hotels
+                      </Link>
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground mb-4">No shared configuration found</p>
+                  <Button asChild>
+                    <Link href={`/admin/chains/${chainCode}/configuration/edit`}>
+                      <Edit className="mr-2 h-4 w-4" />
+                      Create Configuration
+                    </Link>
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="users" className="space-y-4 pt-4">
+        <TabsContent value="users" className="space-y-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle>Chain Users</CardTitle>
-                <CardDescription>Users with access to this hotel chain</CardDescription>
+                <CardDescription>Users with access to multiple hotels in this chain</CardDescription>
               </div>
               <Button asChild>
-                <Link href={`/admin/chains/${chainId}/users/add`}>
+                <Link href={`/admin/chains/${chainCode}/users/add`}>
                   <Plus className="mr-2 h-4 w-4" />
-                  Add User
+                  Add Chain-wide User
                 </Link>
               </Button>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground mb-4">
-                This section shows users with access to multiple hotels in this chain.
-              </p>
-
-              {/* In a real app, you would fetch and display users here */}
               <div className="text-center py-8">
+                <p className="text-muted-foreground mb-4">
+                  This section shows users with access to multiple hotels in this chain.
+                </p>
                 <Button asChild>
-                  <Link href={`/admin/chains/${chainId}/users/add`}>
+                  <Link href={`/admin/chains/${chainCode}/users/add`}>
                     <Plus className="mr-2 h-4 w-4" />
                     Add Chain-wide User Access
                   </Link>
