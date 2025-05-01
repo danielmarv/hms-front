@@ -28,20 +28,14 @@ export function useRoomTypes() {
   const { request, isLoading } = useApi()
   const [roomTypes, setRoomTypes] = useState<RoomType[]>([])
 
-  // Add this at the top of the useRoomTypes function
-  console.log("Initial roomTypes state:", roomTypes)
-
-  // Replace the fetchRoomTypes function with this updated version
   const fetchRoomTypes = async () => {
     const { data, error } = await request<{ data: RoomType[] } | RoomType[]>("/room-types")
 
     if (error) {
-      console.error("API error:", error)
       setRoomTypes([])
       return []
     }
 
-    // Handle both possible response formats
     let roomTypesData: RoomType[] = []
 
     if (data) {
