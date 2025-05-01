@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
 import { toast } from "sonner"
 import { ArrowLeft, Plus, X } from "lucide-react"
 import { useRoomTypes } from "@/hooks/use-room-types"
@@ -27,10 +28,16 @@ export default function EditRoomTypePage() {
   const [formData, setFormData] = useState({
     name: "",
     description: "",
-    base_price: "",
-    category: "",
-    max_occupancy: "",
+    basePrice: "",
+    bedConfiguration: "",
+    size: "",
+    maxOccupancy: "",
+    capacity: {
+      adults: "",
+      children: "0",
+    },
     amenities: [] as string[],
+    isActive: true,
   })
   const [newAmenity, setNewAmenity] = useState("")
 
@@ -43,10 +50,16 @@ export default function EditRoomTypePage() {
         setFormData({
           name: roomType.name,
           description: roomType.description || "",
-          base_price: roomType.base_price.toString(),
-          category: roomType.category,
-          max_occupancy: roomType.max_occupancy.toString(),
+          basePrice: roomType.basePrice.toString(),
+          bedConfiguration: roomType.bedConfiguration || "",
+          size: roomType.size?.toString() || "",
+          maxOccupancy: roomType.maxOccupancy?.toString() || "",
+          capacity: {
+            adults: roomType.capacity?.adults?.toString() || "1",
+            children: roomType.capacity?.children?.toString() || "0",
+          },
           amenities: roomType.amenities || [],
+          isActive: roomType.isActive !== false,
         })
       } else {
         toast.error("Room type not found")
@@ -61,11 +74,38 @@ export default function EditRoomTypePage() {
 
   const handleChange = (e) => {
     const { name, value } = e.target
-    setFormData((prev) => ({ ...prev, [name]: value }))
+
+    if (name.includes(".")) {
+      const [parent, child] = name.split(".")
+      setFormData((prev) => ({
+        ...prev,
+        [parent]: {
+          ...prev[parent],
+          [child]: value,
+        },
+      }))
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }))
+    }
   }
 
   const handleSelectChange = (name) => (value) => {
-    setFormData((prev) => ({ ...prev, [name]: value }))
+    if (name.includes(".")) {
+      const [parent, child] = name.split(".")
+      setFormData((prev) => ({
+        ...prev,
+        [parent]: {
+          ...prev[parent],
+          [child]: value,
+        },
+      }))
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }))
+    }
+  }
+
+  const handleSwitchChange = (name) => (checked) => {
+    setFormData((prev) => ({ ...prev, [name]: checked }))
   }
 
   const handleAddAmenity = (e) => {
@@ -94,8 +134,13 @@ export default function EditRoomTypePage() {
       // Convert string values to appropriate types
       const roomTypeData = {
         ...formData,
-        base_price: Number.parseFloat(formData.base_price),
-        max_occupancy: Number.parseInt(formData.max_occupancy),
+        basePrice: Number.parseFloat(formData.basePrice),
+        size: Number.parseInt(formData.size),
+        maxOccupancy: Number.parseInt(formData.maxOccupancy),
+        capacity: {
+          adults: Number.parseInt(formData.capacity.adults),
+          children: Number.parseInt(formData.capacity.children),
+        },
       }
 
       const { data, error } = await updateRoomType(roomTypeId, roomTypeData)
@@ -194,33 +239,26 @@ export default function EditRoomTypePage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="category">Category *</Label>
-                <Select value={formData.category} onValueChange={handleSelectChange("category")} required>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="standard">Standard</SelectItem>
-                    <SelectItem value="deluxe">Deluxe</SelectItem>
-                    <SelectItem value="suite">Suite</SelectItem>
-                    <SelectItem value="executive">Executive</SelectItem>
-                    <SelectItem value="penthouse">Penthouse</SelectItem>
-                    <SelectItem value="accessible">Accessible</SelectItem>
-                    <SelectItem value="family">Family</SelectItem>
-                    <SelectItem value="presidential">Presidential</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="bedConfiguration">Bed Configuration *</Label>
+                <Input
+                  id="bedConfiguration"
+                  name="bedConfiguration"
+                  value={formData.bedConfiguration}
+                  onChange={handleChange}
+                  placeholder="e.g. 1 King Bed, 2 Queen Beds"
+                  required
+                />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="base_price">Base Price per Night ($) *</Label>
+                <Label htmlFor="basePrice">Base Price per Night ($) *</Label>
                 <Input
-                  id="base_price"
-                  name="base_price"
+                  id="basePrice"
+                  name="basePrice"
                   type="number"
                   min="0"
                   step="0.01"
-                  value={formData.base_price}
+                  value={formData.basePrice}
                   onChange={handleChange}
                   placeholder="e.g. 199.99"
                   required
@@ -228,8 +266,55 @@ export default function EditRoomTypePage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="max_occupancy">Maximum Occupancy *</Label>
-                <Select value={formData.max_occupancy} onValueChange={handleSelectChange("max_occupancy")} required>
+                <Label htmlFor="size">Room Size (sq ft) *</Label>
+                <Input
+                  id="size"
+                  name="size"
+                  type="number"
+                  min="0"
+                  value={formData.size}
+                  onChange={handleChange}
+                  placeholder="e.g. 400"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="capacity.adults">Adult Capacity *</Label>
+                <Select value={formData.capacity.adults} onValueChange={handleSelectChange("capacity.adults")} required>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select adult capacity" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1 Adult</SelectItem>
+                    <SelectItem value="2">2 Adults</SelectItem>
+                    <SelectItem value="3">3 Adults</SelectItem>
+                    <SelectItem value="4">4 Adults</SelectItem>
+                    <SelectItem value="5">5 Adults</SelectItem>
+                    <SelectItem value="6">6 Adults</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="capacity.children">Child Capacity</Label>
+                <Select value={formData.capacity.children} onValueChange={handleSelectChange("capacity.children")}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select child capacity" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">0 Children</SelectItem>
+                    <SelectItem value="1">1 Child</SelectItem>
+                    <SelectItem value="2">2 Children</SelectItem>
+                    <SelectItem value="3">3 Children</SelectItem>
+                    <SelectItem value="4">4 Children</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="maxOccupancy">Maximum Occupancy *</Label>
+                <Select value={formData.maxOccupancy} onValueChange={handleSelectChange("maxOccupancy")} required>
                   <SelectTrigger>
                     <SelectValue placeholder="Select max occupancy" />
                   </SelectTrigger>
@@ -245,10 +330,20 @@ export default function EditRoomTypePage() {
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="isActive">Active Status</Label>
+                  <Switch id="isActive" checked={formData.isActive} onCheckedChange={handleSwitchChange("isActive")} />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {formData.isActive ? "Room type is available for booking" : "Room type is not available for booking"}
+                </p>
+              </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description">Description *</Label>
               <Textarea
                 id="description"
                 name="description"
@@ -256,6 +351,7 @@ export default function EditRoomTypePage() {
                 onChange={handleChange}
                 placeholder="Describe this room type, its features, and benefits"
                 rows={4}
+                required
               />
             </div>
 
