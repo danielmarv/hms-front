@@ -7,11 +7,11 @@ export type RoomType = {
   _id: string
   name: string
   description: string
-  base_price: number
+  basePrice: number
   category: string
   bedConfiguration: string
   size: number
-  max_occupancy: number
+  maxOccupancy: number
   capacity: {
     adults: number
     children: number
@@ -28,9 +28,9 @@ export function useRoomTypes() {
   const [roomTypes, setRoomTypes] = useState<RoomType[]>([])
 
   const fetchRoomTypes = async () => {
-    const { data, error } = await request<{ data: RoomType[] }>("/room-types")
+    const { data } = await request<{ data: RoomType[] }>("/room-types")
 
-    if (data && !error) {
+    if (data) {
       setRoomTypes(data.data || [])
       return data.data
     }

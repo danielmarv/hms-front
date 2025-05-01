@@ -23,11 +23,11 @@ export default function NewRoomTypePage() {
   const [formData, setFormData] = useState({
     name: "",
     description: "",
-    base_price: "",
+    basePrice: "",
     category: "standard",
     bedConfiguration: "",
     size: "",
-    max_occupancy: "2",
+    maxOccupancy: "2",
     capacity: {
       adults: "2",
       children: "0",
@@ -99,9 +99,9 @@ export default function NewRoomTypePage() {
       // Convert string values to appropriate types
       const roomTypeData = {
         ...formData,
-        base_price: Number.parseFloat(formData.base_price),
+        basePrice: Number.parseFloat(formData.basePrice),
         size: Number.parseInt(formData.size),
-        max_occupancy: Number.parseInt(formData.max_occupancy),
+        maxOccupancy: Number.parseInt(formData.maxOccupancy),
         capacity: {
           adults: Number.parseInt(formData.capacity.adults),
           children: Number.parseInt(formData.capacity.children),
@@ -190,14 +190,14 @@ export default function NewRoomTypePage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="base_price">Base Price per Night ($) *</Label>
+                <Label htmlFor="basePrice">Base Price per Night ($) *</Label>
                 <Input
-                  id="base_price"
-                  name="base_price"
+                  id="basePrice"
+                  name="basePrice"
                   type="number"
                   min="0"
                   step="0.01"
-                  value={formData.base_price}
+                  value={formData.basePrice}
                   onChange={handleChange}
                   placeholder="e.g. 199.99"
                   required
@@ -219,8 +219,8 @@ export default function NewRoomTypePage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="max_occupancy">Maximum Occupancy *</Label>
-                <Select value={formData.max_occupancy} onValueChange={handleSelectChange("max_occupancy")} required>
+                <Label htmlFor="maxOccupancy">Maximum Occupancy *</Label>
+                <Select value={formData.maxOccupancy} onValueChange={handleSelectChange("maxOccupancy")} required>
                   <SelectTrigger>
                     <SelectValue placeholder="Select max occupancy" />
                   </SelectTrigger>

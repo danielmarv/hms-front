@@ -65,8 +65,9 @@ export default function RoomTypesPage() {
       setRoomTypeToDelete(null)
     }
   }
-
+  console.log("Room Types:", roomTypes)
   const filteredRoomTypes = roomTypes.filter((type) => type.name.toLowerCase().includes(searchQuery.toLowerCase()))
+  console.log("Filtered Room Types:", filteredRoomTypes)
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
