@@ -7,11 +7,10 @@ export type RoomType = {
   _id: string
   name: string
   description: string
-  basePrice: number
-  category: string
+  basePrice: number // Changed from base_price to match API response
   bedConfiguration: string
   size: number
-  maxOccupancy: number
+  maxOccupancy: number // Changed from max_occupancy to match API response
   capacity: {
     adults: number
     children: number
@@ -21,26 +20,49 @@ export type RoomType = {
   isActive: boolean
   createdAt: string
   updatedAt: string
+  id?: string // Added as it appears in the API response
+  availableRoomsCount?: number // Added as it appears in the API response
 }
 
 export function useRoomTypes() {
   const { request, isLoading } = useApi()
   const [roomTypes, setRoomTypes] = useState<RoomType[]>([])
 
-  const fetchRoomTypes = async () => {
-    const { data } = await request<{ data: RoomType[] }>("/room-types")
+  // Add this at the top of the useRoomTypes function
+  console.log("Initial roomTypes state:", roomTypes)
 
-    if (data) {
-      setRoomTypes(data.data || [])
-      return data.data
+  // Replace the fetchRoomTypes function with this updated version
+  const fetchRoomTypes = async () => {
+    const { data, error } = await request<{ data: RoomType[] } | RoomType[]>("/room-types")
+
+    if (error) {
+      console.error("API error:", error)
+      setRoomTypes([])
+      return []
     }
 
-    return []
+    // Handle both possible response formats
+    let roomTypesData: RoomType[] = []
+
+    if (data) {
+      // If data is an array, use it directly
+      if (Array.isArray(data)) {
+        roomTypesData = data
+      }
+      // If data has a 'data' property that's an array, use that
+      else if (data.data && Array.isArray(data.data)) {
+        roomTypesData = data.data
+      }
+    }
+
+    console.log("Processed room types data:", roomTypesData)
+    setRoomTypes(roomTypesData)
+    return roomTypesData
   }
 
   const fetchRoomTypeById = async (id: string) => {
-    const { data, error } = await request<{ data: RoomType }>(`/room-types/${id}`)
-    return error ? null : data?.data
+    const { data, error } = await request<{ data: RoomType; success: boolean }>(`/room-types/${id}`)
+    return error || !data?.success ? null : data?.data
   }
 
   const createRoomType = async (roomTypeData: Partial<RoomType>) => {
@@ -50,7 +72,7 @@ export function useRoomTypes() {
       roomTypeData,
     )
     return {
-      data: error ? null : data?.data,
+      data: error || !data?.success ? null : data?.data,
       error: error || (data?.success === false ? data?.message : null),
     }
   }
@@ -62,19 +84,19 @@ export function useRoomTypes() {
       roomTypeData,
     )
     return {
-      data: error ? null : data?.data,
+      data: error || !data?.success ? null : data?.data,
       error: error || (data?.success === false ? data?.message : null),
     }
   }
 
   const deleteRoomType = async (id: string) => {
     const { data, error } = await request<{ message: string; success: boolean }>(`/room-types/${id}`, "DELETE")
-    return { success: !error, message: error || data?.message }
+    return { success: !error && data?.success, message: error || data?.message }
   }
 
   const fetchRoomTypeStats = async () => {
-    const { data, error } = await request<{ data: any[] }>("/room-types/stats")
-    return error ? [] : data?.data || []
+    const { data, error } = await request<{ data: any[]; success: boolean }>("/room-types/stats")
+    return error || !data?.success ? [] : data?.data || []
   }
 
   return {
