@@ -9,73 +9,71 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Loader2, MoreHorizontal, Plus, Trash, Edit, Eye, Hotel, Key } from "lucide-react"
+import { Loader2, MoreHorizontal, Plus, Trash, Edit, Eye, Hotel, Key, AlertCircle } from "lucide-react"
+import { useUsers, type User } from "@/hooks/use-users"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
 
 export default function UsersPage() {
-  const [users, setUsers] = useState<any[]>([])
+  const { getAllUsers, deleteUser, isLoading: apiLoading } = useUsers()
+  const [users, setUsers] = useState<User[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [userToDelete, setUserToDelete] = useState<User | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        // In a real app, you would fetch this data from your API
-        // const response = await fetch('/api/users')
-        // const data = await response.json()
-
-        // For now, we'll use mock data
-        setUsers([
-          {
-            _id: "1",
-            full_name: "John Smith",
-            email: "john.smith@example.com",
-            role: "super admin",
-            status: "active",
-            hotelAccess: 5,
-          },
-          {
-            _id: "2",
-            full_name: "Sarah Johnson",
-            email: "sarah.johnson@example.com",
-            role: "hotel manager",
-            status: "active",
-            hotelAccess: 2,
-          },
-          {
-            _id: "3",
-            full_name: "Michael Brown",
-            email: "michael.brown@example.com",
-            role: "receptionist",
-            status: "active",
-            hotelAccess: 1,
-          },
-          {
-            _id: "4",
-            full_name: "Emily Davis",
-            email: "emily.davis@example.com",
-            role: "chain manager",
-            status: "active",
-            hotelAccess: 12,
-          },
-          {
-            _id: "5",
-            full_name: "Robert Wilson",
-            email: "robert.wilson@example.com",
-            role: "hotel manager",
-            status: "inactive",
-            hotelAccess: 0,
-          },
-        ])
-      } catch (error) {
-        console.error("Error fetching users:", error)
-        toast.error("Failed to load users")
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
     fetchUsers()
-  }, [])
+  }, [currentPage])
+
+  const fetchUsers = async () => {
+    setIsLoading(true)
+    try {
+      const response = await getAllUsers(currentPage, 10)
+      setUsers(response.data)
+      setTotalPages(Math.ceil(response.total / 10))
+    } catch (error) {
+      console.error("Error fetching users:", error)
+      toast.error("Failed to load users")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleDeleteUser = async () => {
+    if (!userToDelete) return
+
+    setIsDeleting(true)
+    try {
+      await deleteUser(userToDelete._id)
+      toast.success(`${userToDelete.full_name} has been deleted`)
+      setUsers(users.filter((user) => user._id !== userToDelete._id))
+    } catch (error) {
+      console.error("Error deleting user:", error)
+      toast.error("Failed to delete user")
+    } finally {
+      setIsDeleting(false)
+      setUserToDelete(null)
+    }
+  }
 
   const filteredUsers = users.filter(
     (user) =>
@@ -129,89 +127,166 @@ export default function UsersPage() {
               </Button>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Hotel Access</TableHead>
-                  <TableHead className="w-[100px]">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredUsers.map((user) => (
-                  <TableRow key={user._id}>
-                    <TableCell className="font-medium">{user.full_name}</TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell className="capitalize">{user.role}</TableCell>
-                    <TableCell>
-                      <Badge variant={user.status === "active" ? "default" : "outline"}>{user.status}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      {user.hotelAccess > 0 ? (
-                        <div className="flex items-center gap-1">
-                          <Hotel className="h-4 w-4 text-muted-foreground" />
-                          <span>{user.hotelAccess}</span>
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">None</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Open menu</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem asChild>
-                            <Link href={`/admin/users/${user._id}`}>
-                              <Eye className="mr-2 h-4 w-4" />
-                              View Details
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem asChild>
-                            <Link href={`/admin/users/${user._id}/edit`}>
-                              <Edit className="mr-2 h-4 w-4" />
-                              Edit
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem asChild>
-                            <Link href={`/admin/users/${user._id}/access`}>
-                              <Hotel className="mr-2 h-4 w-4" />
-                              Manage Access
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem asChild>
-                            <Link href={`/admin/users/${user._id}/permissions`}>
-                              <Key className="mr-2 h-4 w-4" />
-                              Permissions
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onClick={() => {
-                              // In a real app, you would call an API to delete the user
-                              toast.success(`${user.full_name} would be deleted (demo only)`)
-                            }}
-                          >
-                            <Trash className="mr-2 h-4 w-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Hotel Access</TableHead>
+                    <TableHead className="w-[100px]">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredUsers.map((user) => (
+                    <TableRow key={user._id}>
+                      <TableCell className="font-medium">{user.full_name}</TableCell>
+                      <TableCell>{user.email}</TableCell>
+                      <TableCell className="capitalize">{user.role}</TableCell>
+                      <TableCell>
+                        <Badge variant={user.status === "active" ? "default" : "outline"}>{user.status}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        {user.hotelAccess && user.hotelAccess > 0 ? (
+                          <div className="flex items-center gap-1">
+                            <Hotel className="h-4 w-4 text-muted-foreground" />
+                            <span>{user.hotelAccess}</span>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">None</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreHorizontal className="h-4 w-4" />
+                              <span className="sr-only">Open menu</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem asChild>
+                              <Link href={`/admin/users/${user._id}`}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                View Details
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                              <Link href={`/admin/users/${user._id}/edit`}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Edit
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                              <Link href={`/admin/users/${user._id}/access`}>
+                                <Hotel className="mr-2 h-4 w-4" />
+                                Manage Access
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                              <Link href={`/admin/users/${user._id}/permissions`}>
+                                <Key className="mr-2 h-4 w-4" />
+                                Permissions
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => setUserToDelete(user)}
+                            >
+                              <Trash className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              {totalPages > 1 && (
+                <div className="mt-4">
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious
+                          href="#"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            if (currentPage > 1) setCurrentPage(currentPage - 1)
+                          }}
+                          className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
+                        />
+                      </PaginationItem>
+
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                        <PaginationItem key={page}>
+                          <PaginationLink
+                            href="#"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              setCurrentPage(page)
+                            }}
+                            isActive={page === currentPage}
+                          >
+                            {page}
+                          </PaginationLink>
+                        </PaginationItem>
+                      ))}
+
+                      <PaginationItem>
+                        <PaginationNext
+                          href="#"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            if (currentPage < totalPages) setCurrentPage(currentPage + 1)
+                          }}
+                          className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={!!userToDelete} onOpenChange={(open) => !open && setUserToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to delete this user?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the user account
+              {userToDelete?.full_name && <strong> {userToDelete.full_name}</strong>} and remove their access to all
+              hotels and chains.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteUser}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="mr-2 h-4 w-4" />
+                  Delete User
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
