@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -16,80 +16,41 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination"
 import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Plus, Search } from "lucide-react"
-
-// Mock data for rooms
-const rooms = [
-  {
-    id: "R101",
-    number: "101",
-    type: "Standard Double",
-    floor: "1",
-    capacity: 2,
-    pricePerNight: 120,
-    status: "available",
-    amenities: ["Wi-Fi", "TV", "Air Conditioning", "Mini Bar"],
-  },
-  {
-    id: "R102",
-    number: "102",
-    type: "Standard Twin",
-    floor: "1",
-    capacity: 2,
-    pricePerNight: 120,
-    status: "occupied",
-    amenities: ["Wi-Fi", "TV", "Air Conditioning"],
-  },
-  {
-    id: "R201",
-    number: "201",
-    type: "Deluxe King",
-    floor: "2",
-    capacity: 2,
-    pricePerNight: 180,
-    status: "maintenance",
-    amenities: ["Wi-Fi", "TV", "Air Conditioning", "Mini Bar", "Safe", "Bathtub"],
-  },
-  {
-    id: "R202",
-    number: "202",
-    type: "Deluxe Twin",
-    floor: "2",
-    capacity: 2,
-    pricePerNight: 180,
-    status: "available",
-    amenities: ["Wi-Fi", "TV", "Air Conditioning", "Mini Bar", "Safe"],
-  },
-  {
-    id: "R301",
-    number: "301",
-    type: "Suite",
-    floor: "3",
-    capacity: 4,
-    pricePerNight: 300,
-    status: "occupied",
-    amenities: ["Wi-Fi", "TV", "Air Conditioning", "Mini Bar", "Safe", "Bathtub", "Separate Living Area"],
-  },
-]
+import { useRooms, type RoomStatus } from "@/hooks/use-rooms"
+import { useRoomTypes } from "@/hooks/use-room-types"
 
 export default function RoomsPage() {
+  const { rooms, pagination, isLoading, fetchRooms } = useRooms()
+  const { roomTypes, fetchRoomTypes } = useRoomTypes()
+
   const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [typeFilter, setTypeFilter] = useState("all")
+  const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [typeFilter, setTypeFilter] = useState<string>("all")
+  const [currentPage, setCurrentPage] = useState(1)
 
-  // Filter rooms based on search query, status filter, and type filter
-  const filteredRooms = rooms.filter((room) => {
-    const matchesSearch =
-      room.number.includes(searchQuery) || room.type.toLowerCase().includes(searchQuery.toLowerCase())
+  useEffect(() => {
+    fetchRooms({
+      status: statusFilter !== "all" ? (statusFilter as RoomStatus) : undefined,
+      room_type: typeFilter !== "all" ? typeFilter : undefined,
+      page: currentPage,
+      limit: 10,
+    })
+    fetchRoomTypes()
+  }, [statusFilter, typeFilter, currentPage])
 
-    const matchesStatus = statusFilter === "all" || room.status === statusFilter
-    const matchesType = typeFilter === "all" || room.type === typeFilter
-
-    return matchesSearch && matchesStatus && matchesType
-  })
-
-  // Get unique room types for filter
-  const roomTypes = Array.from(new Set(rooms.map((room) => room.type)))
+  // Function to handle search
+  const handleSearch = () => {
+    // Reset to first page when searching
+    setCurrentPage(1)
+    fetchRooms({
+      status: statusFilter !== "all" ? (statusFilter as RoomStatus) : undefined,
+      room_type: typeFilter !== "all" ? typeFilter : undefined,
+      page: 1,
+      limit: 10,
+    })
+  }
 
   // Function to get badge variant based on status
   const getStatusBadge = (status: string) => {
@@ -112,10 +73,22 @@ export default function RoomsPage() {
             Maintenance
           </Badge>
         )
-      case "reserved":
+      case "cleaning":
         return (
           <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+            Cleaning
+          </Badge>
+        )
+      case "reserved":
+        return (
+          <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200">
             Reserved
+          </Badge>
+        )
+      case "out_of_order":
+        return (
+          <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+            Out of Order
           </Badge>
         )
       default:
@@ -150,6 +123,7 @@ export default function RoomsPage() {
                 className="w-full pl-8 sm:w-[200px]"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -161,7 +135,9 @@ export default function RoomsPage() {
                 <SelectItem value="available">Available</SelectItem>
                 <SelectItem value="occupied">Occupied</SelectItem>
                 <SelectItem value="maintenance">Maintenance</SelectItem>
+                <SelectItem value="cleaning">Cleaning</SelectItem>
                 <SelectItem value="reserved">Reserved</SelectItem>
+                <SelectItem value="out_of_order">Out of Order</SelectItem>
               </SelectContent>
             </Select>
             <Select value={typeFilter} onValueChange={setTypeFilter}>
@@ -170,11 +146,13 @@ export default function RoomsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
-                {roomTypes.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {type}
-                  </SelectItem>
-                ))}
+                {roomTypes && roomTypes.length > 0
+                  ? roomTypes.map((type) => (
+                      <SelectItem key={type._id} value={type._id}>
+                        {type.name}
+                      </SelectItem>
+                    ))
+                  : null}
               </SelectContent>
             </Select>
           </div>
@@ -187,31 +165,59 @@ export default function RoomsPage() {
                   <TableHead>Room #</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead className="hidden md:table-cell">Floor</TableHead>
-                  <TableHead className="hidden md:table-cell">Capacity</TableHead>
+                  <TableHead className="hidden md:table-cell">Building</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Price/Night</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredRooms.length === 0 ? (
+                {isLoading ? (
+                  Array(5)
+                    .fill(0)
+                    .map((_, index) => (
+                      <TableRow key={index}>
+                        <TableCell>
+                          <Skeleton className="h-6 w-16" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-6 w-24" />
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          <Skeleton className="h-6 w-12" />
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          <Skeleton className="h-6 w-20" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-6 w-20" />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Skeleton className="h-6 w-16 ml-auto" />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Skeleton className="h-6 w-12 ml-auto" />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                ) : rooms.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="h-24 text-center">
                       No rooms found.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredRooms.map((room) => (
-                    <TableRow key={room.id}>
+                  rooms.map((room) => (
+                    <TableRow key={room._id}>
                       <TableCell className="font-medium">{room.number}</TableCell>
-                      <TableCell>{room.type}</TableCell>
+                      <TableCell>{room.room_type?.name || "N/A"}</TableCell>
                       <TableCell className="hidden md:table-cell">{room.floor}</TableCell>
-                      <TableCell className="hidden md:table-cell">{room.capacity} persons</TableCell>
+                      <TableCell className="hidden md:table-cell">{room.building}</TableCell>
                       <TableCell>{getStatusBadge(room.status)}</TableCell>
-                      <TableCell className="text-right">${room.pricePerNight}</TableCell>
+                      <TableCell className="text-right">${room.room_type?.base_price || 0}</TableCell>
                       <TableCell className="text-right">
                         <Button variant="ghost" size="sm" asChild>
-                          <Link href={`/dashboard/rooms/${room.id}`}>View</Link>
+                          <Link href={`/dashboard/rooms/${room._id}`}>View</Link>
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -224,18 +230,57 @@ export default function RoomsPage() {
             <Pagination>
               <PaginationContent>
                 <PaginationItem>
-                  <PaginationPrevious href="#" />
+                  <PaginationPrevious
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      if (currentPage > 1) {
+                        setCurrentPage(currentPage - 1)
+                      }
+                    }}
+                    className={currentPage <= 1 ? "pointer-events-none opacity-50" : ""}
+                  />
                 </PaginationItem>
+
+                {Array.from({ length: Math.min(pagination.totalPages, 5) }, (_, i) => {
+                  // Show pages around current page
+                  let pageNum = i + 1
+                  if (pagination.totalPages > 5) {
+                    if (currentPage > 3) {
+                      pageNum = currentPage - 3 + i
+                    }
+                    if (pageNum > pagination.totalPages - 4 && currentPage > pagination.totalPages - 2) {
+                      pageNum = pagination.totalPages - 4 + i
+                    }
+                  }
+
+                  return (
+                    <PaginationItem key={i}>
+                      <PaginationLink
+                        href="#"
+                        isActive={pageNum === currentPage}
+                        onClick={(e) => {
+                          e.preventDefault()
+                          setCurrentPage(pageNum)
+                        }}
+                      >
+                        {pageNum}
+                      </PaginationLink>
+                    </PaginationItem>
+                  )
+                })}
+
                 <PaginationItem>
-                  <PaginationLink href="#" isActive>
-                    1
-                  </PaginationLink>
-                </PaginationItem>
-                <PaginationItem>
-                  <PaginationLink href="#">2</PaginationLink>
-                </PaginationItem>
-                <PaginationItem>
-                  <PaginationNext href="#" />
+                  <PaginationNext
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      if (currentPage < pagination.totalPages) {
+                        setCurrentPage(currentPage + 1)
+                      }
+                    }}
+                    className={currentPage >= pagination.totalPages ? "pointer-events-none opacity-50" : ""}
+                  />
                 </PaginationItem>
               </PaginationContent>
             </Pagination>
