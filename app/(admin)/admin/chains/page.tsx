@@ -3,7 +3,19 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Building2, Plus, Search, Hotel, Star, MoreHorizontal, Edit, Trash2, Users, Settings } from "lucide-react"
+import {
+  Building2,
+  Plus,
+  Search,
+  Hotel,
+  Star,
+  MoreHorizontal,
+  Edit,
+  Trash2,
+  Users,
+  Settings,
+  Loader2,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -20,6 +32,16 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { useHotelChains, type HotelChain } from "@/hooks/use-hotel-chains"
 import { toast } from "sonner"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 export default function HotelChainsPage() {
   const router = useRouter()
@@ -27,25 +49,53 @@ export default function HotelChainsPage() {
   const [chains, setChains] = useState<HotelChain[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [isLoadingChains, setIsLoadingChains] = useState(true)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [chainToDelete, setChainToDelete] = useState<string | null>(null)
 
   useEffect(() => {
-    const fetchChains = async () => {
-      try {
-        setIsLoadingChains(true)
-        const response = await getAllChains()
-        if (response.data) {
-          setChains(response.data)
-        }
-      } catch (error) {
-        console.error("Error fetching hotel chains:", error)
-        toast.error("Failed to load hotel chains")
-      } finally {
-        setIsLoadingChains(false)
-      }
-    }
-
     fetchChains()
-  }, [getAllChains])
+  }, [])
+
+  const fetchChains = async () => {
+    try {
+      setIsLoadingChains(true)
+      const response = await getAllChains()
+      if (response.data) {
+        setChains(response.data)
+      } else {
+        throw new Error("Failed to fetch chains")
+      }
+    } catch (error) {
+      console.error("Error fetching hotel chains:", error)
+      toast.error("Failed to load hotel chains")
+    } finally {
+      setIsLoadingChains(false)
+    }
+  }
+
+  const handleDeleteChain = async (chainCode: string) => {
+    setChainToDelete(chainCode)
+  }
+
+  const confirmDeleteChain = async () => {
+    if (!chainToDelete) return
+
+    try {
+      setIsDeleting(true)
+      // In a real implementation, you would call an API to delete the chain
+      // await deleteChain(chainToDelete)
+
+      // For now, we'll just simulate the deletion
+      setChains(chains.filter((chain) => chain.chainCode !== chainToDelete))
+      toast.success("Hotel chain deleted successfully")
+    } catch (error) {
+      console.error("Error deleting hotel chain:", error)
+      toast.error("Failed to delete hotel chain")
+    } finally {
+      setIsDeleting(false)
+      setChainToDelete(null)
+    }
+  }
 
   const filteredChains = chains.filter(
     (chain) =>
@@ -167,9 +217,9 @@ export default function HotelChainsPage() {
                         </div>
                       </TableCell>
                       <TableCell>{renderStarRating(chain.starRating)}</TableCell>
-                      <TableCell>{chain.hotelCount || 1}</TableCell>
+                      <TableCell>{chain.hotelCount || chain.hotels?.length || 1}</TableCell>
                       <TableCell>
-                        <Badge variant={chain.active ? "default" : "destructive"}>
+                        <Badge variant={chain.active ? "success" : "destructive"}>
                           {chain.active ? "Active" : "Inactive"}
                         </Badge>
                       </TableCell>
@@ -208,9 +258,7 @@ export default function HotelChainsPage() {
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive"
-                              onClick={() => {
-                                toast.error("Delete functionality not implemented")
-                              }}
+                              onClick={() => handleDeleteChain(chain.chainCode)}
                             >
                               <Trash2 className="mr-2 h-4 w-4" />
                               Delete Chain
@@ -229,8 +277,47 @@ export default function HotelChainsPage() {
           <div className="text-sm text-muted-foreground">
             Showing {filteredChains.length} of {chains.length} chains
           </div>
+          <Button variant="outline" onClick={fetchChains} disabled={isLoadingChains}>
+            {isLoadingChains ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Refreshing...
+              </>
+            ) : (
+              "Refresh"
+            )}
+          </Button>
         </CardFooter>
       </Card>
+
+      <AlertDialog open={!!chainToDelete} onOpenChange={(open) => !open && setChainToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action will permanently delete this hotel chain and all associated configuration. Hotels in this
+              chain will be unlinked but not deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteChain}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Chain"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

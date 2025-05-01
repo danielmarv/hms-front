@@ -2,37 +2,35 @@
 
 import type React from "react"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
+import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, Building2, Loader2 } from "lucide-react"
+import { ArrowLeft, Building2, ChevronRight, Loader2, Save } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useHotelChains } from "@/hooks/use-hotel-chains"
-import { toast } from "sonner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
+import { Skeleton } from "@/components/ui/skeleton"
+import { useHotelChains, type HotelChain, type SharedConfiguration } from "@/hooks/use-hotel-chains"
+import { toast } from "sonner"
 
-export default function CreateHotelChainPage() {
+export default function EditConfigurationPage() {
+  const params = useParams()
   const router = useRouter()
-  const { createChain } = useHotelChains()
+  const chainCode = params.id as string
+  const { getChainDetails, updateSharedConfiguration, isLoading } = useHotelChains()
+
+  const [chain, setChain] = useState<HotelChain | null>(null)
+  const [isLoadingChain, setIsLoadingChain] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [activeTab, setActiveTab] = useState("basic")
+  const [activeTab, setActiveTab] = useState("branding")
 
-  const [formData, setFormData] = useState({
-    // Basic information
-    name: "",
+  const [formData, setFormData] = useState<SharedConfiguration>({
     chainCode: "",
-    code: "",
-    description: "",
-    type: "hotel",
-    starRating: "0",
-
-    // Configuration
+    name: "",
     branding: {
       primaryColor: "#4f46e5",
       secondaryColor: "#6366f1",
@@ -41,18 +39,6 @@ export default function CreateHotelChainPage() {
         primary: "Inter",
         secondary: "Roboto",
       },
-    },
-    systemSettings: {
-      dateFormat: "MM/DD/YYYY",
-      timeFormat: "12h",
-      currency: {
-        code: "USD",
-        symbol: "$",
-        position: "before",
-      },
-      timezone: "UTC",
-      language: "en-US",
-      measurementSystem: "imperial",
     },
     documentPrefixes: {
       invoice: {
@@ -76,6 +62,18 @@ export default function CreateHotelChainPage() {
         format: "{prefix}-{number}",
       },
     },
+    systemSettings: {
+      dateFormat: "MM/DD/YYYY",
+      timeFormat: "12h",
+      currency: {
+        code: "USD",
+        symbol: "$",
+        position: "before",
+      },
+      timezone: "UTC",
+      language: "en-US",
+      measurementSystem: "imperial",
+    },
     overrideSettings: {
       branding: false,
       documentPrefixes: false,
@@ -83,14 +81,38 @@ export default function CreateHotelChainPage() {
     },
   })
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target
-    setFormData((prev) => ({ ...prev, [name]: value }))
-  }
+  useEffect(() => {
+    const fetchChainDetails = async () => {
+      try {
+        setIsLoadingChain(true)
+        const response = await getChainDetails(chainCode)
+        if (response.data) {
+          setChain(response.data)
 
-  const handleSelectChange = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
-  }
+          // If the chain has shared configuration, use it
+          if (response.data.sharedConfiguration) {
+            setFormData(response.data.sharedConfiguration)
+          } else {
+            // Otherwise, set the chain code and name in the default form data
+            setFormData((prev) => ({
+              ...prev,
+              chainCode: response.data.chainCode,
+              name: response.data.name,
+            }))
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching chain details:", error)
+        toast.error("Failed to load chain details")
+      } finally {
+        setIsLoadingChain(false)
+      }
+    }
+
+    if (chainCode) {
+      fetchChainDetails()
+    }
+  }, [chainCode, getChainDetails])
 
   const handleNestedChange = (section: string, field: string, value: any) => {
     setFormData((prev) => ({
@@ -141,41 +163,49 @@ export default function CreateHotelChainPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!formData.name || !formData.chainCode || !formData.code) {
-      toast.error("Please fill in all required fields")
-      setActiveTab("basic")
-      return
-    }
-
     try {
       setIsSubmitting(true)
 
-      const chainData = {
-        name: formData.name,
-        chainCode: formData.chainCode,
-        code: formData.code,
-        description: formData.description,
-        type: formData.type,
-        starRating: Number.parseInt(formData.starRating),
-      }
-
-      const response = await createChain(chainData)
+      const response = await updateSharedConfiguration(chainCode, formData)
 
       if (response.data) {
-        // After creating the chain, we would update the configuration
-        // In a real implementation, you would call updateSharedConfiguration here
-
-        toast.success("Hotel chain created successfully")
-        router.push(`/admin/chains/${formData.chainCode}`)
+        toast.success("Configuration updated successfully")
+        router.push(`/admin/chains/${chainCode}?tab=configuration`)
       } else {
-        throw new Error("Failed to create hotel chain")
+        throw new Error("Failed to update configuration")
       }
     } catch (error) {
-      console.error("Error creating hotel chain:", error)
-      toast.error("Failed to create hotel chain")
+      console.error("Error updating configuration:", error)
+      toast.error("Failed to update configuration")
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  if (isLoadingChain) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center space-x-2">
+          <Skeleton className="h-8 w-[250px]" />
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          <Skeleton className="h-8 w-[150px]" />
+        </div>
+        <Skeleton className="h-[500px] w-full" />
+      </div>
+    )
+  }
+
+  if (!chain) {
+    return (
+      <div className="flex h-[600px] flex-col items-center justify-center">
+        <Building2 className="h-16 w-16 text-muted-foreground" />
+        <h2 className="mt-4 text-2xl font-bold">Chain Not Found</h2>
+        <p className="mt-2 text-muted-foreground">The hotel chain you're looking for doesn't exist</p>
+        <Button className="mt-6" onClick={() => router.push("/admin/chains")}>
+          Back to Chains
+        </Button>
+      </div>
+    )
   }
 
   return (
@@ -183,13 +213,24 @@ export default function CreateHotelChainPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
           <Button variant="outline" size="icon" asChild>
-            <Link href="/admin/chains">
+            <Link href={`/admin/chains/${chainCode}?tab=configuration`}>
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Create Hotel Chain</h1>
-            <p className="text-muted-foreground">Set up a new hotel chain with headquarters</p>
+            <div className="flex items-center space-x-2">
+              <Link href="/admin/chains" className="text-muted-foreground hover:text-foreground">
+                Hotel Chains
+              </Link>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              <Link href={`/admin/chains/${chainCode}`} className="text-muted-foreground hover:text-foreground">
+                {chain.name}
+              </Link>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium">Edit Configuration</span>
+            </div>
+            <h1 className="text-3xl font-bold tracking-tight">Edit Configuration</h1>
+            <p className="text-muted-foreground">Update shared configuration for {chain.name}</p>
           </div>
         </div>
       </div>
@@ -197,122 +238,10 @@ export default function CreateHotelChainPage() {
       <form onSubmit={handleSubmit}>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="basic">Basic Information</TabsTrigger>
             <TabsTrigger value="branding">Branding & Appearance</TabsTrigger>
+            <TabsTrigger value="documents">Document Prefixes</TabsTrigger>
             <TabsTrigger value="settings">System Settings</TabsTrigger>
           </TabsList>
-
-          <TabsContent value="basic" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Chain Information</CardTitle>
-                <CardDescription>Basic details about the hotel chain</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">
-                      Chain Name <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="name"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleChange}
-                      placeholder="Luxe Hotels International"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="chainCode">
-                      Chain Code <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="chainCode"
-                      name="chainCode"
-                      value={formData.chainCode}
-                      onChange={handleChange}
-                      placeholder="LUXE"
-                      required
-                    />
-                    <p className="text-xs text-muted-foreground">Unique identifier for the chain</p>
-                  </div>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="code">
-                      Headquarters Code <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="code"
-                      name="code"
-                      value={formData.code}
-                      onChange={handleChange}
-                      placeholder="LHI-HQ"
-                      required
-                    />
-                    <p className="text-xs text-muted-foreground">Unique code for headquarters hotel</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="type">Chain Type</Label>
-                    <Select value={formData.type} onValueChange={(value) => handleSelectChange("type", value)}>
-                      <SelectTrigger id="type">
-                        <SelectValue placeholder="Select type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="hotel">Hotel</SelectItem>
-                        <SelectItem value="resort">Resort</SelectItem>
-                        <SelectItem value="motel">Motel</SelectItem>
-                        <SelectItem value="boutique">Boutique</SelectItem>
-                        <SelectItem value="apartment">Serviced Apartment</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    name="description"
-                    value={formData.description}
-                    onChange={handleChange}
-                    placeholder="Describe the hotel chain"
-                    rows={3}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="starRating">Star Rating</Label>
-                  <Select
-                    value={formData.starRating}
-                    onValueChange={(value) => handleSelectChange("starRating", value)}
-                  >
-                    <SelectTrigger id="starRating">
-                      <SelectValue placeholder="Select rating" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="0">Not Applicable</SelectItem>
-                      <SelectItem value="1">1 Star</SelectItem>
-                      <SelectItem value="2">2 Stars</SelectItem>
-                      <SelectItem value="3">3 Stars</SelectItem>
-                      <SelectItem value="4">4 Stars</SelectItem>
-                      <SelectItem value="5">5 Stars</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-              <CardFooter className="flex justify-between">
-                <Button variant="outline" asChild>
-                  <Link href="/admin/chains">Cancel</Link>
-                </Button>
-                <Button type="button" onClick={() => setActiveTab("branding")}>
-                  Next: Branding
-                </Button>
-              </CardFooter>
-            </Card>
-          </TabsContent>
 
           <TabsContent value="branding" className="space-y-6">
             <Card>
@@ -424,80 +353,197 @@ export default function CreateHotelChainPage() {
 
                 <Separator />
 
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">Document Prefixes</h3>
-                  <div className="grid gap-6 md:grid-cols-2">
-                    <div className="space-y-4">
-                      <h4 className="font-medium">Invoice</h4>
-                      <div className="space-y-2">
-                        <Label htmlFor="invoicePrefix">Prefix</Label>
-                        <Input
-                          id="invoicePrefix"
-                          value={formData.documentPrefixes.invoice.prefix}
-                          onChange={(e) => handleDocumentPrefixChange("invoice", "prefix", e.target.value)}
-                          placeholder="INV"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="invoiceStartingNumber">Starting Number</Label>
-                        <Input
-                          id="invoiceStartingNumber"
-                          type="number"
-                          value={formData.documentPrefixes.invoice.startingNumber}
-                          onChange={(e) => handleDocumentPrefixChange("invoice", "startingNumber", e.target.value)}
-                          placeholder="1000"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="invoiceFormat">Format</Label>
-                        <Input
-                          id="invoiceFormat"
-                          value={formData.documentPrefixes.invoice.format}
-                          onChange={(e) => handleDocumentPrefixChange("invoice", "format", e.target.value)}
-                          placeholder="{prefix}-{number}"
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Use {`{prefix}`} and {`{number}`} as placeholders
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <h4 className="font-medium">Receipt</h4>
-                      <div className="space-y-2">
-                        <Label htmlFor="receiptPrefix">Prefix</Label>
-                        <Input
-                          id="receiptPrefix"
-                          value={formData.documentPrefixes.receipt.prefix}
-                          onChange={(e) => handleDocumentPrefixChange("receipt", "prefix", e.target.value)}
-                          placeholder="RCP"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="receiptStartingNumber">Starting Number</Label>
-                        <Input
-                          id="receiptStartingNumber"
-                          type="number"
-                          value={formData.documentPrefixes.receipt.startingNumber}
-                          onChange={(e) => handleDocumentPrefixChange("receipt", "startingNumber", e.target.value)}
-                          placeholder="1000"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="receiptFormat">Format</Label>
-                        <Input
-                          id="receiptFormat"
-                          value={formData.documentPrefixes.receipt.format}
-                          onChange={(e) => handleDocumentPrefixChange("receipt", "format", e.target.value)}
-                          placeholder="{prefix}-{number}"
-                        />
-                      </div>
-                    </div>
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="overrideBranding"
+                      checked={formData.overrideSettings.branding}
+                      onChange={(e) => handleOverrideSettingChange("branding", e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                    <Label htmlFor="overrideBranding">Allow hotels to override branding settings</Label>
                   </div>
+                  <p className="text-xs text-muted-foreground pl-6">
+                    When enabled, individual hotels can customize their own branding
+                  </p>
                 </div>
               </CardContent>
               <CardFooter className="flex justify-between">
-                <Button type="button" variant="outline" onClick={() => setActiveTab("basic")}>
+                <Button variant="outline" asChild>
+                  <Link href={`/admin/chains/${chainCode}?tab=configuration`}>Cancel</Link>
+                </Button>
+                <Button type="button" onClick={() => setActiveTab("documents")}>
+                  Next: Document Prefixes
+                </Button>
+              </CardFooter>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="documents" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Document Prefixes</CardTitle>
+                <CardDescription>Configure document numbering formats across the chain</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid gap-6 md:grid-cols-2">
+                  <div className="space-y-4">
+                    <h4 className="font-medium">Invoice</h4>
+                    <div className="space-y-2">
+                      <Label htmlFor="invoicePrefix">Prefix</Label>
+                      <Input
+                        id="invoicePrefix"
+                        value={formData.documentPrefixes.invoice.prefix}
+                        onChange={(e) => handleDocumentPrefixChange("invoice", "prefix", e.target.value)}
+                        placeholder="INV"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="invoiceStartingNumber">Starting Number</Label>
+                      <Input
+                        id="invoiceStartingNumber"
+                        type="number"
+                        value={formData.documentPrefixes.invoice.startingNumber}
+                        onChange={(e) => handleDocumentPrefixChange("invoice", "startingNumber", e.target.value)}
+                        placeholder="1000"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="invoiceFormat">Format</Label>
+                      <Input
+                        id="invoiceFormat"
+                        value={formData.documentPrefixes.invoice.format}
+                        onChange={(e) => handleDocumentPrefixChange("invoice", "format", e.target.value)}
+                        placeholder="{prefix}-{number}"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Use {"{prefix}"} and {"{number}"} as placeholders
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="font-medium">Receipt</h4>
+                    <div className="space-y-2">
+                      <Label htmlFor="receiptPrefix">Prefix</Label>
+                      <Input
+                        id="receiptPrefix"
+                        value={formData.documentPrefixes.receipt.prefix}
+                        onChange={(e) => handleDocumentPrefixChange("receipt", "prefix", e.target.value)}
+                        placeholder="RCP"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="receiptStartingNumber">Starting Number</Label>
+                      <Input
+                        id="receiptStartingNumber"
+                        type="number"
+                        value={formData.documentPrefixes.receipt.startingNumber}
+                        onChange={(e) => handleDocumentPrefixChange("receipt", "startingNumber", e.target.value)}
+                        placeholder="1000"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="receiptFormat">Format</Label>
+                      <Input
+                        id="receiptFormat"
+                        value={formData.documentPrefixes.receipt.format}
+                        onChange={(e) => handleDocumentPrefixChange("receipt", "format", e.target.value)}
+                        placeholder="{prefix}-{number}"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="grid gap-6 md:grid-cols-2">
+                  <div className="space-y-4">
+                    <h4 className="font-medium">Booking</h4>
+                    <div className="space-y-2">
+                      <Label htmlFor="bookingPrefix">Prefix</Label>
+                      <Input
+                        id="bookingPrefix"
+                        value={formData.documentPrefixes.booking.prefix}
+                        onChange={(e) => handleDocumentPrefixChange("booking", "prefix", e.target.value)}
+                        placeholder="BKG"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="bookingStartingNumber">Starting Number</Label>
+                      <Input
+                        id="bookingStartingNumber"
+                        type="number"
+                        value={formData.documentPrefixes.booking.startingNumber}
+                        onChange={(e) => handleDocumentPrefixChange("booking", "startingNumber", e.target.value)}
+                        placeholder="1000"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="bookingFormat">Format</Label>
+                      <Input
+                        id="bookingFormat"
+                        value={formData.documentPrefixes.booking.format}
+                        onChange={(e) => handleDocumentPrefixChange("booking", "format", e.target.value)}
+                        placeholder="{prefix}-{number}"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="font-medium">Guest</h4>
+                    <div className="space-y-2">
+                      <Label htmlFor="guestPrefix">Prefix</Label>
+                      <Input
+                        id="guestPrefix"
+                        value={formData.documentPrefixes.guest.prefix}
+                        onChange={(e) => handleDocumentPrefixChange("guest", "prefix", e.target.value)}
+                        placeholder="GST"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="guestStartingNumber">Starting Number</Label>
+                      <Input
+                        id="guestStartingNumber"
+                        type="number"
+                        value={formData.documentPrefixes.guest.startingNumber}
+                        onChange={(e) => handleDocumentPrefixChange("guest", "startingNumber", e.target.value)}
+                        placeholder="1000"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="guestFormat">Format</Label>
+                      <Input
+                        id="guestFormat"
+                        value={formData.documentPrefixes.guest.format}
+                        onChange={(e) => handleDocumentPrefixChange("guest", "format", e.target.value)}
+                        placeholder="{prefix}-{number}"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="overrideDocumentPrefixes"
+                      checked={formData.overrideSettings.documentPrefixes}
+                      onChange={(e) => handleOverrideSettingChange("documentPrefixes", e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                    <Label htmlFor="overrideDocumentPrefixes">Allow hotels to override document prefix settings</Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground pl-6">
+                    When enabled, individual hotels can customize their own document numbering formats
+                  </p>
+                </div>
+              </CardContent>
+              <CardFooter className="flex justify-between">
+                <Button type="button" variant="outline" onClick={() => setActiveTab("branding")}>
                   Back
                 </Button>
                 <Button type="button" onClick={() => setActiveTab("settings")}>
@@ -666,59 +712,36 @@ export default function CreateHotelChainPage() {
 
                 <Separator />
 
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">Override Settings</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Allow individual hotels to override chain-wide settings
-                  </p>
-                  <div className="grid gap-4 md:grid-cols-3">
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="overrideBranding"
-                        checked={formData.overrideSettings.branding}
-                        onChange={(e) => handleOverrideSettingChange("branding", e.target.checked)}
-                        className="h-4 w-4 rounded border-gray-300"
-                      />
-                      <Label htmlFor="overrideBranding">Allow branding override</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="overrideDocumentPrefixes"
-                        checked={formData.overrideSettings.documentPrefixes}
-                        onChange={(e) => handleOverrideSettingChange("documentPrefixes", e.target.checked)}
-                        className="h-4 w-4 rounded border-gray-300"
-                      />
-                      <Label htmlFor="overrideDocumentPrefixes">Allow document prefix override</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="overrideSystemSettings"
-                        checked={formData.overrideSettings.systemSettings}
-                        onChange={(e) => handleOverrideSettingChange("systemSettings", e.target.checked)}
-                        className="h-4 w-4 rounded border-gray-300"
-                      />
-                      <Label htmlFor="overrideSystemSettings">Allow system settings override</Label>
-                    </div>
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="overrideSystemSettings"
+                      checked={formData.overrideSettings.systemSettings}
+                      onChange={(e) => handleOverrideSettingChange("systemSettings", e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                    <Label htmlFor="overrideSystemSettings">Allow hotels to override system settings</Label>
                   </div>
+                  <p className="text-xs text-muted-foreground pl-6">
+                    When enabled, individual hotels can customize their own system settings
+                  </p>
                 </div>
               </CardContent>
               <CardFooter className="flex justify-between">
-                <Button type="button" variant="outline" onClick={() => setActiveTab("branding")}>
+                <Button type="button" variant="outline" onClick={() => setActiveTab("documents")}>
                   Back
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Creating...
+                      Saving...
                     </>
                   ) : (
                     <>
-                      <Building2 className="mr-2 h-4 w-4" />
-                      Create Hotel Chain
+                      <Save className="mr-2 h-4 w-4" />
+                      Save Configuration
                     </>
                   )}
                 </Button>

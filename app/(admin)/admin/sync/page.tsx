@@ -1,237 +1,361 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import Link from "next/link"
-import { toast } from "sonner"
+import { useParams, useRouter } from "next/navigation"
+import {
+  Building2,
+  ChevronRight,
+  Loader2,
+  FolderSyncIcon as Sync,
+  Check,
+  AlertTriangle,
+  ArrowRight,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Loader2, Plus, Eye, Building, Calendar, User } from "lucide-react"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Separator } from "@/components/ui/separator"
+import { Skeleton } from "@/components/ui/skeleton"
+import { useHotelChains, type HotelChain } from "@/hooks/use-hotel-chains"
+import { toast } from "sonner"
+import Link from "next/link"
 
-export default function DataSyncPage() {
-  const [syncLogs, setSyncLogs] = useState<any[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState("")
+export default function SyncConfigurationPage() {
+  const params = useParams()
+  const router = useRouter()
+  const chainCode = params.id as string
+  const { getChainDetails, syncChainConfiguration, isLoading } = useHotelChains()
+  const [chain, setChain] = useState<HotelChain | null>(null)
+  const [isLoadingChain, setIsLoadingChain] = useState(true)
+  const [isSyncing, setIsSyncing] = useState(false)
+  const [syncMode, setSyncMode] = useState<"all" | "selected">("all")
+  const [selectedHotels, setSelectedHotels] = useState<string[]>([])
+  const [selectedSections, setSelectedSections] = useState<string[]>(["branding", "documentPrefixes", "systemSettings"])
 
   useEffect(() => {
-    const fetchSyncLogs = async () => {
+    const fetchChainDetails = async () => {
       try {
-        // In a real app, you would fetch this data from your API
-        // const response = await fetch('/api/sync/logs')
-        // const data = await response.json()
-
-        // For now, we'll use mock data
-        setSyncLogs([
-          {
-            _id: "1",
-            chainCode: "LUXE",
-            syncType: "configuration",
-            status: "completed",
-            startTime: "2023-06-15T14:30:00Z",
-            endTime: "2023-06-15T14:32:00Z",
-            initiatedBy: {
-              _id: "u1",
-              full_name: "John Smith",
-            },
-            sourceHotel: {
-              _id: "h1",
-              name: "Luxe Hotels International HQ",
-              code: "LHI-HQ",
-            },
-            details: {
-              success: 5,
-              failed: 0,
-              skipped: 1,
-            },
-          },
-          {
-            _id: "2",
-            chainCode: "COMF",
-            syncType: "configuration",
-            status: "completed with errors",
-            startTime: "2023-06-14T10:15:00Z",
-            endTime: "2023-06-14T10:18:00Z",
-            initiatedBy: {
-              _id: "u2",
-              full_name: "Sarah Johnson",
-            },
-            sourceHotel: {
-              _id: "h4",
-              name: "Comfort Inn Group HQ",
-              code: "CIG-HQ",
-            },
-            details: {
-              success: 18,
-              failed: 2,
-              skipped: 4,
-            },
-          },
-          {
-            _id: "3",
-            chainCode: "BUDG",
-            syncType: "configuration",
-            status: "completed",
-            startTime: "2023-06-13T09:00:00Z",
-            endTime: "2023-06-13T09:01:00Z",
-            initiatedBy: {
-              _id: "u3",
-              full_name: "Michael Brown",
-            },
-            sourceHotel: {
-              _id: "h6",
-              name: "Budget Stays HQ",
-              code: "BST-HQ",
-            },
-            details: {
-              success: 12,
-              failed: 0,
-              skipped: 0,
-            },
-          },
-        ])
+        setIsLoadingChain(true)
+        const response = await getChainDetails(chainCode)
+        if (response.data) {
+          setChain(response.data)
+        }
       } catch (error) {
-        console.error("Error fetching sync logs:", error)
-        toast.error("Failed to load synchronization logs")
+        console.error("Error fetching chain details:", error)
+        toast.error("Failed to load chain details")
       } finally {
-        setIsLoading(false)
+        setIsLoadingChain(false)
       }
     }
 
-    fetchSyncLogs()
-  }, [])
+    if (chainCode) {
+      fetchChainDetails()
+    }
+  }, [chainCode, getChainDetails])
 
-  const filteredLogs = syncLogs.filter(
-    (log) =>
-      log.chainCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.sourceHotel.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.initiatedBy.full_name.toLowerCase().includes(searchQuery.toLowerCase()),
-  )
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleString()
+  const handleHotelSelection = (hotelId: string) => {
+    setSelectedHotels((prev) => {
+      if (prev.includes(hotelId)) {
+        return prev.filter((id) => id !== hotelId)
+      } else {
+        return [...prev, hotelId]
+      }
+    })
   }
+
+  const handleSectionSelection = (section: string) => {
+    setSelectedSections((prev) => {
+      if (prev.includes(section)) {
+        return prev.filter((s) => s !== section)
+      } else {
+        return [...prev, section]
+      }
+    })
+  }
+
+  const handleSync = async () => {
+    if (!chain) return
+
+    try {
+      setIsSyncing(true)
+
+      const syncData = {
+        syncAll: syncMode === "all",
+        targetHotels: syncMode === "selected" ? selectedHotels : [],
+        configSections: selectedSections,
+      }
+
+      const response = await syncChainConfiguration(chainCode, syncData)
+
+      if (response.data) {
+        toast.success(`Configuration synchronized successfully to ${response.data.syncLog.details.success} hotels`)
+        router.push(`/admin/chains/${chainCode}`)
+      }
+    } catch (error) {
+      console.error("Error syncing configuration:", error)
+      toast.error("Failed to sync configuration")
+    } finally {
+      setIsSyncing(false)
+    }
+  }
+
+  if (isLoadingChain) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center space-x-2">
+          <Skeleton className="h-8 w-[250px]" />
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          <Skeleton className="h-8 w-[150px]" />
+        </div>
+        <Skeleton className="h-[500px] w-full" />
+      </div>
+    )
+  }
+
+  if (!chain) {
+    return (
+      <div className="flex h-[600px] flex-col items-center justify-center">
+        <Building2 className="h-16 w-16 text-muted-foreground" />
+        <h2 className="mt-4 text-2xl font-bold">Chain Not Found</h2>
+        <p className="mt-2 text-muted-foreground">The hotel chain you're looking for doesn't exist</p>
+        <Button className="mt-6" onClick={() => router.push("/admin/chains")}>
+          Back to Chains
+        </Button>
+      </div>
+    )
+  }
+
+  // Filter out headquarters from the list of hotels
+  const hotelsToSync = chain.hotels?.filter((hotel) => !hotel.isHeadquarters) || []
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Data Synchronization</h1>
-          <p className="text-muted-foreground">View and manage configuration synchronization across hotel chains</p>
-        </div>
-        <Button asChild>
-          <Link href="/admin/sync/new">
-            <Plus className="mr-2 h-4 w-4" />
-            New Sync
+      <div>
+        <div className="flex items-center space-x-2">
+          <Link href="/admin/chains" className="text-muted-foreground hover:text-foreground">
+            Hotel Chains
           </Link>
-        </Button>
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          <Link href={`/admin/chains/${chainCode}`} className="text-muted-foreground hover:text-foreground">
+            {chain.name}
+          </Link>
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          <span className="font-medium">Sync Configuration</span>
+        </div>
+        <h1 className="text-3xl font-bold tracking-tight">Sync Configuration</h1>
+        <p className="text-muted-foreground">
+          Synchronize configuration settings from headquarters to other hotels in the chain
+        </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Synchronization Logs</CardTitle>
-          <CardDescription>History of configuration synchronization across hotel chains</CardDescription>
+          <CardTitle>Synchronization Settings</CardTitle>
+          <CardDescription>Choose which hotels and configuration sections to synchronize</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="mb-4">
-            <Input
-              placeholder="Search by chain code or hotel name..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="max-w-sm"
-            />
+        <CardContent className="space-y-6">
+          <div>
+            <h3 className="mb-2 text-lg font-medium">Target Hotels</h3>
+            <RadioGroup value={syncMode} onValueChange={(value) => setSyncMode(value as "all" | "selected")}>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="all" id="all" />
+                <Label htmlFor="all">All hotels in chain ({hotelsToSync.length} hotels)</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="selected" id="selected" />
+                <Label htmlFor="selected">Selected hotels only</Label>
+              </div>
+            </RadioGroup>
+
+            {syncMode === "selected" && (
+              <div className="mt-4 rounded-md border p-4">
+                <div className="mb-2 font-medium">Select hotels to sync:</div>
+                {hotelsToSync.length === 0 ? (
+                  <div className="text-muted-foreground">No hotels available for synchronization</div>
+                ) : (
+                  <div className="grid gap-2 md:grid-cols-2">
+                    {hotelsToSync.map((hotel) => (
+                      <div key={hotel._id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={hotel._id}
+                          checked={selectedHotels.includes(hotel._id)}
+                          onCheckedChange={() => handleHotelSelection(hotel._id)}
+                        />
+                        <Label htmlFor={hotel._id} className="flex items-center">
+                          {hotel.name} <span className="ml-1 text-sm text-muted-foreground">({hotel.code})</span>
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {selectedHotels.length > 0 && (
+                  <div className="mt-2 text-sm text-muted-foreground">{selectedHotels.length} hotels selected</div>
+                )}
+              </div>
+            )}
           </div>
 
-          {isLoading ? (
-            <div className="flex h-40 items-center justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <Separator />
+
+          <div>
+            <h3 className="mb-2 text-lg font-medium">Configuration Sections</h3>
+            <div className="rounded-md border p-4">
+              <div className="mb-2 font-medium">Select sections to sync:</div>
+              <div className="grid gap-2 md:grid-cols-3">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="branding"
+                    checked={selectedSections.includes("branding")}
+                    onCheckedChange={() => handleSectionSelection("branding")}
+                  />
+                  <Label htmlFor="branding">Branding</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="documentPrefixes"
+                    checked={selectedSections.includes("documentPrefixes")}
+                    onCheckedChange={() => handleSectionSelection("documentPrefixes")}
+                  />
+                  <Label htmlFor="documentPrefixes">Document Prefixes</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="systemSettings"
+                    checked={selectedSections.includes("systemSettings")}
+                    onCheckedChange={() => handleSectionSelection("systemSettings")}
+                  />
+                  <Label htmlFor="systemSettings">System Settings</Label>
+                </div>
+              </div>
+              {selectedSections.length === 0 && (
+                <div className="mt-2 text-sm text-destructive">Please select at least one section to synchronize</div>
+              )}
             </div>
-          ) : filteredLogs.length === 0 ? (
-            <div className="flex h-40 flex-col items-center justify-center">
-              <p className="text-muted-foreground">No synchronization logs found</p>
-              <Button asChild className="mt-4">
-                <Link href="/admin/sync/new">
-                  <Plus className="mr-2 h-4 w-4" />
-                  New Sync
-                </Link>
-              </Button>
+          </div>
+
+          <Separator />
+
+          <div className="rounded-md border bg-muted/50 p-4">
+            <div className="flex items-center">
+              <AlertTriangle className="mr-2 h-5 w-5 text-amber-500" />
+              <h3 className="font-medium">Synchronization Warning</h3>
             </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Chain</TableHead>
-                  <TableHead>Source Hotel</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Results</TableHead>
-                  <TableHead>Initiated By</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead className="w-[100px]">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredLogs.map((log) => (
-                  <TableRow key={log._id}>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Building className="h-4 w-4 text-muted-foreground" />
-                        <span>{log.chainCode}</span>
+            <p className="mt-2 text-sm text-muted-foreground">
+              This action will overwrite the selected configuration sections in the target hotels with the settings from
+              the headquarters hotel. This cannot be undone. Make sure you have backed up any important custom
+              configurations.
+            </p>
+          </div>
+        </CardContent>
+        <CardFooter className="flex justify-between">
+          <Button variant="outline" onClick={() => router.push(`/admin/chains/${chainCode}`)}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSync}
+            disabled={
+              isSyncing || selectedSections.length === 0 || (syncMode === "selected" && selectedHotels.length === 0)
+            }
+          >
+            {isSyncing ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Syncing...
+              </>
+            ) : (
+              <>
+                <Sync className="mr-2 h-4 w-4" />
+                Sync Configuration
+              </>
+            )}
+          </Button>
+        </CardFooter>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Synchronization Preview</CardTitle>
+          <CardDescription>Review what will be synchronized to the target hotels</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="rounded-md border p-4">
+              <div className="mb-2 font-medium">Source</div>
+              <div className="flex items-center space-x-2">
+                <Building2 className="h-5 w-5 text-primary" />
+                <span>{chain.headquarters?.name || "Headquarters"}</span>
+                <span className="text-sm text-muted-foreground">({chain.headquarters?.code || chain.code})</span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-center">
+              <ArrowRight className="h-6 w-6 text-muted-foreground" />
+            </div>
+
+            <div className="rounded-md border p-4">
+              <div className="mb-2 font-medium">Target</div>
+              <div className="space-y-1">
+                {syncMode === "all" ? (
+                  <div className="flex items-center space-x-2">
+                    <Check className="h-4 w-4 text-green-500" />
+                    <span>All hotels in chain ({hotelsToSync.length} hotels)</span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="text-sm text-muted-foreground mb-1">{selectedHotels.length} selected hotels:</div>
+                    {selectedHotels.length === 0 ? (
+                      <div className="text-sm text-amber-500">No hotels selected</div>
+                    ) : (
+                      <div className="max-h-32 overflow-y-auto space-y-1">
+                        {selectedHotels.map((hotelId) => {
+                          const hotel = hotelsToSync.find((h) => h._id === hotelId)
+                          return hotel ? (
+                            <div key={hotelId} className="flex items-center space-x-2">
+                              <Check className="h-4 w-4 text-green-500" />
+                              <span>{hotel.name}</span>
+                              <span className="text-sm text-muted-foreground">({hotel.code})</span>
+                            </div>
+                          ) : null
+                        })}
                       </div>
-                    </TableCell>
-                    <TableCell>{log.sourceHotel.name}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          log.status === "completed"
-                            ? "default"
-                            : log.status === "completed with errors"
-                              ? "secondary"
-                              : log.status === "in-progress"
-                                ? "outline"
-                                : "destructive"
-                        }
-                      >
-                        {log.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="text-xs text-green-600">Success: {log.details.success}</span>
-                        {log.details.failed > 0 && (
-                          <span className="text-xs text-destructive">Failed: {log.details.failed}</span>
-                        )}
-                        {log.details.skipped > 0 && (
-                          <span className="text-xs text-muted-foreground">Skipped: {log.details.skipped}</span>
-                        )}
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-md border p-4">
+              <div className="mb-2 font-medium">Sections to Sync</div>
+              <div className="space-y-1">
+                {selectedSections.length === 0 ? (
+                  <div className="text-sm text-amber-500">No sections selected</div>
+                ) : (
+                  <>
+                    {selectedSections.includes("branding") && (
+                      <div className="flex items-center space-x-2">
+                        <Check className="h-4 w-4 text-green-500" />
+                        <span>Branding (colors, fonts, logo)</span>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <User className="h-4 w-4 text-muted-foreground" />
-                        <span>{log.initiatedBy.full_name}</span>
+                    )}
+                    {selectedSections.includes("documentPrefixes") && (
+                      <div className="flex items-center space-x-2">
+                        <Check className="h-4 w-4 text-green-500" />
+                        <span>Document Prefixes (invoice, receipt, booking, guest)</span>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <span>{formatDate(log.startTime)}</span>
+                    )}
+                    {selectedSections.includes("systemSettings") && (
+                      <div className="flex items-center space-x-2">
+                        <Check className="h-4 w-4 text-green-500" />
+                        <span>System Settings (date format, currency, timezone)</span>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="sm" asChild>
-                        <Link href={`/admin/sync/${log._id}`}>
-                          <Eye className="mr-2 h-4 w-4" />
-                          Details
-                        </Link>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>

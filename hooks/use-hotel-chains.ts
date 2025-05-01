@@ -5,46 +5,47 @@ import { useApi } from "./use-api"
 
 export interface HotelChain {
   _id: string
-  chainCode: string
   name: string
+  chainCode: string
   code: string
   description: string
   type: string
   starRating: number
   active: boolean
-  hotelCount?: number
-  headquarters?: {
-    _id: string
-    name: string
-    code: string
-    location: string
-  }
+  createdAt: string
+  updatedAt: string
   hotels?: Hotel[]
+  headquarters?: Hotel
+  hotelCount?: number
   sharedConfiguration?: SharedConfiguration
-  hierarchy?: ChainHierarchy
-  stats?: {
-    totalHotels: number
-    activeHotels: number
-    totalRooms: number
-    totalUsers: number
-  }
+  hierarchy?: any
 }
 
 export interface Hotel {
   _id: string
   name: string
   code: string
-  description?: string
+  description: string
   type: string
-  starRating?: number
+  starRating: number
   parentHotel?: string
   isHeadquarters: boolean
   chainCode?: string
   parentCompany?: string
   active: boolean
-  createdAt?: string
-  updatedAt?: string
-  branches?: Hotel[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ChainUser {
+  user: {
+    id: string
+    full_name: string
+    email: string
+  }
+  hotelAccess: {
+    accessLevel: string
+  }[]
 }
 
 export interface SharedConfiguration {
@@ -58,13 +59,28 @@ export interface SharedConfiguration {
       primary: string
       secondary: string
     }
-    logo?: string
   }
   documentPrefixes: {
-    invoice: DocumentPrefix
-    receipt: DocumentPrefix
-    booking: DocumentPrefix
-    guest: DocumentPrefix
+    invoice: {
+      prefix: string
+      startingNumber: number
+      format: string
+    }
+    receipt: {
+      prefix: string
+      startingNumber: number
+      format: string
+    }
+    booking: {
+      prefix: string
+      startingNumber: number
+      format: string
+    }
+    guest: {
+      prefix: string
+      startingNumber: number
+      format: string
+    }
   }
   systemSettings: {
     dateFormat: string
@@ -85,93 +101,50 @@ export interface SharedConfiguration {
   }
 }
 
-export interface DocumentPrefix {
-  prefix: string
-  startingNumber: number
-  format: string
-}
-
-export interface ChainHierarchy {
-  id: string
-  name: string
-  code: string
-  type: string
-  isHeadquarters: boolean
-  children: ChainHierarchyNode[]
-}
-
-export interface ChainHierarchyNode {
-  id: string
-  name: string
-  code: string
-  type: string
-  children: ChainHierarchyNode[]
-}
-
 export interface SyncLog {
   _id: string
   chainCode: string
   syncType: string
+  status: string
+  startTime: string
+  endTime: string
+  initiatedBy: {
+    _id: string
+    full_name: string
+  }
   sourceHotel: {
     _id: string
     name: string
     code: string
-  }
-  targetHotels: {
-    _id: string
-    name: string
-    code: string
-  }[]
-  status: string
-  startTime: string
-  endTime?: string
-  initiatedBy: {
-    _id: string
-    full_name: string
-    email: string
   }
   details: {
     success: number
     failed: number
     skipped: number
   }
-  errors?: {
-    hotelId: {
-      _id: string
-      name: string
-      code: string
-    }
-    error: string
-  }[]
-}
-
-export interface ChainUser {
-  user: {
-    id: string
-    full_name: string
-    email: string
+  targetHotels?: {
+    _id: string
+    name: string
+    code: string
     status: string
-  }
-  hotelAccess: {
-    hotel: {
-      _id: string
-      name: string
-      code: string
-    }
-    accessLevel: string
-    accessAllBranches: boolean
   }[]
+  configSections?: string[]
 }
 
 export function useHotelChains() {
   const { request, isLoading } = useApi()
 
   // Get all hotel chains
-  const getAllChains = useCallback(async () => {
-    return await request<HotelChain[]>("/chains")
-  }, [request])
+  const getAllChains = useCallback(
+    async (page = 1, limit = 10) => {
+      return await request<{ data: HotelChain[]; pagination: any; total: number }>(
+        `/chains?page=${page}&limit=${limit}`,
+      )
+    },
+    [request],
+  )
 
-  // Get hotel chain details
+  // Get specific chain details
   const getChainDetails = useCallback(
     async (chainCode: string) => {
       return await request<HotelChain>(`/chains/${chainCode}`)
@@ -181,61 +154,24 @@ export function useHotelChains() {
 
   // Create a new hotel chain
   const createChain = useCallback(
-    async (chainData: {
-      name: string
-      code: string
-      description?: string
-      chainCode: string
-      type?: string
-      starRating?: number
-    }) => {
-      return await request<{ headquarters: Hotel; sharedConfiguration: SharedConfiguration }>(
-        "/chains",
-        "POST",
-        chainData,
-      )
+    async (chainData: Partial<HotelChain>) => {
+      return await request<HotelChain>("/chains", "POST", chainData)
     },
     [request],
   )
 
-  // Update shared configuration
-  const updateSharedConfiguration = useCallback(
-    async (
-      chainCode: string,
-      configData: {
-        branding?: Partial<SharedConfiguration["branding"]>
-        documentPrefixes?: Partial<SharedConfiguration["documentPrefixes"]>
-        systemSettings?: Partial<SharedConfiguration["systemSettings"]>
-        overrideSettings?: Partial<SharedConfiguration["overrideSettings"]>
-      },
-    ) => {
-      return await request<SharedConfiguration>(`/chains/${chainCode}/configuration`, "PUT", configData)
+  // Update a hotel chain
+  const updateChain = useCallback(
+    async (chainCode: string, chainData: Partial<HotelChain>) => {
+      return await request<HotelChain>(`/chains/${chainCode}`, "PUT", chainData)
     },
     [request],
   )
 
-  // Add a hotel to a chain
-  const addHotelToChain = useCallback(
-    async (
-      chainCode: string,
-      hotelData: {
-        name: string
-        code: string
-        description?: string
-        type?: string
-        starRating?: number
-        parentHotel?: string
-      },
-    ) => {
-      return await request<Hotel>(`/chains/${chainCode}/hotels`, "POST", hotelData)
-    },
-    [request],
-  )
-
-  // Remove a hotel from a chain
-  const removeHotelFromChain = useCallback(
-    async (chainCode: string, hotelId: string) => {
-      return await request<Hotel>(`/chains/${chainCode}/hotels/${hotelId}`, "DELETE")
+  // Delete a hotel chain
+  const deleteChain = useCallback(
+    async (chainCode: string) => {
+      return await request<{ success: boolean; message: string }>(`/chains/${chainCode}`, "DELETE")
     },
     [request],
   )
@@ -243,85 +179,99 @@ export function useHotelChains() {
   // Get chain statistics
   const getChainStatistics = useCallback(
     async (chainCode: string) => {
-      return await request<{
-        totalHotels: number
-        activeHotels: number
-        totalRooms: number
-        activeBookings: number
-        totalGuests: number
-        hotels: { id: string; name: string; code: string; active: boolean }[]
-      }>(`/chains/${chainCode}/statistics`)
+      return await request<any>(`/chains/${chainCode}/statistics`)
     },
     [request],
   )
 
-  // Get cross-hotel users
-  const getCrossHotelUsers = useCallback(
-    async (chainCode: string) => {
-      return await request<ChainUser[]>(`/cross-hotel/chains/${chainCode}/users`)
+  // Add hotel to chain
+  const addHotelToChain = useCallback(
+    async (chainCode: string, hotelData: Partial<Hotel>) => {
+      return await request<Hotel>(`/chains/${chainCode}/hotels`, "POST", hotelData)
     },
     [request],
   )
 
-  // Grant chain access to a user
-  const grantChainAccess = useCallback(
-    async (chainCode: string, userData: { userId: string; accessLevel: string }) => {
-      return await request<{ userId: string; chainCode: string; accessLevel: string; hotelCount: number }>(
-        `/cross-hotel/chains/${chainCode}/users`,
-        "POST",
-        userData,
-      )
-    },
-    [request],
-  )
-
-  // Revoke chain access from a user
-  const revokeChainAccess = useCallback(
-    async (chainCode: string, userId: string) => {
-      return await request<{ userId: string; chainCode: string; hotelsAffected: number }>(
-        `/cross-hotel/chains/${chainCode}/users/${userId}`,
+  // Remove hotel from chain
+  const removeHotelFromChain = useCallback(
+    async (chainCode: string, hotelId: string) => {
+      return await request<{ success: boolean; message: string }>(
+        `/chains/${chainCode}/hotels/${hotelId}`,
         "DELETE",
       )
     },
     [request],
   )
 
-  // Sync configuration across hotels in a chain
-  const syncChainConfiguration = useCallback(
-    async (
-      chainCode: string,
-      syncData: {
-        syncAll?: boolean
-        targetHotels?: string[]
-        configSections?: string[]
-      },
-    ) => {
-      return await request<{ syncLog: SyncLog; syncId: string }>(
-        `/data-sync/chains/${chainCode}/configuration`,
-        "POST",
-        syncData,
+  // Get users with access across multiple hotels in the chain
+  const getCrossHotelUsers = useCallback(
+    async (chainCode: string) => {
+      return await request<ChainUser[]>(`/chains/${chainCode}/users`)
+    },
+    [request],
+  )
+
+  // Grant access to a user across all hotels in the chain
+  const grantChainAccess = useCallback(
+    async (chainCode: string, accessData: { userId: string; accessLevel: string }) => {
+      return await request<{ hotelCount: number }>(`/chains/${chainCode}/users`, "POST", accessData)
+    },
+    [request],
+  )
+
+  // Revoke a user's access across all hotels in the chain
+  const revokeChainAccess = useCallback(
+    async (chainCode: string, userId: string) => {
+      return await request<{ hotelsAffected: number }>(`/chains/${chainCode}/users/${userId}`, "DELETE")
+    },
+    [request],
+  )
+
+  // Get synchronization logs for a chain
+  const getSyncLogs = useCallback(
+    async (chainCode: string, page = 1, limit = 10) => {
+      return await request<{ data: SyncLog[]; pagination: any; total: number }>(
+        `/hotel-chains/${chainCode}/sync-logs?page=${page}&limit=${limit}`,
       )
     },
     [request],
   )
 
-  // Get sync logs for a chain
-  const getSyncLogs = useCallback(
-    async (chainCode: string, page = 1, limit = 20) => {
-      return await request<{
-        count: number
-        total: number
-        pagination: { page: number; limit: number; totalPages: number }
-        data: SyncLog[]
-      }>(`/data-sync/chains/${chainCode}/logs?page=${page}&limit=${limit}`)
+  // Get details of a specific sync log
+  const getSyncLogDetails = useCallback(
+    async (logId: string) => {
+      return await request<SyncLog>(`/sync-logs/${logId}`)
     },
     [request],
   )
 
-  // Get sync log details
-  const getSyncLogDetails = useCallback(
-    async (syncId: string) => {
-      return await request<SyncLog>(`/data-sync/logs/${syncId}`)
+  // Update shared configuration for a chain
+  const updateSharedConfiguration = useCallback(
+    async (chainCode: string, configData: Partial<SharedConfiguration>) => {
+      return await request<SharedConfiguration>(`/chains/${chainCode}/configuration`, "PUT", configData)
+    },
+    [request],
+  )
+
+  // Get shared configuration for a chain
+  const getSharedConfiguration = useCallback(
+    async (chainCode: string) => {
+      return await request<SharedConfiguration>(`/chains/${chainCode}/configuration`)
+    },
+    [request],
+  )
+
+  // Synchronize configuration across hotels in a chain
+  const syncChainConfiguration = useCallback(
+    async (
+      chainCode: string,
+      syncData: {
+        syncAll: boolean
+        targetHotels: string[]
+        configSections: string[]
+      },
+    ) => {
+      return await request<{ syncLog: SyncLog }>(`/hotel-chains/${chainCode}/sync`, "POST", syncData)
     },
     [request],
   )
@@ -331,15 +281,18 @@ export function useHotelChains() {
     getAllChains,
     getChainDetails,
     createChain,
-    updateSharedConfiguration,
+    updateChain,
+    deleteChain,
+    getChainStatistics,
     addHotelToChain,
     removeHotelFromChain,
-    getChainStatistics,
     getCrossHotelUsers,
     grantChainAccess,
     revokeChainAccess,
-    syncChainConfiguration,
     getSyncLogs,
     getSyncLogDetails,
+    getSharedConfiguration,
+    updateSharedConfiguration,
+    syncChainConfiguration,
   }
 }

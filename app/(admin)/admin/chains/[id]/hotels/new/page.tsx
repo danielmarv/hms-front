@@ -8,31 +8,32 @@ import Link from "next/link"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Checkbox } from "@/components/ui/checkbox"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Separator } from "@/components/ui/separator"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
-import { ArrowLeft, Loader2, FolderSyncIcon as Sync } from "lucide-react"
+import { ArrowLeft, Loader2, Save } from "lucide-react"
 import { useHotelChains, type Hotel } from "@/hooks/use-hotel-chains"
 
-export default function SyncConfigurationPage() {
+export default function AddHotelToChainPage() {
   const params = useParams()
   const router = useRouter()
   const chainCode = params.id as string
-  const { getChainDetails, syncChainConfiguration, isLoading: isLoadingChain } = useHotelChains()
+  const { getChainDetails, addHotelToChain, isLoading: isLoadingChain } = useHotelChains()
 
   const [chain, setChain] = useState<any>(null)
   const [hotels, setHotels] = useState<Hotel[]>([])
-  const [syncType, setSyncType] = useState("all")
-  const [selectedHotels, setSelectedHotels] = useState<string[]>([])
-  const [configSections, setConfigSections] = useState({
-    branding: true,
-    documentPrefixes: true,
-    systemSettings: true,
+  const [formData, setFormData] = useState({
+    name: "",
+    code: "",
+    description: "",
+    type: "hotel",
+    starRating: "0",
+    parentHotel: "",
   })
-  const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     const fetchChainDetails = async () => {
@@ -40,11 +41,13 @@ export default function SyncConfigurationPage() {
         const response = await getChainDetails(chainCode)
         if (response.data) {
           setChain(response.data)
-          // Filter out headquarters
-          const chainHotels = response.data.hotels?.filter((hotel: Hotel) => !hotel.isHeadquarters) || []
-          setHotels(chainHotels)
-          // Pre-select all hotels
-          setSelectedHotels(chainHotels.map((hotel: Hotel) => hotel._id))
+          setHotels(response.data.hotels || [])
+
+          // Set default parent hotel to headquarters
+          const headquarters = response.data.hotels?.find((hotel: Hotel) => hotel.isHeadquarters)
+          if (headquarters) {
+            setFormData((prev) => ({ ...prev, parentHotel: headquarters._id }))
+          }
         } else {
           toast.error("Failed to load chain details")
         }
@@ -61,64 +64,38 @@ export default function SyncConfigurationPage() {
     }
   }, [chainCode, getChainDetails])
 
-  const handleConfigSectionChange = (section: string) => {
-    setConfigSections((prev) => ({
-      ...prev,
-      [section]: !prev[section as keyof typeof prev],
-    }))
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target
+    setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handleHotelSelection = (hotelId: string, checked: boolean) => {
-    if (checked) {
-      setSelectedHotels((prev) => [...prev, hotelId])
-    } else {
-      setSelectedHotels((prev) => prev.filter((id) => id !== hotelId))
-    }
-  }
-
-  const handleSelectAllHotels = (checked: boolean) => {
-    if (checked) {
-      setSelectedHotels(hotels.map((hotel) => hotel._id))
-    } else {
-      setSelectedHotels([])
-    }
+  const handleSelectChange = (name: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
-    if (syncType === "selected" && selectedHotels.length === 0) {
-      toast.error("Please select at least one hotel")
-      return
-    }
-
-    const selectedSections = Object.entries(configSections)
-      .filter(([_, value]) => value)
-      .map(([key]) => key)
-
-    if (selectedSections.length === 0) {
-      toast.error("Please select at least one configuration section")
-      return
-    }
-
     setIsSubmitting(true)
 
     try {
-      const response = await syncChainConfiguration(chainCode, {
-        syncAll: syncType === "all",
-        targetHotels: syncType === "selected" ? selectedHotels : undefined,
-        configSections: selectedSections,
+      const response = await addHotelToChain(chainCode, {
+        name: formData.name,
+        code: formData.code,
+        description: formData.description,
+        type: formData.type,
+        starRating: Number(formData.starRating),
+        parentHotel: formData.parentHotel,
       })
 
       if (response.data) {
-        toast.success("Configuration synchronized successfully")
-        router.push(`/admin/chains/${chainCode}?tab=configuration`)
+        toast.success("Hotel added to chain successfully")
+        router.push(`/admin/chains/${chainCode}?tab=hotels`)
       } else {
-        throw new Error("Failed to synchronize configuration")
+        throw new Error("Failed to add hotel to chain")
       }
     } catch (error) {
-      console.error("Error syncing configuration:", error)
-      toast.error("Failed to synchronize configuration")
+      console.error("Error adding hotel to chain:", error)
+      toast.error("Failed to add hotel to chain")
     } finally {
       setIsSubmitting(false)
     }
@@ -129,7 +106,7 @@ export default function SyncConfigurationPage() {
       <div className="space-y-6">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" asChild>
-            <Link href={`/admin/chains/${chainCode}`}>
+            <Link href={`/admin/chains/${chainCode}?tab=hotels`}>
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
@@ -156,129 +133,130 @@ export default function SyncConfigurationPage() {
     <div className="space-y-6">
       <div className="flex items-center gap-2">
         <Button variant="outline" size="icon" asChild>
-          <Link href={`/admin/chains/${chainCode}`}>
+          <Link href={`/admin/chains/${chainCode}?tab=hotels`}>
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Sync Configuration</h1>
-          <p className="text-muted-foreground">Synchronize shared configuration to hotels in this chain</p>
+          <h1 className="text-3xl font-bold tracking-tight">Add Hotel to Chain</h1>
+          <p className="text-muted-foreground">Add a new hotel to {chain.name}</p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit}>
         <Card>
           <CardHeader>
-            <CardTitle>Synchronization Options</CardTitle>
-            <CardDescription>Choose which hotels and configuration sections to sync</CardDescription>
+            <CardTitle>Hotel Information</CardTitle>
+            <CardDescription>Basic information about the hotel</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-4">
-              <h3 className="text-sm font-medium">Target Hotels</h3>
-              <RadioGroup value={syncType} onValueChange={setSyncType}>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="all" id="all" />
-                  <Label htmlFor="all">All hotels in chain ({hotels.length})</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="selected" id="selected" />
-                  <Label htmlFor="selected">Selected hotels only</Label>
-                </div>
-              </RadioGroup>
-
-              {syncType === "selected" && (
-                <div className="pl-6 pt-2">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <Checkbox
-                      id="selectAll"
-                      checked={selectedHotels.length === hotels.length}
-                      onCheckedChange={handleSelectAllHotels}
-                    />
-                    <label htmlFor="selectAll" className="text-sm font-medium leading-none">
-                      Select all
-                    </label>
-                  </div>
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {hotels.map((hotel) => (
-                      <div key={hotel._id} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={hotel._id}
-                          checked={selectedHotels.includes(hotel._id)}
-                          onCheckedChange={(checked) => handleHotelSelection(hotel._id, checked as boolean)}
-                        />
-                        <label htmlFor={hotel._id} className="text-sm font-medium leading-none">
-                          {hotel.name} ({hotel.code})
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <Separator />
-
-            <div className="space-y-4">
-              <h3 className="text-sm font-medium">Configuration Sections</h3>
-              <p className="text-sm text-muted-foreground">Select which configuration sections to synchronize:</p>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="branding"
-                    checked={configSections.branding}
-                    onCheckedChange={() => handleConfigSectionChange("branding")}
-                  />
-                  <label htmlFor="branding" className="text-sm font-medium leading-none">
-                    Branding (colors, logo, fonts)
-                  </label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="documentPrefixes"
-                    checked={configSections.documentPrefixes}
-                    onCheckedChange={() => handleConfigSectionChange("documentPrefixes")}
-                  />
-                  <label htmlFor="documentPrefixes" className="text-sm font-medium leading-none">
-                    Document Prefixes (invoice, receipt, booking formats)
-                  </label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="systemSettings"
-                    checked={configSections.systemSettings}
-                    onCheckedChange={() => handleConfigSectionChange("systemSettings")}
-                  />
-                  <label htmlFor="systemSettings" className="text-sm font-medium leading-none">
-                    System Settings (date format, currency, timezone)
-                  </label>
-                </div>
+                <Label htmlFor="name">Hotel Name</Label>
+                <Input
+                  id="name"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  placeholder="Luxe New York"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="code">Hotel Code</Label>
+                <Input
+                  id="code"
+                  name="code"
+                  value={formData.code}
+                  onChange={handleChange}
+                  placeholder="LHI-NY"
+                  required
+                />
+                <p className="text-xs text-muted-foreground">Unique code for this hotel</p>
               </div>
             </div>
 
-            <Separator />
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="type">Hotel Type</Label>
+                <Select value={formData.type} onValueChange={(value) => handleSelectChange("type", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="hotel">Hotel</SelectItem>
+                    <SelectItem value="resort">Resort</SelectItem>
+                    <SelectItem value="motel">Motel</SelectItem>
+                    <SelectItem value="boutique">Boutique</SelectItem>
+                    <SelectItem value="apartment">Serviced Apartment</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="starRating">Star Rating</Label>
+                <Select value={formData.starRating} onValueChange={(value) => handleSelectChange("starRating", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select rating" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">Not Applicable</SelectItem>
+                    <SelectItem value="1">1 Star</SelectItem>
+                    <SelectItem value="2">2 Stars</SelectItem>
+                    <SelectItem value="3">3 Stars</SelectItem>
+                    <SelectItem value="4">4 Stars</SelectItem>
+                    <SelectItem value="5">5 Stars</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
 
             <div className="space-y-2">
-              <h3 className="text-sm font-medium">Synchronization Warning</h3>
-              <p className="text-sm text-muted-foreground">
-                This action will overwrite the selected configuration sections in all target hotels. Hotels with
-                override settings enabled will not be affected.
-              </p>
+              <Label htmlFor="parentHotel">Parent Hotel</Label>
+              <Select value={formData.parentHotel} onValueChange={(value) => handleSelectChange("parentHotel", value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select parent hotel" />
+                </SelectTrigger>
+                <SelectContent>
+                  {hotels.map((hotel) => (
+                    <SelectItem key={hotel._id} value={hotel._id}>
+                      {hotel.name} {hotel.isHeadquarters ? "(Headquarters)" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">The parent hotel in the chain hierarchy</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
+                placeholder="Describe the hotel"
+                rows={3}
+              />
             </div>
           </CardContent>
           <CardFooter className="flex justify-between">
-            <Button type="button" variant="outline" onClick={() => router.push(`/admin/chains/${chainCode}`)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.push(`/admin/chains/${chainCode}?tab=hotels`)}
+            >
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Synchronizing...
+                  Adding...
                 </>
               ) : (
                 <>
-                  <Sync className="mr-2 h-4 w-4" />
-                  Synchronize Configuration
+                  <Save className="mr-2 h-4 w-4" />
+                  Add Hotel
                 </>
               )}
             </Button>
