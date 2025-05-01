@@ -20,8 +20,8 @@ export type RoomType = {
   isActive: boolean
   createdAt: string
   updatedAt: string
-  id?: string // Added as it appears in the API response
-  availableRoomsCount?: number // Added as it appears in the API response
+  id?: string
+  availableRoomsCount?: number
 }
 
 export function useRoomTypes() {
