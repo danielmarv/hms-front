@@ -2,19 +2,45 @@
 
 import { useCallback } from "react"
 import { useApi } from "./use-api"
-import type { Hotel } from "./use-hotels"
 
-export interface UserHotelAccess {
+export interface Hotel {
   _id: string
-  user: string
-  hotel: string | Hotel
-  accessLevel: "full" | "limited" | "readonly"
-  permissions: string[]
-  accessAllBranches: boolean
-  accessibleBranches: string[]
-  isDefault: boolean
-  createdAt: string
-  updatedAt: string
+  name: string
+  code: string
+  chainCode?: string
+  type?: string
+  active?: boolean
+}
+
+export interface Role {
+  _id: string
+  name: string
+  description?: string
+}
+
+export interface HotelChain {
+  _id: string
+  name: string
+  chainCode: string
+  description?: string
+}
+
+export interface UserAccess {
+  _id?: string
+  hotel: Hotel | string
+  role?: Role | string
+  access_level: "read" | "write" | "admin"
+  accessAllBranches?: boolean
+  isDefault?: boolean
+}
+
+export interface User {
+  _id: string
+  full_name: string
+  email: string
+  role?: Role | string
+  status: "active" | "inactive"
+  accessible_hotels: UserAccess[]
 }
 
 export function useUserAccess() {
@@ -22,83 +48,137 @@ export function useUserAccess() {
 
   const getUserHotelAccess = useCallback(
     async (userId: string) => {
-      return await request<UserHotelAccess[]>(`/users/${userId}/hotels`)
+      try {
+        const response = await request<User | { data: User; success: boolean }>(`/users/${userId}`)
+
+        // Handle different response formats
+        if (response && typeof response === "object") {
+          if ("data" in response) {
+            return Array.isArray(response.data.accessible_hotels) ? response.data.accessible_hotels : []
+          }
+          return Array.isArray(response.accessible_hotels) ? response.accessible_hotels : []
+        }
+
+        return []
+      } catch (error) {
+        console.error("Error fetching user hotel access:", error)
+        return []
+      }
     },
     [request],
   )
 
-  const getHotelUserAccess = useCallback(
-    async (hotelId: string) => {
-      return await request<UserHotelAccess[]>(`/hotels/${hotelId}/users`)
-    },
-    [request],
-  )
-
-  const grantHotelAccess = useCallback(
+  const addUserHotelAccess = useCallback(
     async (
       userId: string,
       hotelId: string,
       accessData: {
-        accessLevel: "full" | "limited" | "readonly"
-        permissions?: string[]
-        accessAllBranches?: boolean
-        accessibleBranches?: string[]
-        isDefault?: boolean
+        roleId?: string
+        accessLevel: "read" | "write" | "admin"
       },
     ) => {
-      return await request<UserHotelAccess>(`/users/${userId}/hotels/${hotelId}`, "POST", accessData)
-    },
-    [request],
-  )
+      const payload = {
+        hotelId,
+        roleId: accessData.roleId,
+        accessLevel: accessData.accessLevel,
+      }
 
-  const updateHotelAccess = useCallback(
-    async (
-      userId: string,
-      hotelId: string,
-      accessData: {
-        accessLevel?: "full" | "limited" | "readonly"
-        permissions?: string[]
-        accessAllBranches?: boolean
-        accessibleBranches?: string[]
-        isDefault?: boolean
-      },
-    ) => {
-      return await request<UserHotelAccess>(`/users/${userId}/hotels/${hotelId}`, "PUT", accessData)
-    },
-    [request],
-  )
-
-  const revokeHotelAccess = useCallback(
-    async (userId: string, hotelId: string) => {
-      return await request<{}>(`/users/${userId}/hotels/${hotelId}`, "DELETE")
-    },
-    [request],
-  )
-
-  const getUserDefaultHotel = useCallback(
-    async (userId: string) => {
-      return await request<{ hotel: Hotel; accessLevel: string; accessAllBranches: boolean }>(
-        `/users/${userId}/default-hotel`,
+      const response = await request<{ success: boolean; data: { hotelAccess: UserAccess } }>(
+        `/users/${userId}/hotels`,
+        "POST",
+        payload,
       )
+
+      // Handle different response formats
+      if (response && typeof response === "object" && "data" in response) {
+        return response.data.hotelAccess
+      }
+
+      throw new Error("Invalid response format")
     },
     [request],
   )
 
-  const setUserDefaultHotel = useCallback(
+  const removeUserHotelAccess = useCallback(
     async (userId: string, hotelId: string) => {
-      return await request<{}>(`/users/${userId}/default-hotel/${hotelId}`, "PUT")
+      return await request<{ success: boolean; message: string }>(`/users/${userId}/hotels/${hotelId}`, "DELETE")
     },
     [request],
   )
+
+  const setDefaultHotel = useCallback(
+    async (userId: string, hotelId: string) => {
+      const response = await request<{ success: boolean; data: User }>(
+        `/users/${userId}/default-hotel/${hotelId}`,
+        "PUT",
+      )
+
+      // Return the updated user
+      if (response && typeof response === "object" && "data" in response) {
+        return response.data
+      }
+
+      throw new Error("Invalid response format")
+    },
+    [request],
+  )
+
+  const getAllHotels = useCallback(async () => {
+    try {
+      const response = await request<{ success: boolean; data: Hotel[] }>("/hotels")
+
+      // Handle different response formats
+      if (response && typeof response === "object" && "data" in response) {
+        return Array.isArray(response.data) ? response.data : []
+      }
+
+      return []
+    } catch (error) {
+      console.error("Error fetching hotels:", error)
+      return []
+    }
+  }, [request])
+
+  const getAllChains = useCallback(async () => {
+    try {
+      const response = await request<{ success: boolean; data: HotelChain[] }>("/chains")
+
+      // Handle different response formats
+      if (response && typeof response === "object" && "data" in response) {
+        return Array.isArray(response.data) ? response.data : []
+      }
+
+      return []
+    } catch (error) {
+      console.error("Error fetching chains:", error)
+      return []
+    }
+  }, [request])
+
+  const getAllRoles = useCallback(async () => {
+    try {
+      const response = await request<{ success: boolean; data: Role[] }>("/roles")
+
+      // Handle different response formats
+      if (response && typeof response === "object" && "data" in response) {
+        return Array.isArray(response.data) ? response.data : []
+      }
+
+      return []
+    } catch (error) {
+      console.error("Error fetching roles:", error)
+      return []
+    }
+  }, [request])
 
   return {
     isLoading,
     getUserHotelAccess,
-    getHotelUserAccess,
-    grantHotelAccess,
-    updateHotelAccess,
-    revokeHotelAccess,
-    getUserDefaultHotel,
-    setUserDefaultHotel,
+    addUserHotelAccess,
+    removeUserHotelAccess,
+    setDefaultHotel,
+    getAllHotels,
+    getAllChains,
+    getAllRoles,
   }
 }

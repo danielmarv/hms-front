@@ -144,7 +144,9 @@ export default function UsersPage() {
                     <TableRow key={user._id}>
                       <TableCell className="font-medium">{user.full_name}</TableCell>
                       <TableCell>{user.email}</TableCell>
-                      <TableCell className="capitalize">{user.role}</TableCell>
+                      <TableCell className="capitalize">
+                        {typeof user.role === "object" ? user.role.name : user.role}
+                      </TableCell>
                       <TableCell>
                         <Badge variant={user.status === "active" ? "default" : "outline"}>{user.status}</Badge>
                       </TableCell>
