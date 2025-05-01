@@ -15,16 +15,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ArrowLeft, Loader2, Save } from "lucide-react"
+import { useApi } from "@/hooks/use-api"
 import { useHotelChains, type Hotel } from "@/hooks/use-hotel-chains"
 
-export default function AddHotelToChainPage() {
+export default function EditHotelPage() {
   const params = useParams()
   const router = useRouter()
-  const chainCode = params.id as string
-  const { getChainDetails, addHotelToChain, isLoading: isLoadingChain } = useHotelChains()
+  const hotelId = params.id as string
+  const { request, isLoading: isLoadingApi } = useApi()
+  const { getChainDetails, isLoading: isLoadingChain } = useHotelChains()
 
-  const [chain, setChain] = useState<any>(null)
-  const [hotels, setHotels] = useState<Hotel[]>([])
+  const [hotel, setHotel] = useState<Hotel | null>(null)
+  const [chainHotels, setChainHotels] = useState<Hotel[]>([])
   const [formData, setFormData] = useState({
     name: "",
     code: "",
@@ -38,34 +40,48 @@ export default function AddHotelToChainPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
-    const fetchChainDetails = async () => {
+    const fetchHotelDetails = async () => {
       try {
         setIsLoading(true)
-        const response = await getChainDetails(chainCode)
-        if (response.data) {
-          setChain(response.data)
-          setHotels(response.data.hotels || [])
+        const response = await request<Hotel>(`/hotels/${hotelId}`)
 
-          // Set default parent hotel to headquarters
-          const headquarters = response.data.hotels?.find((hotel: Hotel) => hotel.isHeadquarters)
-          if (headquarters) {
-            setFormData((prev) => ({ ...prev, parentHotel: headquarters._id }))
+        if (response.data) {
+          setHotel(response.data)
+
+          // Initialize form data
+          setFormData({
+            name: response.data.name || "",
+            code: response.data.code || "",
+            description: response.data.description || "",
+            type: response.data.type || "hotel",
+            starRating: String(response.data.starRating || 0),
+            parentHotel: response.data.parentHotel || "",
+            active: response.data.active !== undefined ? response.data.active : true,
+          })
+
+          // If hotel belongs to a chain, fetch chain details to get parent hotel options
+          if (response.data.chainCode) {
+            const chainResponse = await getChainDetails(response.data.chainCode)
+            if (chainResponse.data && chainResponse.data.hotels) {
+              // Filter out the current hotel from parent options
+              setChainHotels(chainResponse.data.hotels.filter((h) => h._id !== hotelId))
+            }
           }
         } else {
-          toast.error("Failed to load chain details")
+          toast.error("Failed to load hotel details")
         }
-        setIsLoading(false)
       } catch (error) {
-        console.error("Error fetching chain details:", error)
-        toast.error("Failed to load chain details")
+        console.error("Error fetching hotel details:", error)
+        toast.error("Failed to load hotel details")
+      } finally {
         setIsLoading(false)
       }
     }
 
-    if (chainCode) {
-      fetchChainDetails()
+    if (hotelId) {
+      fetchHotelDetails()
     }
-  }, [chainCode, getChainDetails])
+  }, [hotelId, request, getChainDetails])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -85,38 +101,42 @@ export default function AddHotelToChainPage() {
     setIsSubmitting(true)
 
     try {
-      const response = await addHotelToChain(chainCode, {
+      const response = await request<Hotel>(`/hotels/${hotelId}`, "PUT", {
         name: formData.name,
         code: formData.code,
         description: formData.description,
         type: formData.type,
         starRating: Number(formData.starRating),
-        parentHotel: formData.parentHotel,
+        parentHotel: formData.parentHotel || null,
         active: formData.active,
       })
 
       if (response.data) {
-        toast.success("Hotel added to chain successfully")
-        router.push(`/admin/chains/${chainCode}/hotels`)
+        toast.success("Hotel updated successfully")
+
+        // Navigate back to the appropriate page
+        if (hotel?.chainCode) {
+          router.push(`/admin/chains/${hotel.chainCode}/hotels`)
+        } else {
+          router.push(`/admin/hotels`)
+        }
       } else {
-        throw new Error("Failed to add hotel to chain")
+        throw new Error("Failed to update hotel")
       }
     } catch (error: any) {
-      console.error("Error adding hotel to chain:", error)
-      toast.error(error.message || "Failed to add hotel to chain")
+      console.error("Error updating hotel:", error)
+      toast.error(error.message || "Failed to update hotel")
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  if (isLoading || isLoadingChain) {
+  if (isLoading || isLoadingApi || isLoadingChain) {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" asChild>
-            <Link href={`/admin/chains/${chainCode}/hotels`}>
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
+          <Button variant="outline" size="icon">
+            <ArrowLeft className="h-4 w-4" />
           </Button>
           <Skeleton className="h-8 w-64" />
         </div>
@@ -125,13 +145,13 @@ export default function AddHotelToChainPage() {
     )
   }
 
-  if (!chain) {
+  if (!hotel) {
     return (
       <div className="flex h-full flex-col items-center justify-center">
-        <h2 className="text-xl font-semibold">Hotel chain not found</h2>
-        <p className="text-muted-foreground">The requested hotel chain could not be found.</p>
+        <h2 className="text-xl font-semibold">Hotel not found</h2>
+        <p className="text-muted-foreground">The requested hotel could not be found.</p>
         <Button className="mt-4" asChild>
-          <Link href="/admin/chains">Back to Chains</Link>
+          <Link href="/admin/hotels">Back to Hotels</Link>
         </Button>
       </div>
     )
@@ -141,13 +161,13 @@ export default function AddHotelToChainPage() {
     <div className="space-y-6">
       <div className="flex items-center gap-2">
         <Button variant="outline" size="icon" asChild>
-          <Link href={`/admin/chains/${chainCode}/hotels`}>
+          <Link href={hotel.chainCode ? `/admin/chains/${hotel.chainCode}/hotels` : "/admin/hotels"}>
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Add Hotel to Chain</h1>
-          <p className="text-muted-foreground">Add a new hotel to {chain.name}</p>
+          <h1 className="text-3xl font-bold tracking-tight">Edit Hotel</h1>
+          <p className="text-muted-foreground">Update information for {hotel.name}</p>
         </div>
       </div>
 
@@ -218,22 +238,27 @@ export default function AddHotelToChainPage() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="parentHotel">Parent Hotel</Label>
-              <Select value={formData.parentHotel} onValueChange={(value) => handleSelectChange("parentHotel", value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select parent hotel" />
-                </SelectTrigger>
-                <SelectContent>
-                  {hotels.map((hotel) => (
-                    <SelectItem key={hotel._id} value={hotel._id}>
-                      {hotel.name} {hotel.isHeadquarters ? "(Headquarters)" : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">The parent hotel in the chain hierarchy</p>
-            </div>
+            {hotel.chainCode && chainHotels.length > 0 && (
+              <div className="space-y-2">
+                <Label htmlFor="parentHotel">Parent Hotel</Label>
+                <Select
+                  value={formData.parentHotel}
+                  onValueChange={(value) => handleSelectChange("parentHotel", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select parent hotel" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {chainHotels.map((h) => (
+                      <SelectItem key={h._id} value={h._id}>
+                        {h.name} {h.isHeadquarters ? "(Headquarters)" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">The parent hotel in the chain hierarchy</p>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="description">Description</Label>
@@ -257,19 +282,23 @@ export default function AddHotelToChainPage() {
             </div>
           </CardContent>
           <CardFooter className="flex justify-between">
-            <Button type="button" variant="outline" onClick={() => router.push(`/admin/chains/${chainCode}/hotels`)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.push(hotel.chainCode ? `/admin/chains/${hotel.chainCode}/hotels` : "/admin/hotels")}
+            >
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Adding...
+                  Saving...
                 </>
               ) : (
                 <>
                   <Save className="mr-2 h-4 w-4" />
-                  Add Hotel
+                  Save Changes
                 </>
               )}
             </Button>
