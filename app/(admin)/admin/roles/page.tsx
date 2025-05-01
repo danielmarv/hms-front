@@ -9,63 +9,34 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Loader2, MoreHorizontal, Plus, Trash, Edit, Key } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Loader2, MoreHorizontal, Plus, Trash, Edit, Key, AlertCircle } from "lucide-react"
+import { useRoles, type Role } from "@/hooks/use-roles"
 
 export default function RolesPage() {
-  const [roles, setRoles] = useState<any[]>([])
+  const { getAllRoles, deleteRole, isLoading: apiLoading } = useRoles()
+  const [roles, setRoles] = useState<Role[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [roleToDelete, setRoleToDelete] = useState<Role | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     const fetchRoles = async () => {
       try {
-        // In a real app, you would fetch this data from your API
-        // const response = await fetch('/api/roles')
-        // const data = await response.json()
-
-        // For now, we'll use mock data
-        setRoles([
-          {
-            _id: "1",
-            name: "super admin",
-            description: "Full system access with all permissions",
-            permissions: [
-              { _id: "p1", key: "manage_hotel", description: "Manage hotels" },
-              { _id: "p2", key: "manage_users", description: "Manage users" },
-              { _id: "p3", key: "manage_configuration", description: "Manage configuration" },
-              { _id: "p4", key: "view_all_data", description: "View all data" },
-            ],
-          },
-          {
-            _id: "2",
-            name: "hotel manager",
-            description: "Manage a specific hotel and its operations",
-            permissions: [
-              { _id: "p1", key: "manage_hotel", description: "Manage hotels" },
-              { _id: "p5", key: "manage_bookings", description: "Manage bookings" },
-              { _id: "p6", key: "manage_staff", description: "Manage staff" },
-            ],
-          },
-          {
-            _id: "3",
-            name: "receptionist",
-            description: "Front desk operations",
-            permissions: [
-              { _id: "p5", key: "manage_bookings", description: "Manage bookings" },
-              { _id: "p7", key: "check_in_out", description: "Check-in/out guests" },
-            ],
-          },
-          {
-            _id: "4",
-            name: "chain manager",
-            description: "Manage hotels across a chain",
-            permissions: [
-              { _id: "p1", key: "manage_hotel", description: "Manage hotels" },
-              { _id: "p3", key: "manage_configuration", description: "Manage configuration" },
-              { _id: "p4", key: "view_all_data", description: "View all data" },
-            ],
-          },
-        ])
+        setIsLoading(true)
+        const fetchedRoles = await getAllRoles()
+        setRoles(Array.isArray(fetchedRoles) ? fetchedRoles : [])
       } catch (error) {
         console.error("Error fetching roles:", error)
         toast.error("Failed to load roles")
@@ -75,13 +46,42 @@ export default function RolesPage() {
     }
 
     fetchRoles()
-  }, [])
+  }, [getAllRoles])
 
   const filteredRoles = roles.filter(
     (role) =>
       role.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       role.description.toLowerCase().includes(searchQuery.toLowerCase()),
   )
+
+  const handleDeleteClick = (role: Role) => {
+    setRoleToDelete(role)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!roleToDelete) return
+
+    try {
+      setIsDeleting(true)
+      await deleteRole(roleToDelete.id)
+      setRoles((prevRoles) => prevRoles.filter((role) => role.id !== roleToDelete.id))
+      toast.success(`Role "${roleToDelete.name}" deleted successfully`)
+    } catch (error: any) {
+      console.error("Error deleting role:", error)
+      if (error.message.includes("assigned to")) {
+        toast.error("Cannot delete role that is assigned to users")
+      } else if (error.message.includes("system roles")) {
+        toast.error("Cannot delete system roles")
+      } else {
+        toast.error("Failed to delete role")
+      }
+    } finally {
+      setIsDeleting(false)
+      setDeleteDialogOpen(false)
+      setRoleToDelete(null)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -139,18 +139,24 @@ export default function RolesPage() {
               </TableHeader>
               <TableBody>
                 {filteredRoles.map((role) => (
-                  <TableRow key={role._id}>
+                  <TableRow key={role.id}>
                     <TableCell className="font-medium capitalize">{role.name}</TableCell>
                     <TableCell>{role.description}</TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
-                        {role.permissions.slice(0, 3).map((permission: any) => (
-                          <Badge key={permission._id} variant="outline">
-                            {permission.key}
-                          </Badge>
-                        ))}
-                        {role.permissions.length > 3 && (
-                          <Badge variant="outline">+{role.permissions.length - 3} more</Badge>
+                        {role.permissions && role.permissions.length > 0 ? (
+                          <>
+                            {role.permissions.slice(0, 3).map((permission) => (
+                              <Badge key={permission.id} variant="outline">
+                                {permission.key}
+                              </Badge>
+                            ))}
+                            {role.permissions.length > 3 && (
+                              <Badge variant="outline">+{role.permissions.length - 3} more</Badge>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-muted-foreground">{role.permissionCount || 0} permissions</span>
                         )}
                       </div>
                     </TableCell>
@@ -164,23 +170,20 @@ export default function RolesPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem asChild>
-                            <Link href={`/admin/roles/${role._id}/edit`}>
+                            <Link href={`/admin/roles/${role.id}/edit`}>
                               <Edit className="mr-2 h-4 w-4" />
                               Edit
                             </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem asChild>
-                            <Link href={`/admin/roles/${role._id}/permissions`}>
+                            <Link href={`/admin/roles/${role.id}/permissions`}>
                               <Key className="mr-2 h-4 w-4" />
                               Manage Permissions
                             </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             className="text-destructive focus:text-destructive"
-                            onClick={() => {
-                              // In a real app, you would call an API to delete the role
-                              toast.success(`${role.name} would be deleted (demo only)`)
-                            }}
+                            onClick={() => handleDeleteClick(role)}
                           >
                             <Trash className="mr-2 h-4 w-4" />
                             Delete
@@ -195,6 +198,37 @@ export default function RolesPage() {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+              Delete Role
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the role "{roleToDelete?.name}"? This action cannot be undone.
+              {roleToDelete?.name === "super admin" || roleToDelete?.name === "admin" ? (
+                <p className="mt-2 text-destructive font-semibold">System roles cannot be deleted.</p>
+              ) : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                handleDeleteConfirm()
+              }}
+              disabled={isDeleting || roleToDelete?.name === "super admin" || roleToDelete?.name === "admin"}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash className="mr-2 h-4 w-4" />}
+              {isDeleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
