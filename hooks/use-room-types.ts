@@ -6,12 +6,19 @@ import { useApi } from "./use-api"
 export type RoomType = {
   _id: string
   name: string
+  description: string
   base_price: number
   category: string
-  description?: string
+  bedConfiguration: string
+  size: number
   max_occupancy: number
+  capacity: {
+    adults: number
+    children: number
+  }
   amenities?: string[]
   images?: string[]
+  isActive: boolean
   createdAt: string
   updatedAt: string
 }
@@ -37,17 +44,31 @@ export function useRoomTypes() {
   }
 
   const createRoomType = async (roomTypeData: Partial<RoomType>) => {
-    const { data, error } = await request<{ data: RoomType }>("/room-types", "POST", roomTypeData)
-    return { data: error ? null : data?.data, error }
+    const { data, error } = await request<{ data: RoomType; success: boolean; message?: string }>(
+      "/room-types",
+      "POST",
+      roomTypeData,
+    )
+    return {
+      data: error ? null : data?.data,
+      error: error || (data?.success === false ? data?.message : null),
+    }
   }
 
   const updateRoomType = async (id: string, roomTypeData: Partial<RoomType>) => {
-    const { data, error } = await request<{ data: RoomType }>(`/room-types/${id}`, "PUT", roomTypeData)
-    return { data: error ? null : data?.data, error }
+    const { data, error } = await request<{ data: RoomType; success: boolean; message?: string }>(
+      `/room-types/${id}`,
+      "PUT",
+      roomTypeData,
+    )
+    return {
+      data: error ? null : data?.data,
+      error: error || (data?.success === false ? data?.message : null),
+    }
   }
 
   const deleteRoomType = async (id: string) => {
-    const { data, error } = await request<{ message: string }>(`/room-types/${id}`, "DELETE")
+    const { data, error } = await request<{ message: string; success: boolean }>(`/room-types/${id}`, "DELETE")
     return { success: !error, message: error || data?.message }
   }
 
