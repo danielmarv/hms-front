@@ -1,271 +1,233 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useParams, useRouter } from "next/navigation"
-import { Building2, ChevronRight, Loader2, Users, Search, UserPlus, Check } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Skeleton } from "@/components/ui/skeleton"
-import { useHotelChains, type HotelChain } from "@/hooks/use-hotel-chains"
-import { toast } from "sonner"
+import { useParams } from "next/navigation"
 import Link from "next/link"
+import { toast } from "sonner"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
+import { Loader2, MoreHorizontal, Plus, Trash, Eye, Hotel } from "lucide-react"
+import { useHotelChains } from "@/hooks/use-hotel-chains"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
-interface User {
-  id: string
-  full_name: string
-  email: string
-  status: string
-}
-
-export default function AddChainUserPage() {
+export default function ChainUsersPage() {
   const params = useParams()
-  const router = useRouter()
   const chainCode = params.id as string
-  const { getChainDetails, grantChainAccess, isLoading } = useHotelChains()
-  const [chain, setChain] = useState<HotelChain | null>(null)
-  const [isLoadingChain, setIsLoadingChain] = useState(true)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [selectedUser, setSelectedUser] = useState<User | null>(null)
-  const [accessLevel, setAccessLevel] = useState("view")
+  const { getCrossHotelUsers, revokeChainAccess, getChainDetails } = useHotelChains()
 
-  // Mock users for demonstration - in a real app, this would come from an API
-  const [users, setUsers] = useState<User[]>([
-    { id: "1", full_name: "John Doe", email: "john@example.com", status: "active" },
-    { id: "2", full_name: "Jane Smith", email: "jane@example.com", status: "active" },
-    { id: "3", full_name: "Robert Johnson", email: "robert@example.com", status: "active" },
-    { id: "4", full_name: "Emily Davis", email: "emily@example.com", status: "inactive" },
-    { id: "5", full_name: "Michael Wilson", email: "michael@example.com", status: "active" },
-  ])
+  const [chainName, setChainName] = useState("")
+  const [users, setUsers] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [userToRevoke, setUserToRevoke] = useState<any | null>(null)
+  const [isRevoking, setIsRevoking] = useState(false)
 
   useEffect(() => {
-    const fetchChainDetails = async () => {
+    const fetchData = async () => {
+      setIsLoading(true)
       try {
-        setIsLoadingChain(true)
-        const response = await getChainDetails(chainCode)
-        if (response.data) {
-          setChain(response.data)
-        }
+        // Get chain details
+        const chainDetails = await getChainDetails(chainCode)
+        setChainName(chainDetails.name || chainDetails.headquarters?.name || "")
+
+        // Get users with access across the chain
+        const chainUsers = await getCrossHotelUsers(chainCode)
+        setUsers(chainUsers)
       } catch (error) {
-        console.error("Error fetching chain details:", error)
-        toast.error("Failed to load chain details")
+        console.error("Error fetching chain users:", error)
+        toast.error("Failed to load chain users")
       } finally {
-        setIsLoadingChain(false)
+        setIsLoading(false)
       }
     }
 
-    if (chainCode) {
-      fetchChainDetails()
+    fetchData()
+  }, [chainCode, getCrossHotelUsers, getChainDetails])
+
+  const handleRevokeAccess = async () => {
+    if (!userToRevoke) return
+
+    setIsRevoking(true)
+    try {
+      await revokeChainAccess(chainCode, userToRevoke.user.id)
+      toast.success(`Access revoked for ${userToRevoke.user.full_name}`)
+      setUsers(users.filter((user) => user.user.id !== userToRevoke.user.id))
+    } catch (error) {
+      console.error("Error revoking access:", error)
+      toast.error("Failed to revoke access")
+    } finally {
+      setIsRevoking(false)
+      setUserToRevoke(null)
     }
-  }, [chainCode, getChainDetails])
+  }
 
   const filteredUsers = users.filter(
     (user) =>
-      user.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase()),
+      user.user.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      user.user.email.toLowerCase().includes(searchQuery.toLowerCase()),
   )
-
-  const handleUserSelect = (user: User) => {
-    setSelectedUser(user)
-  }
-
-  const handleSubmit = async () => {
-    if (!selectedUser) {
-      toast.error("Please select a user")
-      return
-    }
-
-    try {
-      setIsSubmitting(true)
-
-      const response = await grantChainAccess(chainCode, {
-        userId: selectedUser.id,
-        accessLevel,
-      })
-
-      if (response.data) {
-        toast.success(`Access granted to ${response.data.hotelCount} hotels in the chain`)
-        router.push(`/admin/chains/${chainCode}/users`)
-      }
-    } catch (error) {
-      console.error("Error granting chain access:", error)
-      toast.error("Failed to grant chain access")
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  if (isLoadingChain) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center space-x-2">
-          <Skeleton className="h-8 w-[250px]" />
-          <ChevronRight className="h-4 w-4 text-muted-foreground" />
-          <Skeleton className="h-8 w-[150px]" />
-        </div>
-        <Skeleton className="h-[500px] w-full" />
-      </div>
-    )
-  }
-
-  if (!chain) {
-    return (
-      <div className="flex h-[600px] flex-col items-center justify-center">
-        <Building2 className="h-16 w-16 text-muted-foreground" />
-        <h2 className="mt-4 text-2xl font-bold">Chain Not Found</h2>
-        <p className="mt-2 text-muted-foreground">The hotel chain you're looking for doesn't exist</p>
-        <Button className="mt-6" onClick={() => router.push("/admin/chains")}>
-          Back to Chains
-        </Button>
-      </div>
-    )
-  }
 
   return (
     <div className="space-y-6">
-      <div>
-        <div className="flex items-center space-x-2">
-          <Link href="/admin/chains" className="text-muted-foreground hover:text-foreground">
-            Hotel Chains
-          </Link>
-          <ChevronRight className="h-4 w-4 text-muted-foreground" />
-          <Link href={`/admin/chains/${chainCode}`} className="text-muted-foreground hover:text-foreground">
-            {chain.name}
-          </Link>
-          <ChevronRight className="h-4 w-4 text-muted-foreground" />
-          <Link href={`/admin/chains/${chainCode}/users`} className="text-muted-foreground hover:text-foreground">
-            Users
-          </Link>
-          <ChevronRight className="h-4 w-4 text-muted-foreground" />
-          <span className="font-medium">Add Chain User</span>
+      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Chain Users</h1>
+          <p className="text-muted-foreground">
+            Manage users with access to {chainName} ({chainCode})
+          </p>
         </div>
-        <h1 className="text-3xl font-bold tracking-tight">Add Chain User</h1>
-        <p className="text-muted-foreground">Grant a user access to all hotels in the {chain.name} chain</p>
+        <Button asChild>
+          <Link href={`/admin/chains/${chainCode}/users/add`}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Chain User
+          </Link>
+        </Button>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Select User</CardTitle>
-          <CardDescription>Choose a user to grant chain-wide access</CardDescription>
-          <div className="mt-4 flex items-center gap-2">
-            <Search className="h-4 w-4 text-muted-foreground" />
+          <CardTitle>Users with Chain Access</CardTitle>
+          <CardDescription>Users who have access across multiple hotels in this chain</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="mb-4">
             <Input
-              placeholder="Search users..."
+              placeholder="Search by name or email..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="max-w-sm"
             />
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
-            <div className="max-h-[300px] overflow-y-auto">
-              {filteredUsers.length === 0 ? (
-                <div className="flex h-[100px] flex-col items-center justify-center p-4 text-center">
-                  <Users className="h-8 w-8 text-muted-foreground" />
-                  <p className="mt-2 text-sm text-muted-foreground">No users found</p>
-                </div>
-              ) : (
-                <div className="divide-y">
-                  {filteredUsers.map((user) => (
-                    <div
-                      key={user.id}
-                      className={`flex cursor-pointer items-center justify-between p-4 hover:bg-muted/50 ${
-                        selectedUser?.id === user.id ? "bg-muted" : ""
-                      }`}
-                      onClick={() => handleUserSelect(user)}
-                    >
-                      <div className="flex items-center space-x-4">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-                          {user.full_name.charAt(0)}
-                        </div>
-                        <div>
-                          <div className="font-medium">{user.full_name}</div>
-                          <div className="text-sm text-muted-foreground">{user.email}</div>
-                        </div>
-                      </div>
-                      {selectedUser?.id === user.id && <Check className="h-5 w-5 text-primary" />}
-                    </div>
-                  ))}
-                </div>
-              )}
+
+          {isLoading ? (
+            <div className="flex h-40 items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
-          </div>
+          ) : filteredUsers.length === 0 ? (
+            <div className="flex h-40 flex-col items-center justify-center">
+              <p className="text-muted-foreground">No users found with chain-wide access</p>
+              <Button asChild className="mt-4">
+                <Link href={`/admin/chains/${chainCode}/users/add`}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Chain User
+                </Link>
+              </Button>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Access Level</TableHead>
+                  <TableHead>Hotels</TableHead>
+                  <TableHead className="w-[100px]">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredUsers.map((user) => (
+                  <TableRow key={user.user.id}>
+                    <TableCell className="font-medium">{user.user.full_name}</TableCell>
+                    <TableCell>{user.user.email}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          user.hotelAccess[0]?.accessLevel === "full"
+                            ? "default"
+                            : user.hotelAccess[0]?.accessLevel === "limited"
+                              ? "secondary"
+                              : "outline"
+                        }
+                      >
+                        {user.hotelAccess[0]?.accessLevel || "read-only"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Hotel className="h-4 w-4 text-muted-foreground" />
+                        <span>{user.hotelAccess.length}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">Open menu</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem asChild>
+                            <Link href={`/admin/users/${user.user.id}`}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              View User
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link href={`/admin/users/${user.user.id}/access`}>
+                              <Hotel className="mr-2 h-4 w-4" />
+                              Manage Access
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={() => setUserToRevoke(user)}
+                          >
+                            <Trash className="mr-2 h-4 w-4" />
+                            Revoke Chain Access
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 
-      {selectedUser && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Access Level</CardTitle>
-            <CardDescription>
-              Set the access level for {selectedUser.full_name} across all hotels in the chain
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <RadioGroup value={accessLevel} onValueChange={setAccessLevel}>
-              <div className="space-y-4">
-                <div className="flex items-start space-x-2 rounded-md border p-4">
-                  <RadioGroupItem value="view" id="view" className="mt-1" />
-                  <div className="flex-1">
-                    <Label htmlFor="view" className="font-medium">
-                      View Access
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      Can view information across all hotels in the chain but cannot make changes
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start space-x-2 rounded-md border p-4">
-                  <RadioGroupItem value="edit" id="edit" className="mt-1" />
-                  <div className="flex-1">
-                    <Label htmlFor="edit" className="font-medium">
-                      Edit Access
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      Can view and edit information across all hotels in the chain
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start space-x-2 rounded-md border p-4">
-                  <RadioGroupItem value="full" id="full" className="mt-1" />
-                  <div className="flex-1">
-                    <Label htmlFor="full" className="font-medium">
-                      Full Access
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      Has complete control over all hotels in the chain, including configuration and user management
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </RadioGroup>
-          </CardContent>
-          <CardFooter className="flex justify-between">
-            <Button variant="outline" onClick={() => router.push(`/admin/chains/${chainCode}/users`)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSubmit} disabled={isSubmitting}>
-              {isSubmitting ? (
+      <AlertDialog open={!!userToRevoke} onOpenChange={(open) => !open && setUserToRevoke(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Revoke chain access?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove {userToRevoke?.user.full_name}'s access to all hotels in the {chainName} chain. They will
+              no longer be able to access any hotels in this chain unless individually granted access.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleRevokeAccess}
+              disabled={isRevoking}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isRevoking ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Granting Access...
+                  Revoking...
                 </>
               ) : (
-                <>
-                  <UserPlus className="mr-2 h-4 w-4" />
-                  Grant Chain Access
-                </>
+                "Revoke Access"
               )}
-            </Button>
-          </CardFooter>
-        </Card>
-      )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
