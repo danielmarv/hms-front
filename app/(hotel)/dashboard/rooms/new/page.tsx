@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -8,27 +8,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
-import { Separator } from "@/components/ui/separator"
+import { Textarea } from "@/components/ui/textarea"
 import { toast } from "sonner"
-import { ArrowLeft } from "lucide-react"
 import { useRooms } from "@/hooks/use-rooms"
 import { useRoomTypes } from "@/hooks/use-room-types"
+import { Separator } from "@/components/ui/separator"
+import { ArrowLeft } from "lucide-react"
 
 export default function NewRoomPage() {
   const router = useRouter()
   const { createRoom } = useRooms()
-  const { roomTypes, fetchRoomTypes, isLoading: isLoadingRoomTypes } = useRoomTypes()
+  const { roomTypes, fetchRoomTypes, isLoading: roomTypesLoading } = useRoomTypes()
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState({
-    number: "",
-    floor: "",
+    roomNumber: "", // Changed from roomNumber to number to match backend
+    floor: "1",
+    roomType: "", // Changed from roomTypeId to roomType to match backend
     building: "Main Building",
-    room_type: "",
     status: "available",
-    view: "",
     is_smoking_allowed: false,
     is_accessible: false,
     has_smart_lock: false,
@@ -36,12 +35,22 @@ export default function NewRoomPage() {
     notes: "",
   })
 
-  useEffect(() => {
+  // Use useCallback to prevent the function from being recreated on each render
+  const loadRoomTypes = useCallback(() => {
     fetchRoomTypes()
-  }, [])
+  }, [fetchRoomTypes])
+
+  // Call fetchRoomTypes only once when the component mounts
+  useEffect(() => {
+    loadRoomTypes()
+  }, [loadRoomTypes])
 
   const handleChange = (e) => {
     const { name, value } = e.target
+    setFormData((prev) => ({ ...prev, [name]: value }))
+  }
+
+  const handleSelectChange = (name) => (value) => {
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
@@ -49,16 +58,12 @@ export default function NewRoomPage() {
     setFormData((prev) => ({ ...prev, [name]: checked }))
   }
 
-  const handleSelectChange = (name) => (value) => {
-    setFormData((prev) => ({ ...prev, [name]: value }))
-  }
-
   const handleSubmit = async (e) => {
     e.preventDefault()
     setIsSubmitting(true)
 
     try {
-      // Process amenities from comma-separated string to array
+      // Process amenities from comma-separated string to array if needed
       const processedData = {
         ...formData,
         amenities: formData.amenities ? formData.amenities.split(",").map((item) => item.trim()) : [],
@@ -68,7 +73,7 @@ export default function NewRoomPage() {
 
       if (data) {
         toast.success("Room created successfully")
-        router.push(`/dashboard/rooms/${data._id}`)
+        router.push("/dashboard/rooms")
       } else {
         toast.error(`Failed to create room: ${error}`)
       }
@@ -90,24 +95,24 @@ export default function NewRoomPage() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Add New Room</h1>
-          <p className="text-muted-foreground">Create a new room in your hotel</p>
+          <p className="text-muted-foreground">Create a new room in your hotel inventory</p>
         </div>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>Room Details</CardTitle>
-          <CardDescription>Enter the basic information about the room</CardDescription>
+          <CardDescription>Enter the basic information about this room</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label htmlFor="number">Room Number *</Label>
+                <Label htmlFor="roomNumber">Room Number *</Label>
                 <Input
-                  id="number"
-                  name="number"
-                  value={formData.number}
+                  id="roomNumber"
+                  name="roomNumber"
+                  value={formData.roomNumber}
                   onChange={handleChange}
                   placeholder="e.g. 101"
                   required
@@ -115,26 +120,29 @@ export default function NewRoomPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="room_type">Room Type *</Label>
-                <Select value={formData.room_type} onValueChange={handleSelectChange("room_type")} required>
+                <Label htmlFor="roomType">Room Type *</Label>
+                <Select
+                  value={formData.roomType || "default"}
+                  onValueChange={handleSelectChange("roomType")}
+                  required
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select room type" />
                   </SelectTrigger>
                   <SelectContent>
-                    {isLoadingRoomTypes ? (
-                      <SelectItem value="" disabled>
-                        Loading room types...
-                      </SelectItem>
-                    ) : roomTypes.length === 0 ? (
-                      <SelectItem value="" disabled>
-                        No room types available
-                      </SelectItem>
-                    ) : (
+                    <SelectItem value="default" disabled>
+                      Select a room type
+                    </SelectItem>
+                    {roomTypesLoading ? (
+                      <SelectItem value="loading">Loading room types...</SelectItem>
+                    ) : roomTypes.length > 0 ? (
                       roomTypes.map((type) => (
                         <SelectItem key={type._id} value={type._id}>
-                          {type.name} (${type.base_price}/night)
+                          {type.name} ({type.bedConfiguration})
                         </SelectItem>
                       ))
+                    ) : (
+                      <SelectItem value="no-types">No room types available</SelectItem>
                     )}
                   </SelectContent>
                 </Select>
@@ -145,6 +153,7 @@ export default function NewRoomPage() {
                 <Input
                   id="floor"
                   name="floor"
+                  type="text"
                   value={formData.floor}
                   onChange={handleChange}
                   placeholder="e.g. 1"
@@ -153,14 +162,13 @@ export default function NewRoomPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="building">Building *</Label>
+                <Label htmlFor="building">Building</Label>
                 <Input
                   id="building"
                   name="building"
                   value={formData.building}
                   onChange={handleChange}
                   placeholder="e.g. Main Building"
-                  required
                 />
               </div>
 
@@ -179,17 +187,6 @@ export default function NewRoomPage() {
                     <SelectItem value="out_of_order">Out of Order</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="view">View (Optional)</Label>
-                <Input
-                  id="view"
-                  name="view"
-                  value={formData.view}
-                  onChange={handleChange}
-                  placeholder="e.g. Ocean, Garden, City"
-                />
               </div>
             </div>
 
@@ -229,7 +226,7 @@ export default function NewRoomPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="amenities">Amenities (Optional, comma-separated)</Label>
+              <Label htmlFor="amenities">Amenities (comma-separated)</Label>
               <Input
                 id="amenities"
                 name="amenities"
@@ -240,7 +237,7 @@ export default function NewRoomPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="notes">Notes (Optional)</Label>
+              <Label htmlFor="notes">Notes</Label>
               <Textarea
                 id="notes"
                 name="notes"

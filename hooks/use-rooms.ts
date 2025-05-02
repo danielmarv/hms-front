@@ -7,20 +7,21 @@ export type RoomStatus = "available" | "occupied" | "maintenance" | "cleaning" |
 
 export type Room = {
   _id: string
-  number: string
-  floor: string
-  building: string
+  roomNumber: string // Changed from roomNumber to number to match backend
+  floor: string | number
+  building?: string
   status: RoomStatus
-  room_type: {
+  roomType: {
+    // Changed from roomType to room_type to match backend
     _id: string
     name: string
-    base_price: number
-    category: string
+    basePrice: number
+    bedConfiguration?: string
   }
   view?: string
-  is_smoking_allowed: boolean
-  is_accessible: boolean
-  has_smart_lock: boolean
+  is_smoking_allowed?: boolean
+  is_accessible?: boolean
+  has_smart_lock?: boolean
   connected_rooms?: string[]
   amenities?: string[]
   notes?: string
@@ -35,7 +36,7 @@ export type RoomFilters = {
   view?: string
   is_smoking_allowed?: boolean
   is_accessible?: boolean
-  room_type?: string
+  room_type?: string // Changed from roomType to room_type to match backend
   has_smart_lock?: boolean
   sort?: string
   limit?: number
@@ -52,6 +53,20 @@ export type RoomStats = {
   out_of_order: number
 }
 
+export type CreateRoomData = {
+  roomNumber: string // Changed from roomNumber to number to match backend
+  floor: string | number
+  roomType: string // Changed from roomTypeId to room_type to match backend
+  building?: string
+  status?: RoomStatus
+  view?: string
+  is_smoking_allowed?: boolean
+  is_accessible?: boolean
+  has_smart_lock?: boolean
+  amenities?: string[]
+  notes?: string
+}
+
 export function useRooms() {
   const { request, isLoading } = useApi()
   const [rooms, setRooms] = useState<Room[]>([])
@@ -63,7 +78,6 @@ export function useRooms() {
     total: 0,
   })
 
-  // Fix the fetchRooms function to handle the API response structure correctly
   const fetchRooms = async (filters: RoomFilters = {}) => {
     const queryParams = new URLSearchParams()
 
@@ -106,7 +120,7 @@ export function useRooms() {
     return error ? null : data?.data
   }
 
-  const createRoom = async (roomData: Partial<Room>) => {
+  const createRoom = async (roomData: CreateRoomData) => {
     const { data, error } = await request<{ data: Room }>("/rooms", "POST", roomData)
     return { data: error ? null : data?.data, error }
   }
