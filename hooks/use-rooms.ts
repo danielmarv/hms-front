@@ -1,18 +1,17 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { useApi } from "./use-api"
 
 export type RoomStatus = "available" | "occupied" | "maintenance" | "cleaning" | "reserved" | "out_of_order"
 
 export type Room = {
   _id: string
-  roomNumber: string // Changed from roomNumber to number to match backend
+  roomNumber: string
   floor: string | number
   building?: string
   status: RoomStatus
   roomType: {
-    // Changed from roomType to room_type to match backend
     _id: string
     name: string
     basePrice: number
@@ -36,7 +35,7 @@ export type RoomFilters = {
   view?: string
   is_smoking_allowed?: boolean
   is_accessible?: boolean
-  room_type?: string // Changed from roomType to room_type to match backend
+  room_type?: string
   has_smart_lock?: boolean
   sort?: string
   limit?: number
@@ -54,9 +53,9 @@ export type RoomStats = {
 }
 
 export type CreateRoomData = {
-  roomNumber: string // Changed from roomNumber to number to match backend
+  roomNumber: string
   floor: string | number
-  roomType: string // Changed from roomTypeId to room_type to match backend
+  roomType: string
   building?: string
   status?: RoomStatus
   view?: string
@@ -78,112 +77,285 @@ export function useRooms() {
     total: 0,
   })
 
-  const fetchRooms = async (filters: RoomFilters = {}) => {
-    const queryParams = new URLSearchParams()
+  const fetchRooms = useCallback(
+    async (filters: RoomFilters = {}) => {
+      const queryParams = new URLSearchParams()
 
-    // Add filters to query params
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== "") {
-        queryParams.append(key, String(value))
-      }
-    })
-
-    const { data, error } = await request<{
-      data: Room[]
-      pagination?: {
-        page: number
-        limit: number
-        totalPages: number
-      }
-      total?: number
-    }>(`/rooms?${queryParams.toString()}`)
-
-    if (data && !error) {
-      setRooms(data.data || [])
-
-      // Handle the case where pagination might not be in the response
-      setPagination({
-        page: data.pagination?.page || 1,
-        limit: data.pagination?.limit || 10,
-        totalPages: data.pagination?.totalPages || 1,
-        total: data.total || data.data.length || 0,
+      // Add filters to query params
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== "") {
+          queryParams.append(key, String(value))
+        }
       })
 
-      return data.data
-    }
+      try {
+        const { data, error } = await request<{
+          data?: Room[] | null
+          pagination?: {
+            page: number
+            limit: number
+            totalPages: number
+          }
+          total?: number
+          success?: boolean
+        }>(`/rooms?${queryParams.toString()}`)
 
-    return []
-  }
+        if (data && !error) {
+          // Handle case where data might be directly the array or nested in data property
+          const roomsData = Array.isArray(data) ? data : Array.isArray(data.data) ? data.data : null
 
-  const fetchRoomById = async (id: string) => {
-    const { data, error } = await request<{ data: Room }>(`/rooms/${id}`)
-    return error ? null : data?.data
-  }
+          if (roomsData) {
+            setRooms(roomsData)
 
-  const createRoom = async (roomData: CreateRoomData) => {
-    const { data, error } = await request<{ data: Room }>("/rooms", "POST", roomData)
-    return { data: error ? null : data?.data, error }
-  }
+            // Handle the case where pagination might not be in the response
+            setPagination({
+              page: data.pagination?.page || 1,
+              limit: data.pagination?.limit || 10,
+              totalPages: data.pagination?.totalPages || 1,
+              total: data.total || (roomsData ? roomsData.length : 0),
+            })
 
-  const updateRoom = async (id: string, roomData: Partial<Room>) => {
-    const { data, error } = await request<{ data: Room }>(`/rooms/${id}`, "PUT", roomData)
-    return { data: error ? null : data?.data, error }
-  }
+            return roomsData
+          }
+        }
 
-  const deleteRoom = async (id: string) => {
-    const { data, error } = await request<{ message: string }>(`/rooms/${id}`, "DELETE")
-    return { success: !error, message: error || data?.message }
-  }
-
-  const updateRoomStatus = async (id: string, status: RoomStatus) => {
-    const { data, error } = await request<{ data: Room }>(`/rooms/${id}/status`, "PATCH", { status })
-    return { data: error ? null : data?.data, error }
-  }
-
-  const fetchRoomStats = async () => {
-    const { data, error } = await request<{ data: RoomStats }>("/rooms/stats")
-
-    if (data && !error) {
-      setRoomStats(data.data)
-      return data.data
-    }
-
-    return null
-  }
-
-  const connectRooms = async (roomIds: string[]) => {
-    const { data, error } = await request<{ message: string }>("/rooms/connect", "POST", { roomIds })
-    return { success: !error, message: error || data?.message }
-  }
-
-  const disconnectRooms = async (roomId: string, disconnectFromId: string) => {
-    const { data, error } = await request<{ message: string }>("/rooms/disconnect", "POST", {
-      roomId,
-      disconnectFromId,
-    })
-    return { success: !error, message: error || data?.message }
-  }
-
-  const fetchAvailableRooms = async (
-    startDate: string,
-    endDate: string,
-    filters: Omit<RoomFilters, "status" | "sort" | "limit" | "page"> = {},
-  ) => {
-    const queryParams = new URLSearchParams({
-      startDate,
-      endDate,
-    })
-
-    // Add filters to query params
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== "") {
-        queryParams.append(key, String(value))
+        // If we get here, something went wrong
+        console.error("Error fetching rooms:", error || "Invalid response format")
+        return []
+      } catch (err) {
+        console.error("Exception fetching rooms:", err)
+        return []
       }
-    })
+    },
+    [request],
+  )
 
-    const { data, error } = await request<{ data: Room[] }>(`/rooms/available?${queryParams.toString()}`)
-    return error ? [] : data?.data || []
-  }
+  const fetchRoomById = useCallback(
+    async (id: string) => {
+      try {
+        const { data, error } = await request<{ data?: Room; success?: boolean }>(`/rooms/${id}`)
+
+        if (error) {
+          console.error("Error fetching room:", error)
+          return null
+        }
+
+        // Handle case where data might be directly the room or nested in data property
+        return data?.data || (data && !("data" in data) ? (data as unknown as Room) : null)
+      } catch (err) {
+        console.error("Exception fetching room:", err)
+        return null
+      }
+    },
+    [request],
+  )
+
+  const createRoom = useCallback(
+    async (roomData: CreateRoomData) => {
+      try {
+        const { data, error } = await request<{ data?: Room; success?: boolean; message?: string }>(
+          "/rooms",
+          "POST",
+          roomData,
+        )
+
+        if (error || data?.success === false) {
+          const errorMessage = error || data?.message || "Failed to create room"
+          console.error("Error creating room:", errorMessage)
+          return { data: null, error: errorMessage }
+        }
+
+        return {
+          data: data?.data || (data && !("data" in data) ? (data as unknown as Room) : null),
+          error: null,
+        }
+      } catch (err) {
+        console.error("Exception creating room:", err)
+        return { data: null, error: err instanceof Error ? err.message : "Unknown error" }
+      }
+    },
+    [request],
+  )
+
+  const updateRoom = useCallback(
+    async (id: string, roomData: Partial<Room>) => {
+      try {
+        const { data, error } = await request<{ data?: Room; success?: boolean; message?: string }>(
+          `/rooms/${id}`,
+          "PUT",
+          roomData,
+        )
+
+        if (error || data?.success === false) {
+          const errorMessage = error || data?.message || "Failed to update room"
+          console.error("Error updating room:", errorMessage)
+          return { data: null, error: errorMessage }
+        }
+
+        return {
+          data: data?.data || (data && !("data" in data) ? (data as unknown as Room) : null),
+          error: null,
+        }
+      } catch (err) {
+        console.error("Exception updating room:", err)
+        return { data: null, error: err instanceof Error ? err.message : "Unknown error" }
+      }
+    },
+    [request],
+  )
+
+  const deleteRoom = useCallback(
+    async (id: string) => {
+      try {
+        const { data, error } = await request<{ message?: string; success?: boolean }>(`/rooms/${id}`, "DELETE")
+
+        if (error || data?.success === false) {
+          const errorMessage = error || data?.message || "Failed to delete room"
+          console.error("Error deleting room:", errorMessage)
+          return { success: false, message: errorMessage }
+        }
+
+        return { success: true, message: data?.message || "Room deleted successfully" }
+      } catch (err) {
+        console.error("Exception deleting room:", err)
+        return { success: false, message: err instanceof Error ? err.message : "Unknown error" }
+      }
+    },
+    [request],
+  )
+
+  const updateRoomStatus = useCallback(
+    async (id: string, status: RoomStatus) => {
+      try {
+        const { data, error } = await request<{ data?: Room; success?: boolean; message?: string }>(
+          `/rooms/${id}/status`,
+          "PATCH",
+          { status },
+        )
+
+        if (error || data?.success === false) {
+          const errorMessage = error || data?.message || "Failed to update room status"
+          console.error("Error updating room status:", errorMessage)
+          return { data: null, error: errorMessage }
+        }
+
+        return {
+          data: data?.data || (data && !("data" in data) ? (data as unknown as Room) : null),
+          error: null,
+        }
+      } catch (err) {
+        console.error("Exception updating room status:", err)
+        return { data: null, error: err instanceof Error ? err.message : "Unknown error" }
+      }
+    },
+    [request],
+  )
+
+  const fetchRoomStats = useCallback(async () => {
+    try {
+      const { data, error } = await request<{ data?: RoomStats; success?: boolean }>("/rooms/stats")
+
+      if (error || data?.success === false) {
+        console.error("Error fetching room stats:", error || "Invalid response format")
+        return null
+      }
+
+      const statsData = data?.data || (data && !("data" in data) ? (data as unknown as RoomStats) : null)
+
+      if (statsData) {
+        setRoomStats(statsData)
+        return statsData
+      }
+
+      return null
+    } catch (err) {
+      console.error("Exception fetching room stats:", err)
+      return null
+    }
+  }, [request])
+
+  const connectRooms = useCallback(
+    async (roomIds: string[]) => {
+      try {
+        const { data, error } = await request<{ message?: string; success?: boolean }>("/rooms/connect", "POST", {
+          roomIds,
+        })
+
+        if (error || data?.success === false) {
+          const errorMessage = error || data?.message || "Failed to connect rooms"
+          console.error("Error connecting rooms:", errorMessage)
+          return { success: false, message: errorMessage }
+        }
+
+        return { success: true, message: data?.message || "Rooms connected successfully" }
+      } catch (err) {
+        console.error("Exception connecting rooms:", err)
+        return { success: false, message: err instanceof Error ? err.message : "Unknown error" }
+      }
+    },
+    [request],
+  )
+
+  const disconnectRooms = useCallback(
+    async (roomId: string, disconnectFromId: string) => {
+      try {
+        const { data, error } = await request<{ message?: string; success?: boolean }>("/rooms/disconnect", "POST", {
+          roomId,
+          disconnectFromId,
+        })
+
+        if (error || data?.success === false) {
+          const errorMessage = error || data?.message || "Failed to disconnect rooms"
+          console.error("Error disconnecting rooms:", errorMessage)
+          return { success: false, message: errorMessage }
+        }
+
+        return { success: true, message: data?.message || "Rooms disconnected successfully" }
+      } catch (err) {
+        console.error("Exception disconnecting rooms:", err)
+        return { success: false, message: err instanceof Error ? err.message : "Unknown error" }
+      }
+    },
+    [request],
+  )
+
+  const fetchAvailableRooms = useCallback(
+    async (
+      startDate: string,
+      endDate: string,
+      filters: Omit<RoomFilters, "status" | "sort" | "limit" | "page"> = {},
+    ) => {
+      try {
+        const queryParams = new URLSearchParams({
+          startDate,
+          endDate,
+        })
+
+        // Add filters to query params
+        Object.entries(filters).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== "") {
+            queryParams.append(key, String(value))
+          }
+        })
+
+        const { data, error } = await request<{ data?: Room[]; success?: boolean }>(
+          `/rooms/available?${queryParams.toString()}`,
+        )
+
+        if (error || data?.success === false) {
+          console.error("Error fetching available rooms:", error || "Invalid response format")
+          return []
+        }
+
+        // Handle case where data might be directly the array or nested in data property
+        return Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : []
+      } catch (err) {
+        console.error("Exception fetching available rooms:", err)
+        return []
+      }
+    },
+    [request],
+  )
 
   return {
     rooms,

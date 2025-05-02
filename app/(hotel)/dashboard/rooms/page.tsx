@@ -33,7 +33,7 @@ export default function RoomsPage() {
   useEffect(() => {
     fetchRooms({
       status: statusFilter !== "all" ? (statusFilter as RoomStatus) : undefined,
-      room_type: typeFilter !== "all" ? typeFilter : undefined,
+      roomType: typeFilter !== "all" ? typeFilter : undefined,
       page: currentPage,
       limit: 10,
     })
@@ -46,7 +46,7 @@ export default function RoomsPage() {
     setCurrentPage(1)
     fetchRooms({
       status: statusFilter !== "all" ? (statusFilter as RoomStatus) : undefined,
-      room_type: typeFilter !== "all" ? typeFilter : undefined,
+      roomType: typeFilter !== "all" ? typeFilter : undefined,
       page: 1,
       limit: 10,
     })
@@ -209,12 +209,14 @@ export default function RoomsPage() {
                 ) : (
                   rooms.map((room) => (
                     <TableRow key={room._id}>
-                      <TableCell className="font-medium">{room.number}</TableCell>
-                      <TableCell>{room.room_type?.name || "N/A"}</TableCell>
+                      <TableCell className="font-medium">{room.roomNumber}</TableCell>
+                      <TableCell>{room.roomType?.name || "N/A"}</TableCell>
                       <TableCell className="hidden md:table-cell">{room.floor}</TableCell>
                       <TableCell className="hidden md:table-cell">{room.building}</TableCell>
                       <TableCell>{getStatusBadge(room.status)}</TableCell>
-                      <TableCell className="text-right">${room.room_type?.base_price || 0}</TableCell>
+                      <TableCell className="text-right">
+                        ${room.roomType?.basePice || room.roomType?.basePrice || 0}
+                      </TableCell>
                       <TableCell className="text-right">
                         <Button variant="ghost" size="sm" asChild>
                           <Link href={`/dashboard/rooms/${room._id}`}>View</Link>

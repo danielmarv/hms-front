@@ -23,9 +23,9 @@ export default function NewRoomPage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState({
-    roomNumber: "", // Changed from roomNumber to number to match backend
+    roomNumber: "", // Changed from number
     floor: "1",
-    roomType: "", // Changed from roomTypeId to roomType to match backend
+    roomType: "", // Changed from room_type
     building: "Main Building",
     status: "available",
     is_smoking_allowed: false,
@@ -121,11 +121,7 @@ export default function NewRoomPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="roomType">Room Type *</Label>
-                <Select
-                  value={formData.roomType || "default"}
-                  onValueChange={handleSelectChange("roomType")}
-                  required
-                >
+                <Select value={formData.roomType || "default"} onValueChange={handleSelectChange("roomType")} required>
                   <SelectTrigger>
                     <SelectValue placeholder="Select room type" />
                   </SelectTrigger>

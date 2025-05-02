@@ -104,7 +104,7 @@ export default function RoomDetailPage() {
       case "cleaning":
         return (
           <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
-            <Clock className="mr-1 h-3 w-3" /> Cleaning
+            <Clock className="mr-1 h-3 w-3" /> Cleaningg
           </Badge>
         )
       case "reserved":
@@ -179,9 +179,9 @@ export default function RoomDetailPage() {
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Room {room.number}</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Room {room.roomNumber}</h1>
             <p className="text-muted-foreground">
-              {room.room_type?.name || "No room type"} • Floor {room.floor} • {room.building}
+              {room.roomType?.name || "No room type"} • Floor {room.floor} • {room.building}
             </p>
           </div>
         </div>
@@ -203,8 +203,8 @@ export default function RoomDetailPage() {
               <AlertDialogHeader>
                 <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This action cannot be undone. This will permanently delete Room {room.number} and remove its data from
-                  the server.
+                  This action cannot be undone. This will permanently delete Room {room.roomNumber} and remove its data
+                  from the server.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -238,11 +238,11 @@ export default function RoomDetailPage() {
                   </div>
                   <div>
                     <h3 className="text-sm font-medium text-muted-foreground">Room Type</h3>
-                    <p className="mt-1">{room.room_type?.name || "N/A"}</p>
+                    <p className="mt-1">{room.roomType?.name || "N/A"}</p>
                   </div>
                   <div>
                     <h3 className="text-sm font-medium text-muted-foreground">Price per Night</h3>
-                    <p className="mt-1">${room.room_type?.base_price || "N/A"}</p>
+                    <p className="mt-1">${room.roomType?.basePice || room.roomType?.basePrice || "N/A"}</p>
                   </div>
                   <div>
                     <h3 className="text-sm font-medium text-muted-foreground">Location</h3>
