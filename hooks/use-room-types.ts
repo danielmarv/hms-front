@@ -39,17 +39,13 @@ export function useRoomTypes() {
     let roomTypesData: RoomType[] = []
 
     if (data) {
-      // If data is an array, use it directly
       if (Array.isArray(data)) {
         roomTypesData = data
       }
-      // If data has a 'data' property that's an array, use that
       else if (data.data && Array.isArray(data.data)) {
         roomTypesData = data.data
       }
     }
-
-    console.log("Processed room types data:", roomTypesData)
     setRoomTypes(roomTypesData)
     return roomTypesData
   }
