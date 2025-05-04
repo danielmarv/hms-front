@@ -30,7 +30,6 @@ export default function NewGuestPage() {
     dob: "",
     nationality: "",
 
-    // ID information
     id_type: "",
     id_number: "",
     id_expiry: "",
