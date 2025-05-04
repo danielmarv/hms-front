@@ -147,6 +147,10 @@ export function useGuests() {
   }
 
   const getGuestById = async (id: string) => {
+    // Skip API call for "new" route
+    if (id === "new") {
+      return { data: null, error: null, isLoading: false }
+    }
     return await request<Guest>(`/guests/${id}`)
   }
 
