@@ -23,7 +23,6 @@ export default function NewGuestPage() {
   const { createGuest, isLoading } = useGuests()
   const [activeTab, setActiveTab] = useState("basic")
   const [formData, setFormData] = useState({
-    // Basic information
     full_name: "",
     email: "",
     phone: "",
