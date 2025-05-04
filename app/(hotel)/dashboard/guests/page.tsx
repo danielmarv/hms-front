@@ -55,17 +55,22 @@ export default function GuestsPage() {
         search: searchQuery,
       })
 
-      if (response.data) {
+      if (response.data && Array.isArray(response.data.data)) {
         setGuests(response.data.data)
         setPagination({
-          page: response.data.pagination.page,
-          limit: response.data.pagination.limit,
-          totalPages: response.data.pagination.totalPages,
-          total: response.data.total,
+          page: response.data.pagination?.page || 1,
+          limit: response.data.pagination?.limit || 10,
+          totalPages: response.data.pagination?.totalPages || 1,
+          total: response.data.total || 0,
         })
+      } else {
+        // If response doesn't have the expected structure, set empty array
+        setGuests([])
+        console.error("Unexpected API response format:", response)
       }
     } catch (error) {
       console.error("Failed to load guests:", error)
+      setGuests([]) // Ensure guests is an array even on error
     }
   }
 
@@ -252,7 +257,7 @@ export default function GuestsPage() {
                         </TableCell>
                       </TableRow>
                     ))
-                ) : guests.length === 0 ? (
+                ) : !guests || guests.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="h-24 text-center">
                       No guests found.
