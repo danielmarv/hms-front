@@ -1,558 +1,271 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import { useToast } from "@/hooks/use-toast"
+import { useApi, type ApiResponse } from "./use-api"
 
-interface InventoryItem {
-  _id: string
+export type InventoryItem = {
+  id: string
   name: string
   sku: string
+  description?: string
   category: string
-  quantity_in_stock: number
-  reorder_level: number
-  unit: string
-  price_per_unit: number
-  total_value: number
-  supplier:
-    | string
-    | {
-        _id: string
-        name: string
-        contact_person: string
-        phone: string
-      }
-  location: string
-  is_active: boolean
+  currentStock: number
+  minStockLevel: number
+  maxStockLevel: number
+  reorderPoint: number
+  unitPrice: number
+  unitCost: number
+  supplier: string
+  supplierName?: string
+  location?: string
+  department?: string
+  lastRestockDate?: string
+  expiryDate?: string
+  isActive: boolean
   createdAt: string
   updatedAt: string
 }
 
-interface StockTransaction {
-  _id: string
-  item: string
-  type: "restock" | "consumption" | "transfer" | "adjustment" | "waste" | "return"
+export type InventoryTransaction = {
+  id: string
+  inventoryItemId: string
+  type: "IN" | "OUT" | "TRANSFER" | "ADJUSTMENT"
   quantity: number
-  unit_price: number
-  transaction_date: string
-  department?: string
-  reference_number?: string
-  reason?: string
-  performedBy: string | { _id: string; full_name: string }
-  status: "pending" | "completed" | "cancelled"
+  fromLocation?: string
+  toLocation?: string
+  fromDepartment?: string
+  toDepartment?: string
+  notes?: string
+  createdBy: string
   createdAt: string
 }
 
-interface InventoryStats {
-  totalItems: number
-  activeItems: number
-  totalValue: number
-  categoryStats: Array<{
-    _id: string
-    count: number
-    value: number
-  }>
-  stockStatus: Array<{
-    _id: string
-    count: number
-  }>
-}
-
-interface PaginationData {
-  page: number
-  limit: number
+export type PaginationData = {
+  currentPage: number
   totalPages: number
-}
-
-interface InventoryResponse {
-  success: boolean
-  count: number
-  total: number
-  pagination: PaginationData
-  data: InventoryItem[]
-}
-
-interface TransactionResponse {
-  success: boolean
-  count: number
-  total: number
-  pagination: PaginationData
-  data: StockTransaction[]
-}
-
-interface StatsResponse {
-  success: boolean
-  data: InventoryStats
-}
-
-interface StockUpdateData {
-  quantity: number
-  type: "restock" | "consumption" | "transfer" | "adjustment" | "waste" | "return"
-  reason?: string
-  unit_price?: number
-  department?: string
-  reference_number?: string
-  transaction_date?: string
-}
-
-interface TransactionQueryParams {
-  page?: number
-  limit?: number
-  startDate?: string
-  endDate?: string
-  type?: string
+  limit: number
 }
 
 export function useInventory() {
+  const { request, isLoading } = useApi()
   const [items, setItems] = useState<InventoryItem[]>([])
-  const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
   const [pagination, setPagination] = useState<PaginationData>({
-    page: 1,
-    limit: 20,
+    currentPage: 1,
     totalPages: 1,
+    limit: 10,
   })
-  const [totalItems, setTotalItems] = useState<number>(0)
-  const { toast } = useToast()
+  const [totalItems, setTotalItems] = useState(0)
 
   const fetchInventoryItems = useCallback(
-    async (page = 1, limit = 20, search = "", category = "", supplier = "", stockStatus = "", isActive = "") => {
-      setLoading(true)
-      setError(null)
+    async (page = 1, limit = 10, search = "", category = "", supplier = "", stockStatus = "", isActive = "") => {
+      let queryParams = `?page=${page}&limit=${limit}`
+      if (search) queryParams += `&search=${encodeURIComponent(search)}`
+      if (category) queryParams += `&category=${encodeURIComponent(category)}`
+      if (supplier) queryParams += `&supplier=${encodeURIComponent(supplier)}`
+      if (stockStatus) queryParams += `&stockStatus=${encodeURIComponent(stockStatus)}`
+      if (isActive) queryParams += `&isActive=${encodeURIComponent(isActive)}`
 
-      try {
-        let url = `/api/inventory?page=${page}&limit=${limit}`
-        if (search) url += `&search=${encodeURIComponent(search)}`
-        if (category) url += `&category=${encodeURIComponent(category)}`
-        if (supplier) url += `&supplier=${encodeURIComponent(supplier)}`
-        if (stockStatus) url += `&stockStatus=${encodeURIComponent(stockStatus)}`
-        if (isActive !== "") url += `&isActive=${isActive}`
+      const response = await request<{
+        items: InventoryItem[]
+        pagination: PaginationData
+        totalItems: number
+      }>(`/inventory${queryParams}`)
 
-        const response = await fetch(url)
-
-        if (!response.ok) {
-          throw new Error(`Error fetching inventory items: ${response.status}`)
-        }
-
-        const data: InventoryResponse = await response.json()
-
-        setItems(data.data)
-        setPagination(data.pagination)
-        setTotalItems(data.total)
-        return data
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An unknown error occurred")
-        toast({
-          title: "Error",
-          description: err instanceof Error ? err.message : "Failed to fetch inventory items",
-          variant: "destructive",
-        })
-        return null
-      } finally {
-        setLoading(false)
+      if (response.data) {
+        setItems(response.data.items)
+        setPagination(response.data.pagination)
+        setTotalItems(response.data.totalItems)
+      } else {
+        setError(response.error)
       }
+
+      return response
     },
-    [toast],
+    [request],
   )
 
-  // Alias for fetchInventoryItems with different name for clarity
-  const getInventoryItems = fetchInventoryItems
-
+  // Add the missing getInventoryItemById method
   const getInventoryItemById = useCallback(
-    async (id: string) => {
-      setLoading(true)
-      setError(null)
-
-      try {
-        // Skip API call if the ID is "new"
-        if (id === "new") {
-          setLoading(false)
-          return null
-        }
-
-        const response = await fetch(`/api/inventory/${id}`)
-
-        if (!response.ok) {
-          throw new Error(`Error fetching inventory item: ${response.status}`)
-        }
-
-        const data = await response.json()
-        return data.data
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An unknown error occurred")
-        toast({
-          title: "Error",
-          description: err instanceof Error ? err.message : "Failed to fetch inventory item",
-          variant: "destructive",
-        })
-        return null
-      } finally {
-        setLoading(false)
-      }
+    async (id: string): Promise<ApiResponse<InventoryItem>> => {
+      const response = await request<InventoryItem>(`/inventory/${id}`)
+      return response
     },
-    [toast],
+    [request],
+  )
+
+  // Add the missing getInventoryItems method (different from fetchInventoryItems as it returns the raw response)
+  const getInventoryItems = useCallback(
+    async (
+      page = 1,
+      limit = 10,
+      search = "",
+      category = "",
+      supplier = "",
+      stockStatus = "",
+      isActive = "",
+    ): Promise<ApiResponse<{ items: InventoryItem[]; pagination: PaginationData; totalItems: number }>> => {
+      let queryParams = `?page=${page}&limit=${limit}`
+      if (search) queryParams += `&search=${encodeURIComponent(search)}`
+      if (category) queryParams += `&category=${encodeURIComponent(category)}`
+      if (supplier) queryParams += `&supplier=${encodeURIComponent(supplier)}`
+      if (stockStatus) queryParams += `&stockStatus=${encodeURIComponent(stockStatus)}`
+      if (isActive) queryParams += `&isActive=${encodeURIComponent(isActive)}`
+
+      return await request<{
+        items: InventoryItem[]
+        pagination: PaginationData
+        totalItems: number
+      }>(`/inventory${queryParams}`)
+    },
+    [request],
+  )
+
+  // Add the missing getItemTransactions method
+  const getItemTransactions = useCallback(
+    async (
+      itemId: string,
+      page = 1,
+      limit = 10,
+    ): Promise<
+      ApiResponse<{ transactions: InventoryTransaction[]; pagination: PaginationData; totalTransactions: number }>
+    > => {
+      const queryParams = `?page=${page}&limit=${limit}`
+      return await request<{
+        transactions: InventoryTransaction[]
+        pagination: PaginationData
+        totalTransactions: number
+      }>(`/inventory/${itemId}/transactions${queryParams}`)
+    },
+    [request],
   )
 
   const createInventoryItem = useCallback(
-    async (itemData: Partial<InventoryItem>) => {
-      setLoading(true)
-      setError(null)
-
-      try {
-        const response = await fetch("/api/inventory", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(itemData),
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.message || `Error creating inventory item: ${response.status}`)
-        }
-
-        const data = await response.json()
-
-        toast({
-          title: "Success",
-          description: "Inventory item created successfully",
-        })
-
-        return data.data
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An unknown error occurred")
-        toast({
-          title: "Error",
-          description: err instanceof Error ? err.message : "Failed to create inventory item",
-          variant: "destructive",
-        })
-        return null
-      } finally {
-        setLoading(false)
+    async (itemData: Omit<InventoryItem, "id" | "createdAt" | "updatedAt">) => {
+      const response = await request<InventoryItem>("/inventory", "POST", itemData)
+      if (response.data) {
+        // Refresh the inventory list after creating a new item
+        fetchInventoryItems(pagination.currentPage, pagination.limit)
       }
+      return response
     },
-    [toast],
+    [request, fetchInventoryItems, pagination],
   )
 
   const updateInventoryItem = useCallback(
     async (id: string, itemData: Partial<InventoryItem>) => {
-      setLoading(true)
-      setError(null)
-
-      try {
-        const response = await fetch(`/api/inventory/${id}`, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(itemData),
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.message || `Error updating inventory item: ${response.status}`)
-        }
-
-        const data = await response.json()
-
-        toast({
-          title: "Success",
-          description: "Inventory item updated successfully",
-        })
-
-        return data.data
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An unknown error occurred")
-        toast({
-          title: "Error",
-          description: err instanceof Error ? err.message : "Failed to update inventory item",
-          variant: "destructive",
-        })
-        return null
-      } finally {
-        setLoading(false)
+      const response = await request<InventoryItem>(`/inventory/${id}`, "PUT", itemData)
+      if (response.data) {
+        // Update the local state with the updated item
+        setItems((prevItems) => prevItems.map((item) => (item.id === id ? { ...item, ...response.data } : item)))
       }
+      return response
     },
-    [toast],
+    [request],
   )
 
   const deleteInventoryItem = useCallback(
     async (id: string) => {
-      setLoading(true)
-      setError(null)
-
-      try {
-        const response = await fetch(`/api/inventory/${id}`, {
-          method: "DELETE",
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.message || `Error deleting inventory item: ${response.status}`)
-        }
-
-        toast({
-          title: "Success",
-          description: "Inventory item deleted successfully",
-        })
-
-        return true
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An unknown error occurred")
-        toast({
-          title: "Error",
-          description: err instanceof Error ? err.message : "Failed to delete inventory item",
-          variant: "destructive",
-        })
-        return false
-      } finally {
-        setLoading(false)
+      const response = await request<{ success: boolean }>(`/inventory/${id}`, "DELETE")
+      if (response.data?.success) {
+        // Remove the deleted item from the local state
+        setItems((prevItems) => prevItems.filter((item) => item.id !== id))
+        setTotalItems((prev) => prev - 1)
       }
+      return response
     },
-    [toast],
+    [request],
   )
 
   const updateStockLevel = useCallback(
-    async (id: string, data: StockUpdateData) => {
-      setLoading(true)
-      setError(null)
-
-      try {
-        const response = await fetch(`/api/inventory/${id}/stock`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            ...data,
-            transaction_date: data.transaction_date || new Date().toISOString(),
-          }),
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.message || `Error updating stock level: ${response.status}`)
-        }
-
-        const responseData = await response.json()
-
-        toast({
-          title: "Success",
-          description: "Stock level updated successfully",
-        })
-
-        return responseData.data
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An unknown error occurred")
-        toast({
-          title: "Error",
-          description: err instanceof Error ? err.message : "Failed to update stock level",
-          variant: "destructive",
-        })
-        return null
-      } finally {
-        setLoading(false)
+    async (
+      id: string,
+      quantity: number,
+      type: "IN" | "OUT" | "ADJUSTMENT",
+      notes?: string,
+      location?: string,
+      department?: string,
+      supplier?: string,
+    ) => {
+      const data = {
+        quantity,
+        type,
+        notes,
+        location,
+        department,
+        supplier,
       }
+      return await request<InventoryItem>(`/inventory/${id}/stock`, "PUT", data)
     },
-    [toast],
+    [request],
   )
-
-  const getItemTransactions = useCallback(
-    async (id: string, params: TransactionQueryParams = {}) => {
-      setLoading(true)
-      setError(null)
-
-      try {
-        const { page = 1, limit = 20, startDate, endDate, type } = params
-
-        let url = `/api/inventory/${id}/transactions?page=${page}&limit=${limit}`
-        if (startDate) url += `&startDate=${encodeURIComponent(startDate)}`
-        if (endDate) url += `&endDate=${encodeURIComponent(endDate)}`
-        if (type) url += `&type=${encodeURIComponent(type)}`
-
-        const response = await fetch(url)
-
-        if (!response.ok) {
-          throw new Error(`Error fetching transactions: ${response.status}`)
-        }
-
-        const data: TransactionResponse = await response.json()
-        return data
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An unknown error occurred")
-        toast({
-          title: "Error",
-          description: err instanceof Error ? err.message : "Failed to fetch transactions",
-          variant: "destructive",
-        })
-        return null
-      } finally {
-        setLoading(false)
-      }
-    },
-    [toast],
-  )
-
-  const fetchLowStockItems = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const response = await fetch("/api/inventory/low-stock")
-
-      if (!response.ok) {
-        throw new Error(`Error fetching low stock items: ${response.status}`)
-      }
-
-      const data = await response.json()
-      return data.data
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An unknown error occurred")
-      toast({
-        title: "Error",
-        description: err instanceof Error ? err.message : "Failed to fetch low stock items",
-        variant: "destructive",
-      })
-      return []
-    } finally {
-      setLoading(false)
-    }
-  }, [toast])
-
-  const fetchInventoryStats = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const response = await fetch("/api/inventory/stats")
-
-      if (!response.ok) {
-        throw new Error(`Error fetching inventory statistics: ${response.status}`)
-      }
-
-      const data: StatsResponse = await response.json()
-      return data.data
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An unknown error occurred")
-      toast({
-        title: "Error",
-        description: err instanceof Error ? err.message : "Failed to fetch inventory statistics",
-        variant: "destructive",
-      })
-      return null
-    } finally {
-      setLoading(false)
-    }
-  }, [toast])
 
   const transferStock = useCallback(
-    async (fromItemId: string, toItemId: string, quantity: number, reason?: string, department?: string) => {
-      setLoading(true)
-      setError(null)
-
-      try {
-        // First, reduce stock from source item
-        const deductResponse = await updateStockLevel(fromItemId, {
-          quantity,
-          type: "transfer",
-          reason: `Transfer to item ID: ${toItemId}${reason ? ` - ${reason}` : ""}`,
-          department,
-        })
-
-        if (!deductResponse) {
-          throw new Error("Failed to deduct stock from source item")
-        }
-
-        // Then, add stock to destination item
-        const addResponse = await updateStockLevel(toItemId, {
-          quantity,
-          type: "transfer",
-          reason: `Transfer from item ID: ${fromItemId}${reason ? ` - ${reason}` : ""}`,
-          department,
-        })
-
-        if (!addResponse) {
-          // If adding to destination fails, we should ideally revert the deduction
-          // This would require a more complex transaction system
-          throw new Error("Failed to add stock to destination item")
-        }
-
-        toast({
-          title: "Success",
-          description: "Stock transferred successfully",
-        })
-
-        return { from: deductResponse, to: addResponse }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An unknown error occurred")
-        toast({
-          title: "Error",
-          description: err instanceof Error ? err.message : "Failed to transfer stock",
-          variant: "destructive",
-        })
-        return null
-      } finally {
-        setLoading(false)
+    async (
+      fromItemId: string,
+      toItemId: string,
+      quantity: number,
+      notes?: string,
+      fromLocation?: string,
+      toLocation?: string,
+    ) => {
+      const data = {
+        fromItemId,
+        toItemId,
+        quantity,
+        notes,
+        fromLocation,
+        toLocation,
       }
+      return await request<{ success: boolean }>(`/inventory/transfer`, "POST", data)
     },
-    [toast, updateStockLevel],
+    [request],
   )
 
+  // Add the missing transferStockToDepartment method
   const transferStockToDepartment = useCallback(
-    async (itemId: string, quantity: number, department: string, reason?: string) => {
-      setLoading(true)
-      setError(null)
-
-      try {
-        const response = await updateStockLevel(itemId, {
-          quantity,
-          type: "consumption",
-          reason: `Transfer to ${department} department${reason ? ` - ${reason}` : ""}`,
-          department,
-        })
-
-        if (!response) {
-          throw new Error("Failed to transfer stock to department")
-        }
-
-        toast({
-          title: "Success",
-          description: `Stock transferred successfully to ${department} department`,
-        })
-
-        return response
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An unknown error occurred")
-        toast({
-          title: "Error",
-          description: err instanceof Error ? err.message : "Failed to transfer stock to department",
-          variant: "destructive",
-        })
-        return null
-      } finally {
-        setLoading(false)
+    async (itemId: string, departmentId: string, quantity: number, notes?: string) => {
+      const data = {
+        itemId,
+        departmentId,
+        quantity,
+        notes,
       }
+      return await request<{ success: boolean }>(`/inventory/${itemId}/transfer-to-department`, "POST", data)
     },
-    [toast, updateStockLevel],
+    [request],
   )
+
+  const getInventoryCategories = useCallback(async () => {
+    return await request<string[]>("/inventory/categories")
+  }, [request])
+
+  const getInventoryLocations = useCallback(async () => {
+    return await request<string[]>("/inventory/locations")
+  }, [request])
+
+  const getInventoryDepartments = useCallback(async () => {
+    return await request<string[]>("/inventory/departments")
+  }, [request])
 
   return {
     items,
-    loading,
+    loading: isLoading,
     error,
     pagination,
     totalItems,
     fetchInventoryItems,
-    getInventoryItems,
     getInventoryItemById,
+    getInventoryItems,
+    getItemTransactions,
     createInventoryItem,
     updateInventoryItem,
     deleteInventoryItem,
     updateStockLevel,
-    getItemTransactions,
-    fetchLowStockItems,
-    fetchInventoryStats,
     transferStock,
     transferStockToDepartment,
+    getInventoryCategories,
+    getInventoryLocations,
+    getInventoryDepartments,
   }
 }

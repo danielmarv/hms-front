@@ -1,419 +1,174 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import { useToast } from "@/hooks/use-toast"
+import { useApi, type ApiResponse } from "./use-api"
 
-interface Supplier {
-  _id: string
+export type Supplier = {
+  id: string
   name: string
-  code?: string
-  contact_person?: string
-  phone?: string
-  alternative_phone?: string
-  email?: string
-  website?: string
-  address?: {
-    street?: string
-    city?: string
-    state?: string
-    postal_code?: string
-    country?: string
-  }
-  supplies?: string[]
-  categories?: string[]
-  tax_id?: string
-  payment_terms?: string
-  credit_limit?: number
-  currency?: string
-  bank_details?: {
-    bank_name?: string
-    account_number?: string
-    account_name?: string
-    swift_code?: string
-  }
+  contactPerson: string
+  email: string
+  phone: string
+  address: string
+  city: string
+  state: string
+  country: string
+  postalCode: string
+  taxId?: string
+  paymentTerms?: string
   notes?: string
+  category?: string
   rating?: number
-  is_active: boolean
-  lead_time?: number
-  minimum_order?: number
-  documents?: Array<{
-    _id: string
-    name: string
-    url: string
-    type: string
-    uploaded_at: string
-  }>
+  isActive: boolean
+  documents?: SupplierDocument[]
   createdAt: string
   updatedAt: string
 }
 
-interface PaginationData {
-  page: number
-  limit: number
-  totalPages: number
+export type SupplierDocument = {
+  id: string
+  name: string
+  type: string
+  url: string
+  uploadedAt: string
 }
 
-interface SupplierResponse {
-  success: boolean
-  count: number
-  total: number
-  pagination: PaginationData
-  data: Supplier[]
+export type PaginationData = {
+  currentPage: number
+  totalPages: number
+  limit: number
 }
 
 export function useSuppliers() {
+  const { request, isLoading } = useApi()
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
-  const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
   const [pagination, setPagination] = useState<PaginationData>({
-    page: 1,
-    limit: 20,
+    currentPage: 1,
     totalPages: 1,
+    limit: 10,
   })
-  const [totalSuppliers, setTotalSuppliers] = useState<number>(0)
-  const { toast } = useToast()
+  const [totalSuppliers, setTotalSuppliers] = useState(0)
 
   const fetchSuppliers = useCallback(
-    async (page = 1, limit = 20, search = "", category = "", isActive = "") => {
-      setLoading(true)
-      setError(null)
+    async (page = 1, limit = 10, search = "", category = "", isActive = "") => {
+      let queryParams = `?page=${page}&limit=${limit}`
+      if (search) queryParams += `&search=${encodeURIComponent(search)}`
+      if (category) queryParams += `&category=${encodeURIComponent(category)}`
+      if (isActive) queryParams += `&isActive=${encodeURIComponent(isActive)}`
 
-      try {
-        let url = `/api/inventory/suppliers?page=${page}&limit=${limit}`
-        if (search) url += `&search=${encodeURIComponent(search)}`
-        if (category) url += `&category=${encodeURIComponent(category)}`
-        if (isActive !== "") url += `&isActive=${isActive}`
+      const response = await request<{
+        suppliers: Supplier[]
+        pagination: PaginationData
+        totalSuppliers: number
+      }>(`/suppliers${queryParams}`)
 
-        const response = await fetch(url)
-
-        if (!response.ok) {
-          throw new Error(`Error fetching suppliers: ${response.status}`)
-        }
-
-        const data: SupplierResponse = await response.json()
-
-        setSuppliers(data.data)
-        setPagination(data.pagination)
-        setTotalSuppliers(data.total)
-        return data
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An unknown error occurred")
-        toast({
-          title: "Error",
-          description: err instanceof Error ? err.message : "Failed to fetch suppliers",
-          variant: "destructive",
-        })
-        return null
-      } finally {
-        setLoading(false)
+      if (response.data) {
+        setSuppliers(response.data.suppliers)
+        setPagination(response.data.pagination)
+        setTotalSuppliers(response.data.totalSuppliers)
+      } else {
+        setError(response.error)
       }
+
+      return response
     },
-    [toast],
+    [request],
   )
 
+  // Add the missing getSupplierById method
   const getSupplierById = useCallback(
-    async (id: string) => {
-      setLoading(true)
-      setError(null)
-
-      try {
-        // Skip API call if the ID is "new"
-        if (id === "new") {
-          setLoading(false)
-          return null
-        }
-
-        const response = await fetch(`/api/inventory/suppliers/${id}`)
-
-        if (!response.ok) {
-          throw new Error(`Error fetching supplier: ${response.status}`)
-        }
-
-        const data = await response.json()
-        return data.data
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An unknown error occurred")
-        toast({
-          title: "Error",
-          description: err instanceof Error ? err.message : "Failed to fetch supplier",
-          variant: "destructive",
-        })
-        return null
-      } finally {
-        setLoading(false)
-      }
+    async (id: string): Promise<ApiResponse<Supplier>> => {
+      return await request<Supplier>(`/suppliers/${id}`)
     },
-    [toast],
+    [request],
   )
 
   const createSupplier = useCallback(
-    async (supplierData: Partial<Supplier>) => {
-      setLoading(true)
-      setError(null)
-
-      try {
-        const response = await fetch("/api/inventory/suppliers", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(supplierData),
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.message || `Error creating supplier: ${response.status}`)
-        }
-
-        const data = await response.json()
-
-        toast({
-          title: "Success",
-          description: "Supplier created successfully",
-        })
-
-        return data.data
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An unknown error occurred")
-        toast({
-          title: "Error",
-          description: err instanceof Error ? err.message : "Failed to create supplier",
-          variant: "destructive",
-        })
-        return null
-      } finally {
-        setLoading(false)
+    async (supplierData: Omit<Supplier, "id" | "createdAt" | "updatedAt" | "documents">) => {
+      const response = await request<Supplier>("/suppliers", "POST", supplierData)
+      if (response.data) {
+        // Refresh the suppliers list after creating a new supplier
+        fetchSuppliers(pagination.currentPage, pagination.limit)
       }
+      return response
     },
-    [toast],
+    [request, fetchSuppliers, pagination],
   )
 
   const updateSupplier = useCallback(
     async (id: string, supplierData: Partial<Supplier>) => {
-      setLoading(true)
-      setError(null)
-
-      try {
-        const response = await fetch(`/api/inventory/suppliers/${id}`, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(supplierData),
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.message || `Error updating supplier: ${response.status}`)
-        }
-
-        const data = await response.json()
-
-        toast({
-          title: "Success",
-          description: "Supplier updated successfully",
-        })
-
-        return data.data
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An unknown error occurred")
-        toast({
-          title: "Error",
-          description: err instanceof Error ? err.message : "Failed to update supplier",
-          variant: "destructive",
-        })
-        return null
-      } finally {
-        setLoading(false)
+      const response = await request<Supplier>(`/suppliers/${id}`, "PUT", supplierData)
+      if (response.data) {
+        // Update the local state with the updated supplier
+        setSuppliers((prevSuppliers) =>
+          prevSuppliers.map((supplier) => (supplier.id === id ? { ...supplier, ...response.data } : supplier)),
+        )
       }
+      return response
     },
-    [toast],
+    [request],
   )
 
   const deleteSupplier = useCallback(
     async (id: string) => {
-      setLoading(true)
-      setError(null)
-
-      try {
-        const response = await fetch(`/api/inventory/suppliers/${id}`, {
-          method: "DELETE",
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.message || `Error deleting supplier: ${response.status}`)
-        }
-
-        toast({
-          title: "Success",
-          description: "Supplier deleted successfully",
-        })
-
-        return true
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An unknown error occurred")
-        toast({
-          title: "Error",
-          description: err instanceof Error ? err.message : "Failed to delete supplier",
-          variant: "destructive",
-        })
-        return false
-      } finally {
-        setLoading(false)
+      const response = await request<{ success: boolean }>(`/suppliers/${id}`, "DELETE")
+      if (response.data?.success) {
+        // Remove the deleted supplier from the local state
+        setSuppliers((prevSuppliers) => prevSuppliers.filter((supplier) => supplier.id !== id))
+        setTotalSuppliers((prev) => prev - 1)
       }
+      return response
     },
-    [toast],
+    [request],
   )
 
-  const getSupplierItems = useCallback(
-    async (id: string) => {
-      setLoading(true)
-      setError(null)
+  const uploadSupplierDocument = useCallback(async (id: string, file: File, documentType: string) => {
+    // Create a FormData object to send the file
+    const formData = new FormData()
+    formData.append("file", file)
+    formData.append("type", documentType)
 
-      try {
-        const response = await fetch(`/api/inventory/suppliers/${id}/items`)
+    // Custom fetch for file upload since our useApi doesn't handle FormData
+    const token = localStorage.getItem("accessToken") || ""
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
 
-        if (!response.ok) {
-          throw new Error(`Error fetching supplier items: ${response.status}`)
-        }
+    try {
+      const response = await fetch(`${API_URL}/suppliers/${id}/documents`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      })
 
-        const data = await response.json()
-        return data.data
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An unknown error occurred")
-        toast({
-          title: "Error",
-          description: err instanceof Error ? err.message : "Failed to fetch supplier items",
-          variant: "destructive",
-        })
-        return []
-      } finally {
-        setLoading(false)
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to upload document")
       }
-    },
-    [toast],
-  )
 
-  const toggleSupplierStatus = useCallback(
-    async (id: string) => {
-      setLoading(true)
-      setError(null)
-
-      try {
-        const response = await fetch(`/api/inventory/suppliers/${id}/toggle-status`, {
-          method: "PATCH",
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.message || `Error toggling supplier status: ${response.status}`)
-        }
-
-        const data = await response.json()
-
-        toast({
-          title: "Success",
-          description: data.message || "Supplier status updated successfully",
-        })
-
-        return data.data
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An unknown error occurred")
-        toast({
-          title: "Error",
-          description: err instanceof Error ? err.message : "Failed to toggle supplier status",
-          variant: "destructive",
-        })
-        return null
-      } finally {
-        setLoading(false)
-      }
-    },
-    [toast],
-  )
-
-  const addSupplierDocument = useCallback(
-    async (id: string, documentData: { name: string; url: string; type: string }) => {
-      setLoading(true)
-      setError(null)
-
-      try {
-        const response = await fetch(`/api/inventory/suppliers/${id}/documents`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(documentData),
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.message || `Error adding document: ${response.status}`)
-        }
-
-        const data = await response.json()
-
-        toast({
-          title: "Success",
-          description: "Document added successfully",
-        })
-
-        return data.data
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An unknown error occurred")
-        toast({
-          title: "Error",
-          description: err instanceof Error ? err.message : "Failed to add document",
-          variant: "destructive",
-        })
-        return null
-      } finally {
-        setLoading(false)
-      }
-    },
-    [toast],
-  )
+      return { data: data, error: null, isLoading: false }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to upload document"
+      return { data: null, error: errorMessage, isLoading: false }
+    }
+  }, [])
 
   const removeSupplierDocument = useCallback(
     async (id: string, documentId: string) => {
-      setLoading(true)
-      setError(null)
-
-      try {
-        const response = await fetch(`/api/inventory/suppliers/${id}/documents/${documentId}`, {
-          method: "DELETE",
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.message || `Error removing document: ${response.status}`)
-        }
-
-        toast({
-          title: "Success",
-          description: "Document removed successfully",
-        })
-
-        return true
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An unknown error occurred")
-        toast({
-          title: "Error",
-          description: err instanceof Error ? err.message : "Failed to remove document",
-          variant: "destructive",
-        })
-        return false
-      } finally {
-        setLoading(false)
-      }
+      return await request<{ success: boolean }>(`/suppliers/${id}/documents/${documentId}`, "DELETE")
     },
-    [toast],
+    [request],
   )
+
+  const getSupplierCategories = useCallback(async () => {
+    return await request<string[]>("/suppliers/categories")
+  }, [request])
 
   return {
     suppliers,
-    loading,
+    loading: isLoading,
     error,
     pagination,
     totalSuppliers,
@@ -422,9 +177,8 @@ export function useSuppliers() {
     createSupplier,
     updateSupplier,
     deleteSupplier,
-    getSupplierItems,
-    toggleSupplierStatus,
-    addSupplierDocument,
+    uploadSupplierDocument,
     removeSupplierDocument,
+    getSupplierCategories,
   }
 }
