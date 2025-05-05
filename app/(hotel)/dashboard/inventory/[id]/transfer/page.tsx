@@ -47,7 +47,9 @@ export default function TransferStockPage() {
   useEffect(() => {
     const loadDestinationItems = async () => {
       if (transferType === "item") {
-        const result = await getInventoryItems({ category: item?.category })
+        // Assuming getInventoryItems expects a category id as number, pass item?.category as number or adjust accordingly
+        const categoryId = typeof item?.category === "number" ? item.category : Number(item?.category)
+        const result = await getInventoryItems(categoryId)
         if (result && result.data) {
           // Filter out the current item
           const filteredItems = result.data.filter((i: any) => i._id !== params.id)
@@ -125,10 +127,14 @@ export default function TransferStockPage() {
       }
 
       router.push(`/dashboard/inventory/${params.id}`)
-    } catch (err: any) {
+    } catch (err: unknown) {
+      let errorMessage = "Failed to transfer stock"
+      if (err instanceof Error) {
+        errorMessage = err.message
+      }
       toast({
         title: "Error",
-        description: err.message || "Failed to transfer stock",
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {
@@ -162,7 +168,7 @@ export default function TransferStockPage() {
               <CardTitle className="text-destructive">Error</CardTitle>
             </CardHeader>
             <CardContent>
-              <p>{error || "Failed to load inventory item"}</p>
+            <p>{typeof error === "string" ? error : error?.message || "Failed to load inventory item"}</p>
             </CardContent>
             <CardFooter>
               <Button variant="outline" onClick={() => router.back()}>

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
 
 interface InventoryItem {
   _id: string
@@ -30,7 +30,7 @@ interface InventoryItem {
 interface StockTransaction {
   _id: string
   item: string
-  type: "restock" | "use" | "transfer" | "adjustment" | "waste"
+  type: "restock" | "consumption" | "transfer" | "adjustment" | "waste" | "return"
   quantity: number
   unit_price: number
   transaction_date: string
@@ -84,6 +84,24 @@ interface StatsResponse {
   data: InventoryStats
 }
 
+interface StockUpdateData {
+  quantity: number
+  type: "restock" | "consumption" | "transfer" | "adjustment" | "waste" | "return"
+  reason?: string
+  unit_price?: number
+  department?: string
+  reference_number?: string
+  transaction_date?: string
+}
+
+interface TransactionQueryParams {
+  page?: number
+  limit?: number
+  startDate?: string
+  endDate?: string
+  type?: string
+}
+
 export function useInventory() {
   const [items, setItems] = useState<InventoryItem[]>([])
   const [loading, setLoading] = useState<boolean>(false)
@@ -120,6 +138,7 @@ export function useInventory() {
         setItems(data.data)
         setPagination(data.pagination)
         setTotalItems(data.total)
+        return data
       } catch (err) {
         setError(err instanceof Error ? err.message : "An unknown error occurred")
         toast({
@@ -127,6 +146,7 @@ export function useInventory() {
           description: err instanceof Error ? err.message : "Failed to fetch inventory items",
           variant: "destructive",
         })
+        return null
       } finally {
         setLoading(false)
       }
@@ -134,7 +154,10 @@ export function useInventory() {
     [toast],
   )
 
-  const fetchInventoryItem = useCallback(
+  // Alias for fetchInventoryItems with different name for clarity
+  const getInventoryItems = fetchInventoryItems
+
+  const getInventoryItemById = useCallback(
     async (id: string) => {
       setLoading(true)
       setError(null)
@@ -290,15 +313,7 @@ export function useInventory() {
   )
 
   const updateStockLevel = useCallback(
-    async (
-      id: string,
-      quantity: number,
-      type: "restock" | "use" | "transfer" | "adjustment" | "waste",
-      reason?: string,
-      unit_price?: number,
-      department?: string,
-      reference_number?: string,
-    ) => {
+    async (id: string, data: StockUpdateData) => {
       setLoading(true)
       setError(null)
 
@@ -309,13 +324,8 @@ export function useInventory() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            quantity,
-            type,
-            reason,
-            unit_price,
-            department,
-            reference_number,
-            transaction_date: new Date().toISOString(),
+            ...data,
+            transaction_date: data.transaction_date || new Date().toISOString(),
           }),
         })
 
@@ -324,14 +334,14 @@ export function useInventory() {
           throw new Error(errorData.message || `Error updating stock level: ${response.status}`)
         }
 
-        const data = await response.json()
+        const responseData = await response.json()
 
         toast({
           title: "Success",
           description: "Stock level updated successfully",
         })
 
-        return data.data
+        return responseData.data
       } catch (err) {
         setError(err instanceof Error ? err.message : "An unknown error occurred")
         toast({
@@ -347,12 +357,14 @@ export function useInventory() {
     [toast],
   )
 
-  const fetchItemTransactions = useCallback(
-    async (id: string, page = 1, limit = 20, startDate?: string, endDate?: string, type?: string) => {
+  const getItemTransactions = useCallback(
+    async (id: string, params: TransactionQueryParams = {}) => {
       setLoading(true)
       setError(null)
 
       try {
+        const { page = 1, limit = 20, startDate, endDate, type } = params
+
         let url = `/api/inventory/${id}/transactions?page=${page}&limit=${limit}`
         if (startDate) url += `&startDate=${encodeURIComponent(startDate)}`
         if (endDate) url += `&endDate=${encodeURIComponent(endDate)}`
@@ -440,28 +452,24 @@ export function useInventory() {
 
       try {
         // First, reduce stock from source item
-        const deductResponse = await updateStockLevel(
-          fromItemId,
+        const deductResponse = await updateStockLevel(fromItemId, {
           quantity,
-          "transfer",
-          `Transfer to item ID: ${toItemId}${reason ? ` - ${reason}` : ""}`,
-          undefined,
+          type: "transfer",
+          reason: `Transfer to item ID: ${toItemId}${reason ? ` - ${reason}` : ""}`,
           department,
-        )
+        })
 
         if (!deductResponse) {
           throw new Error("Failed to deduct stock from source item")
         }
 
         // Then, add stock to destination item
-        const addResponse = await updateStockLevel(
-          toItemId,
+        const addResponse = await updateStockLevel(toItemId, {
           quantity,
-          "transfer",
-          `Transfer from item ID: ${fromItemId}${reason ? ` - ${reason}` : ""}`,
-          undefined,
+          type: "transfer",
+          reason: `Transfer from item ID: ${fromItemId}${reason ? ` - ${reason}` : ""}`,
           department,
-        )
+        })
 
         if (!addResponse) {
           // If adding to destination fails, we should ideally revert the deduction
@@ -490,6 +498,44 @@ export function useInventory() {
     [toast, updateStockLevel],
   )
 
+  const transferStockToDepartment = useCallback(
+    async (itemId: string, quantity: number, department: string, reason?: string) => {
+      setLoading(true)
+      setError(null)
+
+      try {
+        const response = await updateStockLevel(itemId, {
+          quantity,
+          type: "consumption",
+          reason: `Transfer to ${department} department${reason ? ` - ${reason}` : ""}`,
+          department,
+        })
+
+        if (!response) {
+          throw new Error("Failed to transfer stock to department")
+        }
+
+        toast({
+          title: "Success",
+          description: `Stock transferred successfully to ${department} department`,
+        })
+
+        return response
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "An unknown error occurred")
+        toast({
+          title: "Error",
+          description: err instanceof Error ? err.message : "Failed to transfer stock to department",
+          variant: "destructive",
+        })
+        return null
+      } finally {
+        setLoading(false)
+      }
+    },
+    [toast, updateStockLevel],
+  )
+
   return {
     items,
     loading,
@@ -497,14 +543,16 @@ export function useInventory() {
     pagination,
     totalItems,
     fetchInventoryItems,
-    fetchInventoryItem,
+    getInventoryItems,
+    getInventoryItemById,
     createInventoryItem,
     updateInventoryItem,
     deleteInventoryItem,
     updateStockLevel,
-    fetchItemTransactions,
+    getItemTransactions,
     fetchLowStockItems,
     fetchInventoryStats,
     transferStock,
+    transferStockToDepartment,
   }
 }

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
 
 interface Supplier {
   _id: string
@@ -47,15 +47,6 @@ interface Supplier {
   updatedAt: string
 }
 
-interface SupplierItem {
-  _id: string
-  name: string
-  category: string
-  sku: string
-  currentStock: number
-  unitPrice: number
-}
-
 interface PaginationData {
   page: number
   limit: number
@@ -88,7 +79,7 @@ export function useSuppliers() {
       setError(null)
 
       try {
-        let url = `/api/suppliers?page=${page}&limit=${limit}`
+        let url = `/api/inventory/suppliers?page=${page}&limit=${limit}`
         if (search) url += `&search=${encodeURIComponent(search)}`
         if (category) url += `&category=${encodeURIComponent(category)}`
         if (isActive !== "") url += `&isActive=${isActive}`
@@ -104,6 +95,7 @@ export function useSuppliers() {
         setSuppliers(data.data)
         setPagination(data.pagination)
         setTotalSuppliers(data.total)
+        return data
       } catch (err) {
         setError(err instanceof Error ? err.message : "An unknown error occurred")
         toast({
@@ -111,6 +103,7 @@ export function useSuppliers() {
           description: err instanceof Error ? err.message : "Failed to fetch suppliers",
           variant: "destructive",
         })
+        return null
       } finally {
         setLoading(false)
       }
@@ -118,7 +111,7 @@ export function useSuppliers() {
     [toast],
   )
 
-  const fetchSupplier = useCallback(
+  const getSupplierById = useCallback(
     async (id: string) => {
       setLoading(true)
       setError(null)
@@ -130,7 +123,7 @@ export function useSuppliers() {
           return null
         }
 
-        const response = await fetch(`/api/suppliers/${id}`)
+        const response = await fetch(`/api/inventory/suppliers/${id}`)
 
         if (!response.ok) {
           throw new Error(`Error fetching supplier: ${response.status}`)
@@ -159,7 +152,7 @@ export function useSuppliers() {
       setError(null)
 
       try {
-        const response = await fetch("/api/suppliers", {
+        const response = await fetch("/api/inventory/suppliers", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -201,7 +194,7 @@ export function useSuppliers() {
       setError(null)
 
       try {
-        const response = await fetch(`/api/suppliers/${id}`, {
+        const response = await fetch(`/api/inventory/suppliers/${id}`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
@@ -243,7 +236,7 @@ export function useSuppliers() {
       setError(null)
 
       try {
-        const response = await fetch(`/api/suppliers/${id}`, {
+        const response = await fetch(`/api/inventory/suppliers/${id}`, {
           method: "DELETE",
         })
 
@@ -273,13 +266,42 @@ export function useSuppliers() {
     [toast],
   )
 
+  const getSupplierItems = useCallback(
+    async (id: string) => {
+      setLoading(true)
+      setError(null)
+
+      try {
+        const response = await fetch(`/api/inventory/suppliers/${id}/items`)
+
+        if (!response.ok) {
+          throw new Error(`Error fetching supplier items: ${response.status}`)
+        }
+
+        const data = await response.json()
+        return data.data
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "An unknown error occurred")
+        toast({
+          title: "Error",
+          description: err instanceof Error ? err.message : "Failed to fetch supplier items",
+          variant: "destructive",
+        })
+        return []
+      } finally {
+        setLoading(false)
+      }
+    },
+    [toast],
+  )
+
   const toggleSupplierStatus = useCallback(
     async (id: string) => {
       setLoading(true)
       setError(null)
 
       try {
-        const response = await fetch(`/api/suppliers/${id}/toggle-status`, {
+        const response = await fetch(`/api/inventory/suppliers/${id}/toggle-status`, {
           method: "PATCH",
         })
 
@@ -300,7 +322,7 @@ export function useSuppliers() {
         setError(err instanceof Error ? err.message : "An unknown error occurred")
         toast({
           title: "Error",
-          description: err instanceof Error ? err.message : "Failed to update supplier status",
+          description: err instanceof Error ? err.message : "Failed to toggle supplier status",
           variant: "destructive",
         })
         return null
@@ -311,47 +333,18 @@ export function useSuppliers() {
     [toast],
   )
 
-  const fetchSupplierItems = useCallback(
-    async (id: string) => {
-      setLoading(true)
-      setError(null)
-
-      try {
-        const response = await fetch(`/api/suppliers/${id}/items`)
-
-        if (!response.ok) {
-          throw new Error(`Error fetching supplier items: ${response.status}`)
-        }
-
-        const data = await response.json()
-        return data.data as SupplierItem[]
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An unknown error occurred")
-        toast({
-          title: "Error",
-          description: err instanceof Error ? err.message : "Failed to fetch supplier items",
-          variant: "destructive",
-        })
-        return []
-      } finally {
-        setLoading(false)
-      }
-    },
-    [toast],
-  )
-
   const addSupplierDocument = useCallback(
-    async (id: string, name: string, url: string, type: string) => {
+    async (id: string, documentData: { name: string; url: string; type: string }) => {
       setLoading(true)
       setError(null)
 
       try {
-        const response = await fetch(`/api/suppliers/${id}/documents`, {
+        const response = await fetch(`/api/inventory/suppliers/${id}/documents`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ name, url, type }),
+          body: JSON.stringify(documentData),
         })
 
         if (!response.ok) {
@@ -388,7 +381,7 @@ export function useSuppliers() {
       setError(null)
 
       try {
-        const response = await fetch(`/api/suppliers/${id}/documents/${documentId}`, {
+        const response = await fetch(`/api/inventory/suppliers/${id}/documents/${documentId}`, {
           method: "DELETE",
         })
 
@@ -425,12 +418,12 @@ export function useSuppliers() {
     pagination,
     totalSuppliers,
     fetchSuppliers,
-    fetchSupplier,
+    getSupplierById,
     createSupplier,
     updateSupplier,
     deleteSupplier,
+    getSupplierItems,
     toggleSupplierStatus,
-    fetchSupplierItems,
     addSupplierDocument,
     removeSupplierDocument,
   }

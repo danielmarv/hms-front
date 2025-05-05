@@ -40,7 +40,7 @@ export default function UpdateStockPage() {
     }
 
     loadItem()
-  }, [params.id])
+  }, [params.id, getInventoryItemById])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -59,7 +59,7 @@ export default function UpdateStockPage() {
 
       const data = {
         quantity: Number(quantity),
-        type,
+        type: type as "restock" | "consumption" | "transfer" | "adjustment" | "waste" | "return",
         reason: reason || undefined,
         unit_price: unitPrice ? Number(unitPrice) : undefined,
         department: department || undefined,
