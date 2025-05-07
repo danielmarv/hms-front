@@ -2,533 +2,403 @@
 
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { format } from "date-fns"
-import { toast } from "sonner"
-import { useApi } from "@/hooks/use-api"
+import { useKitchenOrders } from "@/hooks/use-kitchen-orders"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, Clock, ChefHat, User, Utensils, Coffee, CheckCircle, XCircle, Loader2 } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { ArrowLeft, AlertTriangle, XCircle, ChefHat, Timer } from "lucide-react"
+import Link from "next/link"
+import type { KitchenOrder } from "@/types"
 
-export default function KitchenOrderDetail() {
+const ORDER_STATUS_COLORS: Record<string, string> = {
+  New: "bg-blue-100 text-blue-800",
+  Preparing: "bg-yellow-100 text-yellow-800",
+  Ready: "bg-green-100 text-green-800",
+  Completed: "bg-green-100 text-green-800",
+  Cancelled: "bg-red-100 text-red-800",
+}
+
+const PRIORITY_COLORS: Record<string, string> = {
+  Low: "bg-blue-100 text-blue-800",
+  Medium: "bg-yellow-100 text-yellow-800",
+  High: "bg-red-100 text-red-800",
+}
+
+export default function KitchenOrderDetailPage() {
   const params = useParams()
   const router = useRouter()
-  const { request } = useApi()
-  const [order, setOrder] = useState<any>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isUpdating, setIsUpdating] = useState(false)
-  const [selectedChef, setSelectedChef] = useState("")
+  const { getOrder, updateOrderStatus, updateItemStatus, loading: apiLoading } = useKitchenOrders()
+  const [order, setOrder] = useState<KitchenOrder | null>(null)
+  const [loading, setLoading] = useState(true)
   const [notes, setNotes] = useState("")
-  const [chefs, setChefs] = useState<any[]>([])
+  const [timeElapsed, setTimeElapsed] = useState(0)
+  const orderId = params.id as string
 
   useEffect(() => {
-    const fetchOrder = async () => {
-      setIsLoading(true)
-      try {
-        const response = await request(`/kitchen/orders/${params.id}`)
-        if (response.data) {
-          setOrder(response.data.data)
-          setNotes(response.data.data.notes || "")
-          if (response.data.data.chef) {
-            setSelectedChef(
-              typeof response.data.data.chef === "object" ? response.data.data.chef._id : response.data.data.chef,
-            )
-          }
-        } else {
-          toast.error(response.error || "Failed to load order")
-        }
-      } catch (error) {
-        console.error("Error fetching order:", error)
-        toast.error("An error occurred while loading the order")
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    const fetchChefs = async () => {
-      try {
-        // This would be a real API call to fetch chefs
-        // For now, we'll use dummy data
-        setChefs([
-          { _id: "chef1", full_name: "Chef John Doe" },
-          { _id: "chef2", full_name: "Chef Jane Smith" },
-          { _id: "chef3", full_name: "Chef Mike Johnson" },
-        ])
-      } catch (error) {
-        console.error("Error fetching chefs:", error)
-      }
-    }
-
     fetchOrder()
-    fetchChefs()
-  }, [params.id, request])
+  }, [orderId])
 
-  const updateOrderStatus = async (status: string) => {
-    setIsUpdating(true)
+  useEffect(() => {
+    if (order && (order.status === "New" || order.status === "Preparing")) {
+      const startTime = new Date(order.startedAt || order.createdAt).getTime()
+      const interval = setInterval(() => {
+        const now = new Date().getTime()
+        const elapsed = Math.floor((now - startTime) / 1000) // elapsed time in seconds
+        setTimeElapsed(elapsed)
+      }, 1000)
+      return () => clearInterval(interval)
+    }
+  }, [order])
+
+  const fetchOrder = async () => {
+    setLoading(true)
     try {
-      const response = await request(`/kitchen/orders/${params.id}/status`, "PATCH", { status })
-
-      if (response.data) {
-        toast.success(`Order status updated to ${status}`)
-        // Refresh order data
-        const updatedOrder = await request(`/kitchen/orders/${params.id}`)
-        if (updatedOrder.data) {
-          setOrder(updatedOrder.data.data)
-        }
-      } else {
-        toast.error(response.error || "Failed to update order status")
+      const result = await getOrder(orderId)
+      if (result) {
+        setOrder(result)
       }
     } catch (error) {
-      toast.error("An error occurred while updating order status")
-      console.error(error)
+      console.error("Error fetching order:", error)
     } finally {
-      setIsUpdating(false)
+      setLoading(false)
     }
   }
 
-  const updateItemStatus = async (itemId: string, status: string) => {
-    setIsUpdating(true)
-    try {
-      const response = await request(`/kitchen/orders/${params.id}/item-status`, "PATCH", {
-        itemId,
-        status,
-        assignedTo: selectedChef || undefined,
-      })
-
-      if (response.data) {
-        toast.success(`Item status updated to ${status}`)
-        // Refresh order data
-        const updatedOrder = await request(`/kitchen/orders/${params.id}`)
-        if (updatedOrder.data) {
-          setOrder(updatedOrder.data.data)
-        }
-      } else {
-        toast.error(response.error || "Failed to update item status")
-      }
-    } catch (error) {
-      toast.error("An error occurred while updating item status")
-      console.error(error)
-    } finally {
-      setIsUpdating(false)
+  const handleUpdateStatus = async (status: string) => {
+    const result = await updateOrderStatus(orderId, status, notes)
+    if (result) {
+      setOrder(result)
+      setNotes("")
     }
   }
 
-  const assignChef = async () => {
-    if (!selectedChef) {
-      toast.error("Please select a chef")
-      return
-    }
-
-    setIsUpdating(true)
-    try {
-      const response = await request(`/kitchen/orders/${params.id}/assign-chef`, "PATCH", {
-        chef: selectedChef,
-      })
-
-      if (response.data) {
-        toast.success("Chef assigned successfully")
-        // Refresh order data
-        const updatedOrder = await request(`/kitchen/orders/${params.id}`)
-        if (updatedOrder.data) {
-          setOrder(updatedOrder.data.data)
-        }
-      } else {
-        toast.error(response.error || "Failed to assign chef")
-      }
-    } catch (error) {
-      toast.error("An error occurred while assigning chef")
-      console.error(error)
-    } finally {
-      setIsUpdating(false)
+  const handleUpdateItemStatus = async (itemId: string, status: string) => {
+    const result = await updateItemStatus(orderId, itemId, status)
+    if (result) {
+      setOrder(result)
     }
   }
 
-  const updateOrderNotes = async () => {
-    setIsUpdating(true)
-    try {
-      const response = await request(`/kitchen/orders/${params.id}`, "PUT", {
-        notes,
-      })
-
-      if (response.data) {
-        toast.success("Order notes updated")
-        // Refresh order data
-        const updatedOrder = await request(`/kitchen/orders/${params.id}`)
-        if (updatedOrder.data) {
-          setOrder(updatedOrder.data.data)
-        }
-      } else {
-        toast.error(response.error || "Failed to update notes")
-      }
-    } catch (error) {
-      toast.error("An error occurred while updating notes")
-      console.error(error)
-    } finally {
-      setIsUpdating(false)
-    }
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs < 10 ? "0" : ""}${secs}`
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Pending":
-        return "bg-yellow-100 text-yellow-800 border-yellow-200"
-      case "In Progress":
-        return "bg-blue-100 text-blue-800 border-blue-200"
-      case "Ready":
-        return "bg-green-100 text-green-800 border-green-200"
-      case "Completed":
-        return "bg-green-100 text-green-800 border-green-200"
-      case "Cancelled":
-        return "bg-red-100 text-red-800 border-red-200"
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-200"
-    }
-  }
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "High":
-        return "bg-red-100 text-red-800 border-red-200"
-      case "Normal":
-        return "bg-blue-100 text-blue-800 border-blue-200"
-      case "Low":
-        return "bg-gray-100 text-gray-800 border-gray-200"
-      default:
-        return "bg-blue-100 text-blue-800 border-blue-200"
-    }
-  }
-
-  const getOrderTypeIcon = (type: string) => {
-    switch (type) {
-      case "Dine In":
-        return <Utensils className="h-4 w-4" />
-      case "Takeaway":
-        return <Coffee className="h-4 w-4" />
-      case "Delivery":
-        return <User className="h-4 w-4" />
-      default:
-        return <Utensils className="h-4 w-4" />
-    }
-  }
-
-  const getNextStatusButton = () => {
-    if (!order) return null
-
-    switch (order.status) {
-      case "Pending":
-        return (
-          <Button onClick={() => updateOrderStatus("In Progress")} disabled={isUpdating} className="w-full">
-            Start Preparing
-          </Button>
-        )
-      case "In Progress":
-        return (
-          <Button onClick={() => updateOrderStatus("Ready")} disabled={isUpdating} className="w-full">
-            Mark as Ready
-          </Button>
-        )
-      case "Ready":
-        return (
-          <Button onClick={() => updateOrderStatus("Completed")} disabled={isUpdating} className="w-full">
-            Complete Order
-          </Button>
-        )
-      default:
-        return null
-    }
-  }
+  const isLoading = loading || apiLoading
 
   if (isLoading) {
     return (
-      <div className="container mx-auto py-6 flex justify-center items-center min-h-[60vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="container mx-auto p-6">
+        <div className="mb-6">
+          <Skeleton className="h-8 w-32" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <Card>
+              <CardHeader>
+                <Skeleton className="h-6 w-1/3" />
+                <Skeleton className="h-4 w-1/4" />
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {Array(4)
+                    .fill(0)
+                    .map((_, i) => (
+                      <div key={i} className="flex justify-between items-center">
+                        <div className="space-y-1">
+                          <Skeleton className="h-5 w-40" />
+                          <Skeleton className="h-4 w-24" />
+                        </div>
+                        <Skeleton className="h-10 w-24" />
+                      </div>
+                    ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          <div>
+            <Card>
+              <CardHeader>
+                <Skeleton className="h-6 w-1/2" />
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-2/3" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     )
   }
 
   if (!order) {
     return (
-      <div className="container mx-auto py-6">
-        <Button variant="outline" onClick={() => router.back()} className="mb-6">
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
-        </Button>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-destructive">Order Not Found</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>The requested order could not be found.</p>
-          </CardContent>
-          <CardFooter>
-            <Button variant="outline" onClick={() => router.push("/kitchen")}>
-              Return to Kitchen Dashboard
-            </Button>
-          </CardFooter>
+      <div className="container mx-auto p-6">
+        <Link href="/kitchen">
+          <Button variant="outline" className="mb-6">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Kitchen
+          </Button>
+        </Link>
+        <Card className="p-8 text-center">
+          <div className="mb-4 flex justify-center">
+            <XCircle className="h-12 w-12 text-red-500" />
+          </div>
+          <h3 className="text-lg font-semibold">Order Not Found</h3>
+          <p className="text-muted-foreground mt-2">The order you're looking for doesn't exist or has been removed.</p>
+          <Button className="mt-4" onClick={() => router.push("/kitchen")}>
+            Return to Kitchen
+          </Button>
         </Card>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto py-6">
-      <Button variant="outline" onClick={() => router.back()} className="mb-6">
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Back to Kitchen Dashboard
-      </Button>
+    <div className="container mx-auto p-6">
+      <Link href="/kitchen">
+        <Button variant="outline" className="mb-6">
+          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Kitchen
+        </Button>
+      </Link>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-2">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
           <Card>
             <CardHeader>
               <div className="flex justify-between items-start">
                 <div>
-                  <CardTitle className="text-2xl">Order #{order.orderNumber}</CardTitle>
-                  <div className="text-sm text-muted-foreground mt-1">
-                    {order.createdAt && (
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {format(new Date(order.createdAt), "PPP p")}
-                      </div>
-                    )}
-                  </div>
+                  <CardTitle className="text-xl">Order #{order.orderNumber}</CardTitle>
+                  <CardDescription>
+                    {new Date(order.createdAt).toLocaleString()} • {order.orderType}
+                  </CardDescription>
                 </div>
-                <div className="flex flex-col gap-1 items-end">
-                  <Badge className={getStatusColor(order.status)}>{order.status}</Badge>
-                  <Badge className={getPriorityColor(order.priority)}>{order.priority}</Badge>
+                <div className="flex gap-2">
+                  <Badge className={ORDER_STATUS_COLORS[order.status] || "bg-gray-100"}>{order.status}</Badge>
+                  <Badge className={PRIORITY_COLORS[order.priority] || "bg-gray-100"}>{order.priority} Priority</Badge>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-wrap gap-4 mb-4">
-                <div className="flex items-center gap-1">
-                  {getOrderTypeIcon(order.orderType)}
-                  <span className="text-sm font-medium">{order.orderType}</span>
-                </div>
-                {order.table && <div className="text-sm font-medium">Table: {order.table.number}</div>}
-                {order.waiter && (
-                  <div className="text-sm font-medium flex items-center gap-1">
-                    <User className="h-3 w-3" />
-                    Waiter: {typeof order.waiter === "object" ? order.waiter.full_name : "Assigned"}
+              {(order.status === "New" || order.status === "Preparing") && (
+                <div className="mb-4 p-3 bg-yellow-50 rounded-md flex items-center justify-between">
+                  <div className="flex items-center">
+                    <Timer className="h-5 w-5 text-yellow-600 mr-2" />
+                    <span className="font-medium">Time Elapsed: {formatTime(timeElapsed)}</span>
                   </div>
-                )}
+                  {order.status === "New" && (
+                    <Button size="sm" onClick={() => handleUpdateStatus("Preparing")}>
+                      Start Preparing
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              <h3 className="font-medium text-lg mb-3">Order Items</h3>
+              <div className="space-y-4">
+                {order.items.map((item) => (
+                  <div key={item._id} className="flex justify-between items-center border-b pb-3">
+                    <div>
+                      <p className="font-medium">
+                        {item.quantity}x {item.name}
+                      </p>
+                      {item.notes && <p className="text-sm text-muted-foreground">Note: {item.notes}</p>}
+                    </div>
+                    <div className="flex gap-2">
+                      <Badge
+                        className={
+                          item.status === "New"
+                            ? "bg-blue-100 text-blue-800"
+                            : item.status === "Preparing"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : item.status === "Ready"
+                                ? "bg-green-100 text-green-800"
+                                : "bg-gray-100"
+                        }
+                      >
+                        {item.status}
+                      </Badge>
+                      {item.status !== "Ready" && (
+                        <Button size="sm" variant="outline" onClick={() => handleUpdateItemStatus(item._id, "Ready")}>
+                          Mark Ready
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
 
-              <Separator className="my-4" />
+              <Separator className="my-6" />
 
-              <Tabs defaultValue="items">
-                <TabsList className="w-full">
-                  <TabsTrigger value="items">Order Items</TabsTrigger>
-                  <TabsTrigger value="details">Order Details</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="items" className="mt-4">
-                  <div className="space-y-4">
-                    {order.items?.map((item: any, index: number) => (
-                      <Card key={index}>
-                        <CardContent className="p-4">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <div className="font-medium">
-                                {item.quantity}x {item.name || (item.menuItem && item.menuItem.name) || "Item"}
-                              </div>
-                              {item.menuItem?.preparationTime && (
-                                <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                                  <Clock className="h-3 w-3" />
-                                  Prep time: {item.menuItem.preparationTime} min
-                                </div>
-                              )}
-                              {item.notes && (
-                                <div className="text-xs text-muted-foreground mt-1">Notes: {item.notes}</div>
-                              )}
-                              {item.modifiers && item.modifiers.length > 0 && (
-                                <div className="text-xs text-muted-foreground mt-1">
-                                  Modifiers: {item.modifiers.join(", ")}
-                                </div>
-                              )}
-                              {item.assignedTo && (
-                                <div className="text-xs flex items-center gap-1 mt-1">
-                                  <ChefHat className="h-3 w-3" />
-                                  Chef: {typeof item.assignedTo === "object" ? item.assignedTo.full_name : "Assigned"}
-                                </div>
-                              )}
-                            </div>
-                            <Badge className={getStatusColor(item.status)}>{item.status}</Badge>
-                          </div>
-
-                          {(order.status === "Pending" || order.status === "In Progress") && (
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              {item.status === "Pending" && (
-                                <Button
-                                  size="sm"
-                                  onClick={() => updateItemStatus(item._id, "Cooking")}
-                                  disabled={isUpdating}
-                                >
-                                  Start Cooking
-                                </Button>
-                              )}
-                              {item.status === "Cooking" && (
-                                <Button
-                                  size="sm"
-                                  onClick={() => updateItemStatus(item._id, "Ready")}
-                                  disabled={isUpdating}
-                                >
-                                  Mark Ready
-                                </Button>
-                              )}
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="details" className="mt-4">
-                  <div className="space-y-4">
-                    <div>
-                      <h3 className="text-sm font-medium mb-2">Chef Assignment</h3>
-                      <div className="flex gap-2">
-                        <Select value={selectedChef} onValueChange={setSelectedChef}>
-                          <SelectTrigger className="w-[200px]">
-                            <SelectValue placeholder="Select chef" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {chefs.map((chef) => (
-                              <SelectItem key={chef._id} value={chef._id}>
-                                {chef.full_name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Button onClick={assignChef} disabled={isUpdating || !selectedChef}>
-                          Assign Chef
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div>
-                      <h3 className="text-sm font-medium mb-2">Order Notes</h3>
-                      <Textarea
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                        placeholder="Add notes about this order"
-                        rows={4}
-                      />
-                      <Button onClick={updateOrderNotes} disabled={isUpdating} className="mt-2" variant="outline">
-                        Update Notes
-                      </Button>
-                    </div>
-
-                    {order.estimatedCompletionTime && (
-                      <div>
-                        <h3 className="text-sm font-medium mb-1">Estimated Completion</h3>
-                        <p>{format(new Date(order.estimatedCompletionTime), "PPP p")}</p>
-                      </div>
-                    )}
-
-                    {order.startedAt && (
-                      <div>
-                        <h3 className="text-sm font-medium mb-1">Started At</h3>
-                        <p>{format(new Date(order.startedAt), "PPP p")}</p>
-                      </div>
-                    )}
-
-                    {order.completedAt && (
-                      <div>
-                        <h3 className="text-sm font-medium mb-1">Completed At</h3>
-                        <p>{format(new Date(order.completedAt), "PPP p")}</p>
-                      </div>
-                    )}
-                  </div>
-                </TabsContent>
-              </Tabs>
+              <div className="space-y-4">
+                <h3 className="font-medium text-lg">Order Actions</h3>
+                <Textarea
+                  placeholder="Add notes about this order (optional)"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="mb-4"
+                />
+                <div className="flex flex-wrap gap-2">
+                  {order.status === "New" && (
+                    <Button onClick={() => handleUpdateStatus("Preparing")}>Start Preparing</Button>
+                  )}
+                  {(order.status === "New" || order.status === "Preparing") && (
+                    <Button onClick={() => handleUpdateStatus("Ready")}>Mark as Ready</Button>
+                  )}
+                  {order.status === "Ready" && (
+                    <Button onClick={() => handleUpdateStatus("Completed")}>Mark as Completed</Button>
+                  )}
+                  {(order.status === "New" || order.status === "Preparing") && (
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button variant="destructive">Cancel Order</Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Cancel Order</DialogTitle>
+                          <DialogDescription>
+                            Are you sure you want to cancel this order? This action cannot be undone.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <Textarea
+                          placeholder="Reason for cancellation"
+                          value={notes}
+                          onChange={(e) => setNotes(e.target.value)}
+                          className="my-4"
+                        />
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setNotes("")}>
+                            Cancel
+                          </Button>
+                          <Button variant="destructive" onClick={() => handleUpdateStatus("Cancelled")}>
+                            Yes, Cancel Order
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  )}
+                </div>
+              </div>
             </CardContent>
-            <CardFooter className="flex justify-between">
-              <Button
-                variant="destructive"
-                onClick={() => updateOrderStatus("Cancelled")}
-                disabled={isUpdating || order.status === "Completed" || order.status === "Cancelled"}
-              >
-                <XCircle className="h-4 w-4 mr-2" />
-                Cancel Order
-              </Button>
-              {getNextStatusButton()}
-            </CardFooter>
           </Card>
         </div>
 
         <div>
           <Card>
             <CardHeader>
-              <CardTitle>Order Timeline</CardTitle>
+              <CardTitle>Order Details</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-start gap-2">
-                  <div className="mt-0.5">
-                    <div className="h-6 w-6 rounded-full bg-blue-100 flex items-center justify-center">
-                      <Clock className="h-3 w-3 text-blue-600" />
-                    </div>
-                  </div>
-                  <div>
-                    <p className="font-medium">Order Created</p>
-                    <p className="text-sm text-muted-foreground">
-                      {order.createdAt ? format(new Date(order.createdAt), "PPP p") : "Unknown"}
-                    </p>
-                  </div>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="text-sm font-medium">Table/Room</p>
+                <p className="text-sm text-muted-foreground">
+                  {order.table ? `Table ${order.table}` : order.room ? `Room ${order.room}` : "N/A"}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm font-medium">Order Type</p>
+                <p className="text-sm text-muted-foreground">{order.orderType}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium">Priority</p>
+                <p className="text-sm text-muted-foreground flex items-center">
+                  {order.priority === "High" && <AlertTriangle className="mr-1 h-4 w-4 text-red-500" />}
+                  {order.priority}
+                </p>
+              </div>
+              {order.waiter && (
+                <div>
+                  <p className="text-sm font-medium">Waiter</p>
+                  <p className="text-sm text-muted-foreground">{order.waiter}</p>
                 </div>
-
-                {order.startedAt && (
-                  <div className="flex items-start gap-2">
-                    <div className="mt-0.5">
-                      <div className="h-6 w-6 rounded-full bg-amber-100 flex items-center justify-center">
-                        <ChefHat className="h-3 w-3 text-amber-600" />
-                      </div>
+              )}
+              {order.chef && (
+                <div>
+                  <p className="text-sm font-medium">Assigned Chef</p>
+                  <p className="text-sm text-muted-foreground flex items-center">
+                    <ChefHat className="mr-1 h-4 w-4" />
+                    {order.chef}
+                  </p>
+                </div>
+              )}
+              {order.notes && (
+                <div>
+                  <p className="text-sm font-medium">Order Notes</p>
+                  <p className="text-sm text-muted-foreground">{order.notes}</p>
+                </div>
+              )}
+              <div>
+                <p className="text-sm font-medium">Timeline</p>
+                <div className="mt-2 space-y-2">
+                  <div className="flex items-start">
+                    <div className="mr-2 mt-0.5">
+                      <div className="h-2 w-2 rounded-full bg-blue-500"></div>
                     </div>
                     <div>
-                      <p className="font-medium">Preparation Started</p>
-                      <p className="text-sm text-muted-foreground">{format(new Date(order.startedAt), "PPP p")}</p>
+                      <p className="text-xs font-medium">Order Created</p>
+                      <p className="text-xs text-muted-foreground">{new Date(order.createdAt).toLocaleString()}</p>
                     </div>
                   </div>
-                )}
-
-                {order.completedAt && (
-                  <div className="flex items-start gap-2">
-                    <div className="mt-0.5">
-                      <div className="h-6 w-6 rounded-full bg-green-100 flex items-center justify-center">
-                        <CheckCircle className="h-3 w-3 text-green-600" />
+                  {order.startedAt && (
+                    <div className="flex items-start">
+                      <div className="mr-2 mt-0.5">
+                        <div className="h-2 w-2 rounded-full bg-yellow-500"></div>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium">Preparation Started</p>
+                        <p className="text-xs text-muted-foreground">{new Date(order.startedAt).toLocaleString()}</p>
                       </div>
                     </div>
-                    <div>
-                      <p className="font-medium">Order Completed</p>
-                      <p className="text-sm text-muted-foreground">{format(new Date(order.completedAt), "PPP p")}</p>
-                    </div>
-                  </div>
-                )}
-
-                {order.cancelledAt && (
-                  <div className="flex items-start gap-2">
-                    <div className="mt-0.5">
-                      <div className="h-6 w-6 rounded-full bg-red-100 flex items-center justify-center">
-                        <XCircle className="h-3 w-3 text-red-600" />
+                  )}
+                  {order.completedAt && (
+                    <div className="flex items-start">
+                      <div className="mr-2 mt-0.5">
+                        <div className="h-2 w-2 rounded-full bg-green-500"></div>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium">Order Completed</p>
+                        <p className="text-xs text-muted-foreground">{new Date(order.completedAt).toLocaleString()}</p>
                       </div>
                     </div>
-                    <div>
-                      <p className="font-medium">Order Cancelled</p>
-                      <p className="text-sm text-muted-foreground">{format(new Date(order.cancelledAt), "PPP p")}</p>
-                      {order.cancellationReason && (
-                        <p className="text-sm text-muted-foreground mt-1">Reason: {order.cancellationReason}</p>
-                      )}
+                  )}
+                  {order.cancelledAt && (
+                    <div className="flex items-start">
+                      <div className="mr-2 mt-0.5">
+                        <div className="h-2 w-2 rounded-full bg-red-500"></div>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium">Order Cancelled</p>
+                        <p className="text-xs text-muted-foreground">{new Date(order.cancelledAt).toLocaleString()}</p>
+                        {order.cancellationReason && (
+                          <p className="text-xs text-red-500">Reason: {order.cancellationReason}</p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </CardContent>
+            <CardFooter>
+              <Button variant="outline" className="w-full" onClick={fetchOrder}>
+                Refresh Order
+              </Button>
+            </CardFooter>
           </Card>
         </div>
       </div>

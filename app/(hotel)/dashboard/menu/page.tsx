@@ -3,15 +3,15 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { useMenuItems, type MenuItem, type MenuItemFilters } from "@/hooks/use-menu-items"
+import { useRouter } from "next/navigation"
+import { useMenuItems } from "@/hooks/use-menu-items"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { Pagination } from "@/components/ui/pagination"
+import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   AlertDialog,
@@ -24,30 +24,32 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { PlusCircle, Search, Edit, Trash2, Star, DollarSign, ChevronLeft, ChevronRight } from "lucide-react"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import {
+  PlusCircle,
+  Search,
+  Filter,
+  Edit,
+  Trash,
+  Star,
+  DollarSign,
+  Clock,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react"
 import Link from "next/link"
-
-const CATEGORIES = [
-  "All",
-  "Appetizers",
-  "Soups",
-  "Salads",
-  "Main Courses",
-  "Sides",
-  "Desserts",
-  "Beverages",
-  "Specials",
-]
+import { MENU_CATEGORIES } from "@/config/constants"
 
 export default function MenuPage() {
+  const router = useRouter()
   const { getMenuItems, toggleAvailability, toggleFeatured, deleteMenuItem, loading } = useMenuItems()
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([])
+  const [menuItems, setMenuItems] = useState<any[]>([])
   const [totalItems, setTotalItems] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [activeCategory, setActiveCategory] = useState("All")
   const [searchQuery, setSearchQuery] = useState("")
-  const [filters, setFilters] = useState<MenuItemFilters>({
+  const [filters, setFilters] = useState({
     page: 1,
     limit: 12,
     sort: "name",
@@ -59,11 +61,11 @@ export default function MenuPage() {
 
   const fetchMenuItems = async () => {
     const result = await getMenuItems(filters)
-    if (result) {
+    if (result && result.data) {
       setMenuItems(result.data)
-      setTotalItems(result.total)
-      setTotalPages(result.pagination.totalPages)
-      setCurrentPage(result.pagination.page)
+      setTotalItems(result.total || 0)
+      setTotalPages(result.pagination?.totalPages || 1)
+      setCurrentPage(result.pagination?.page || 1)
     }
   }
 
@@ -122,10 +124,10 @@ export default function MenuPage() {
   }
 
   return (
-    <div className="container mx-auto p-6">
+    <div className="container mx-auto py-6">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold">Menu Management</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Menu Management</h1>
           <p className="text-muted-foreground">Manage your restaurant menu items and categories</p>
         </div>
         <Link href="/dashboard/menu/new">
@@ -145,7 +147,7 @@ export default function MenuPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-1">
-                {CATEGORIES.map((category) => (
+                {MENU_CATEGORIES.map((category) => (
                   <Button
                     key={category}
                     variant={activeCategory === category ? "default" : "ghost"}
@@ -169,7 +171,7 @@ export default function MenuPage() {
                   id="available"
                   checked={filters.availability === true}
                   onCheckedChange={(checked) =>
-                    setFilters((prev) => ({ ...prev, availability: checked ? true : undefined }))
+                    setFilters((prev) => ({ ...prev, availability: checked ? true : undefined, page: 1 }))
                   }
                 />
                 <Label htmlFor="available">Available Only</Label>
@@ -179,7 +181,7 @@ export default function MenuPage() {
                   id="featured"
                   checked={filters.featured === true}
                   onCheckedChange={(checked) =>
-                    setFilters((prev) => ({ ...prev, featured: checked ? true : undefined }))
+                    setFilters((prev) => ({ ...prev, featured: checked ? true : undefined, page: 1 }))
                   }
                 />
                 <Label htmlFor="featured">Featured Only</Label>
@@ -189,7 +191,7 @@ export default function MenuPage() {
                   id="vegetarian"
                   checked={filters.isVegetarian === true}
                   onCheckedChange={(checked) =>
-                    setFilters((prev) => ({ ...prev, isVegetarian: checked ? true : undefined }))
+                    setFilters((prev) => ({ ...prev, isVegetarian: checked ? true : undefined, page: 1 }))
                   }
                 />
                 <Label htmlFor="vegetarian">Vegetarian</Label>
@@ -199,7 +201,7 @@ export default function MenuPage() {
                   id="vegan"
                   checked={filters.isVegan === true}
                   onCheckedChange={(checked) =>
-                    setFilters((prev) => ({ ...prev, isVegan: checked ? true : undefined }))
+                    setFilters((prev) => ({ ...prev, isVegan: checked ? true : undefined, page: 1 }))
                   }
                 />
                 <Label htmlFor="vegan">Vegan</Label>
@@ -209,10 +211,43 @@ export default function MenuPage() {
                   id="glutenFree"
                   checked={filters.isGlutenFree === true}
                   onCheckedChange={(checked) =>
-                    setFilters((prev) => ({ ...prev, isGlutenFree: checked ? true : undefined }))
+                    setFilters((prev) => ({ ...prev, isGlutenFree: checked ? true : undefined, page: 1 }))
                   }
                 />
                 <Label htmlFor="glutenFree">Gluten Free</Label>
+              </div>
+              <Separator />
+              <div className="space-y-2">
+                <Label htmlFor="priceRange">Price Range</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="minPrice"
+                    type="number"
+                    placeholder="Min"
+                    className="w-20"
+                    onChange={(e) =>
+                      setFilters((prev) => ({
+                        ...prev,
+                        minPrice: e.target.value ? Number(e.target.value) : undefined,
+                        page: 1,
+                      }))
+                    }
+                  />
+                  <span>to</span>
+                  <Input
+                    id="maxPrice"
+                    type="number"
+                    placeholder="Max"
+                    className="w-20"
+                    onChange={(e) =>
+                      setFilters((prev) => ({
+                        ...prev,
+                        maxPrice: e.target.value ? Number(e.target.value) : undefined,
+                        page: 1,
+                      }))
+                    }
+                  />
+                </div>
               </div>
               <Button
                 variant="outline"
@@ -245,19 +280,22 @@ export default function MenuPage() {
                 <Search className="h-4 w-4" />
               </Button>
             </form>
-            <Select defaultValue="name" onValueChange={handleSortChange}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Sort by" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="name">Name (A-Z)</SelectItem>
-                <SelectItem value="-name">Name (Z-A)</SelectItem>
-                <SelectItem value="price">Price (Low to High)</SelectItem>
-                <SelectItem value="-price">Price (High to Low)</SelectItem>
-                <SelectItem value="-createdAt">Newest First</SelectItem>
-                <SelectItem value="createdAt">Oldest First</SelectItem>
-              </SelectContent>
-            </Select>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="flex gap-2">
+                  <Filter className="h-4 w-4" />
+                  <span>Sort By</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleSortChange("name")}>Name (A-Z)</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSortChange("-name")}>Name (Z-A)</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSortChange("price")}>Price (Low to High)</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSortChange("-price")}>Price (High to Low)</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSortChange("-createdAt")}>Newest First</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSortChange("createdAt")}>Oldest First</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           {loading ? (
@@ -330,10 +368,10 @@ export default function MenuPage() {
                       </div>
                     </div>
                     <CardHeader>
-                      <CardTitle className="flex justify-between items-center">
-                        <span className="truncate">{item.name}</span>
+                      <div className="flex justify-between items-center">
+                        <CardTitle className="truncate">{item.name}</CardTitle>
                         <span className="text-green-600 font-bold">${item.price.toFixed(2)}</span>
-                      </CardTitle>
+                      </div>
                       <CardDescription>{item.category}</CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -354,6 +392,12 @@ export default function MenuPage() {
                             Gluten Free
                           </Badge>
                         )}
+                        {item.preparationTime && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                            <Clock className="h-3 w-3" />
+                            <span>{item.preparationTime} min</span>
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                     <CardFooter className="flex justify-between">
@@ -361,7 +405,7 @@ export default function MenuPage() {
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button variant="destructive" size="icon">
-                              <Trash2 className="h-4 w-4" />
+                              <Trash className="h-4 w-4" />
                             </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
@@ -409,7 +453,7 @@ export default function MenuPage() {
 
               {totalPages > 1 && (
                 <div className="flex justify-center mt-6">
-                  <Pagination>
+                  <div className="flex items-center gap-2">
                     <Button
                       variant="outline"
                       size="icon"
@@ -429,7 +473,7 @@ export default function MenuPage() {
                     >
                       <ChevronRight className="h-4 w-4" />
                     </Button>
-                  </Pagination>
+                  </div>
                 </div>
               )}
             </>
