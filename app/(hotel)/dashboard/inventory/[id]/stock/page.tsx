@@ -3,82 +3,79 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { useParams } from "next/navigation"
-import { useInventory } from "@/hooks/use-inventory"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useParams, useRouter } from "next/navigation"
+import { ArrowLeft, AlertTriangle, Loader2 } from "lucide-react"
+
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import { toast } from "sonner"
-import { ArrowLeft, Loader2 } from "lucide-react"
-import Link from "next/link"
+import { useInventory } from "@/hooks/use-inventory"
 
 export default function UpdateStockPage() {
   const params = useParams()
-  const id = params.id as string
+  const router = useRouter()
   const { getInventoryItemById, updateStockLevel, loading } = useInventory()
 
   const [item, setItem] = useState<any>(null)
-  const [quantity, setQuantity] = useState<number>(0)
-  const [type, setType] = useState<"IN" | "OUT" | "ADJUSTMENT">("IN")
-  const [notes, setNotes] = useState<string>("")
-  const [location, setLocation] = useState<string>("")
+  const [quantity, setQuantity] = useState<string>("")
+  const [type, setType] = useState<string>("restock")
+  const [reason, setReason] = useState<string>("")
+  const [unitPrice, setUnitPrice] = useState<string>("")
   const [department, setDepartment] = useState<string>("")
-  const [supplier, setSupplier] = useState<string>("")
-  const [isLoading, setIsLoading] = useState<boolean>(true)
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
+  const [referenceNumber, setReferenceNumber] = useState<string>("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    const fetchItem = async () => {
+    const loadItem = async () => {
       setIsLoading(true)
-      try {
-        const response = await getInventoryItemById(id)
-        if (response.data) {
-          setItem(response.data)
-          if (response.data.supplier) {
-            setSupplier(response.data.supplier)
-          }
-          if (response.data.location) {
-            setLocation(response.data.location)
-          }
-          if (response.data.department) {
-            setDepartment(response.data.department)
-          }
-        } else {
-          toast.error("Failed to load inventory item")
-        }
-      } catch (error) {
-        toast.error("An error occurred while fetching the inventory item")
-      } finally {
-        setIsLoading(false)
+      const response = await getInventoryItemById(params.id as string)
+      if (response.data) {
+        setItem(response.data)
+        setUnitPrice(response.data.unitPrice?.toString() || "")
+      } else {
+        toast.error("Failed to load inventory item")
       }
+      setIsLoading(false)
     }
 
-    if (id) {
-      fetchItem()
-    }
-  }, [id, getInventoryItemById])
+    loadItem()
+  }, [params.id, getInventoryItemById])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsSubmitting(true)
+
+    if (!quantity || !type) {
+      toast.error("Quantity and transaction type are required")
+      return
+    }
 
     try {
-      // Fix: Add the type parameter to the updateStockLevel call
-      const response = await updateStockLevel(id, quantity, type, notes, location, department, supplier)
+      setIsSubmitting(true)
+
+      const data = {
+        quantity: Number(quantity),
+        type: type as "restock" | "use" | "transfer" | "adjustment" | "waste",
+        reason: reason || undefined,
+        unit_price: unitPrice ? Number(unitPrice) : undefined,
+        department: department || undefined,
+        reference_number: referenceNumber || undefined,
+      }
+
+      const response = await updateStockLevel(params.id as string, data)
 
       if (response.data) {
-        toast.success(`Stock ${type === "IN" ? "added" : type === "OUT" ? "removed" : "adjusted"} successfully`)
-        setItem(response.data)
-        setQuantity(0)
-        setNotes("")
+        toast.success("Stock updated successfully")
+        router.push(`/dashboard/inventory/${params.id}`)
       } else {
-        toast.error("Failed to update stock")
+        toast.error(response.error || "Failed to update stock")
       }
-    } catch (error) {
-      toast.error("An error occurred while updating stock")
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update stock")
     } finally {
       setIsSubmitting(false)
     }
@@ -86,7 +83,7 @@ export default function UpdateStockPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="p-6 flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     )
@@ -94,102 +91,162 @@ export default function UpdateStockPage() {
 
   if (!item) {
     return (
-      <div className="p-4">
-        <Card>
-          <CardContent className="pt-6">
-            <p>Inventory item not found</p>
-            <Button asChild className="mt-4">
-              <Link href="/dashboard/inventory">Back to Inventory</Link>
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="p-6">
+        <div className="max-w-2xl mx-auto">
+          <Card className="border-destructive">
+            <CardHeader>
+              <CardTitle className="text-destructive">Error</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p>Failed to load inventory item</p>
+            </CardContent>
+            <CardFooter>
+              <Button variant="outline" onClick={() => router.back()}>
+                Go Back
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="p-4">
-      <div className="mb-4">
-        <Button variant="outline" asChild>
-          <Link href={`/dashboard/inventory/${id}`}>
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Item
-          </Link>
-        </Button>
-      </div>
+    <div className="p-6">
+      <div className="max-w-2xl mx-auto">
+        <div className="flex items-center gap-4 mb-6">
+          <Button variant="outline" size="icon" onClick={() => router.back()}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h1 className="text-2xl font-bold">Update Stock: {item.name}</h1>
+        </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Update Stock: {item.name}</CardTitle>
-          <CardDescription>
-            Current Stock: {item.currentStock} | Min: {item.minStockLevel} | Max: {item.maxStockLevel} | Reorder Point:{" "}
-            {item.reorderPoint}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="type">Transaction Type</Label>
-                <Select value={type} onValueChange={(value) => setType(value as "IN" | "OUT" | "ADJUSTMENT")}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select transaction type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="IN">Stock In</SelectItem>
-                    <SelectItem value="OUT">Stock Out</SelectItem>
-                    <SelectItem value="ADJUSTMENT">Adjustment</SelectItem>
-                  </SelectContent>
-                </Select>
+        <Card>
+          <CardHeader>
+            <CardTitle>Update Stock Level</CardTitle>
+            <CardDescription>Add or remove stock from this inventory item</CardDescription>
+          </CardHeader>
+          <form onSubmit={handleSubmit}>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="current-stock">Current Stock</Label>
+                  <Input id="current-stock" value={`${item.currentStock} ${item.unit}`} disabled />
+                </div>
+                <div>
+                  <Label htmlFor="reorder-level">Reorder Level</Label>
+                  <Input id="reorder-level" value={`${item.reorderPoint} ${item.unit}`} disabled />
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="quantity">Quantity</Label>
-                <Input
-                  id="quantity"
-                  type="number"
-                  value={quantity}
-                  onChange={(e) => setQuantity(Number(e.target.value))}
-                  min={0}
-                  required
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="type">Transaction Type</Label>
+                  <Select value={type} onValueChange={setType} required>
+                    <SelectTrigger id="type">
+                      <SelectValue placeholder="Select transaction type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="restock">Restock</SelectItem>
+                      <SelectItem value="use">Use</SelectItem>
+                      <SelectItem value="transfer">Transfer</SelectItem>
+                      <SelectItem value="adjustment">Adjustment</SelectItem>
+                      <SelectItem value="waste">Waste</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="quantity">Quantity ({item.unit})</Label>
+                  <Input
+                    id="quantity"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={quantity}
+                    onChange={(e) => setQuantity(e.target.value)}
+                    required
+                  />
+                </div>
               </div>
 
-              {type === "IN" && (
-                <div className="space-y-2">
-                  <Label htmlFor="supplier">Supplier</Label>
-                  <Input id="supplier" value={supplier} onChange={(e) => setSupplier(e.target.value)} />
+              {type === "transfer" && (
+                <div>
+                  <Label htmlFor="department">Department</Label>
+                  <Select value={department} onValueChange={setDepartment}>
+                    <SelectTrigger id="department">
+                      <SelectValue placeholder="Select department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="kitchen">Kitchen</SelectItem>
+                      <SelectItem value="housekeeping">Housekeeping</SelectItem>
+                      <SelectItem value="maintenance">Maintenance</SelectItem>
+                      <SelectItem value="restaurant">Restaurant</SelectItem>
+                      <SelectItem value="bar">Bar</SelectItem>
+                      <SelectItem value="spa">Spa</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
 
-              <div className="space-y-2">
-                <Label htmlFor="location">Location</Label>
-                <Input id="location" value={location} onChange={(e) => setLocation(e.target.value)} />
+              <div>
+                <Label htmlFor="unit-price">Unit Price ($)</Label>
+                <Input
+                  id="unit-price"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={unitPrice}
+                  onChange={(e) => setUnitPrice(e.target.value)}
+                  placeholder="Leave empty to use current price"
+                />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="department">Department</Label>
-                <Input id="department" value={department} onChange={(e) => setDepartment(e.target.value)} />
+              <div>
+                <Label htmlFor="reference">Reference Number</Label>
+                <Input
+                  id="reference"
+                  value={referenceNumber}
+                  onChange={(e) => setReferenceNumber(e.target.value)}
+                  placeholder="Invoice number, PO number, etc."
+                />
               </div>
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Add any additional information about this stock transaction"
-                rows={3}
-              />
-            </div>
+              <div>
+                <Label htmlFor="reason">Reason</Label>
+                <Textarea
+                  id="reason"
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="Reason for this stock update"
+                  rows={3}
+                />
+              </div>
 
-            <Button type="submit" disabled={isSubmitting || loading}>
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {type === "IN" ? "Add Stock" : type === "OUT" ? "Remove Stock" : "Adjust Stock"}
-            </Button>
+              {type === "use" && item.currentStock < Number(quantity) && (
+                <div className="bg-amber-50 border border-amber-200 p-3 rounded-md flex items-start gap-2">
+                  <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-amber-800">Warning</p>
+                    <p className="text-sm text-amber-700">
+                      The quantity you're trying to use ({quantity} {item.unit}) is greater than the current stock (
+                      {item.currentStock} {item.unit}).
+                    </p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+            <CardFooter className="flex justify-between">
+              <Button variant="outline" type="button" onClick={() => router.back()}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSubmitting || loading}>
+                {isSubmitting ? "Updating..." : "Update Stock"}
+              </Button>
+            </CardFooter>
           </form>
-        </CardContent>
-      </Card>
+        </Card>
+      </div>
     </div>
   )
 }
