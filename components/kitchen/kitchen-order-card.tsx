@@ -3,85 +3,35 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { formatDistanceToNow } from "date-fns"
-import { toast } from "sonner"
-import { Clock, ChefHat, User, Coffee, Utensils } from "lucide-react"
+import type { KitchenOrder } from "@/types"
+import { useKitchenOrders } from "@/hooks/use-kitchen-orders"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
-import { useApi } from "@/hooks/use-api"
+import { Clock, ChefHat, User, Coffee, Utensils, ExternalLink } from "lucide-react"
+import { KITCHEN_STATUS_COLORS, PRIORITY_COLORS, ORDER_TYPES } from "@/config/constants"
 
 interface KitchenOrderCardProps {
-  order: any
+  order: KitchenOrder
   onStatusChange?: () => void
 }
 
 export function KitchenOrderCard({ order, onStatusChange }: KitchenOrderCardProps) {
   const router = useRouter()
-  const { request } = useApi()
+  const { updateKitchenOrderStatus, loading } = useKitchenOrders()
   const [isUpdating, setIsUpdating] = useState(false)
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Pending":
-        return "bg-yellow-100 text-yellow-800 border-yellow-200"
-      case "In Progress":
-        return "bg-blue-100 text-blue-800 border-blue-200"
-      case "Ready":
-        return "bg-green-100 text-green-800 border-green-200"
-      case "Completed":
-        return "bg-green-100 text-green-800 border-green-200"
-      case "Cancelled":
-        return "bg-red-100 text-red-800 border-red-200"
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-200"
-    }
-  }
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "High":
-        return "bg-red-100 text-red-800 border-red-200"
-      case "Normal":
-        return "bg-blue-100 text-blue-800 border-blue-200"
-      case "Low":
-        return "bg-gray-100 text-gray-800 border-gray-200"
-      default:
-        return "bg-blue-100 text-blue-800 border-blue-200"
-    }
-  }
 
   const getOrderTypeIcon = (type: string) => {
     switch (type) {
-      case "Dine In":
+      case ORDER_TYPES.DINE_IN:
         return <Utensils className="h-4 w-4" />
-      case "Takeaway":
+      case ORDER_TYPES.TAKEAWAY:
         return <Coffee className="h-4 w-4" />
-      case "Delivery":
+      case ORDER_TYPES.DELIVERY:
         return <User className="h-4 w-4" />
       default:
         return <Utensils className="h-4 w-4" />
-    }
-  }
-
-  const updateOrderStatus = async (status: string) => {
-    setIsUpdating(true)
-    try {
-      const response = await request(`/kitchen/orders/${order._id}/status`, "PATCH", { status })
-
-      if (response.data) {
-        toast.success(`Order status updated to ${status}`)
-        if (onStatusChange) {
-          onStatusChange()
-        }
-      } else {
-        toast.error(response.error || "Failed to update order status")
-      }
-    } catch (error) {
-      toast.error("An error occurred while updating order status")
-      console.error(error)
-    } finally {
-      setIsUpdating(false)
     }
   }
 
@@ -89,19 +39,19 @@ export function KitchenOrderCard({ order, onStatusChange }: KitchenOrderCardProp
     switch (order.status) {
       case "Pending":
         return (
-          <Button onClick={() => updateOrderStatus("In Progress")} disabled={isUpdating} className="w-full">
+          <Button onClick={() => handleUpdateStatus("Cooking")} disabled={isUpdating || loading} className="w-full">
             Start Preparing
           </Button>
         )
-      case "In Progress":
+      case "Cooking":
         return (
-          <Button onClick={() => updateOrderStatus("Ready")} disabled={isUpdating} className="w-full">
+          <Button onClick={() => handleUpdateStatus("Ready")} disabled={isUpdating || loading} className="w-full">
             Mark as Ready
           </Button>
         )
       case "Ready":
         return (
-          <Button onClick={() => updateOrderStatus("Completed")} disabled={isUpdating} className="w-full">
+          <Button onClick={() => handleUpdateStatus("Completed")} disabled={isUpdating || loading} className="w-full">
             Complete Order
           </Button>
         )
@@ -109,6 +59,22 @@ export function KitchenOrderCard({ order, onStatusChange }: KitchenOrderCardProp
         return null
     }
   }
+
+  const handleUpdateStatus = async (status: string) => {
+    setIsUpdating(true)
+    try {
+      await updateKitchenOrderStatus(order._id, status)
+      if (onStatusChange) {
+        onStatusChange()
+      }
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+  const pendingItems = order.items.filter((item) => item.status === "Pending").length
+  const cookingItems = order.items.filter((item) => item.status === "Cooking").length
+  const readyItems = order.items.filter((item) => item.status === "Ready").length
 
   return (
     <Card className="h-full">
@@ -126,8 +92,8 @@ export function KitchenOrderCard({ order, onStatusChange }: KitchenOrderCardProp
             </div>
           </div>
           <div className="flex flex-col gap-1 items-end">
-            <Badge className={getStatusColor(order.status)}>{order.status}</Badge>
-            <Badge className={getPriorityColor(order.priority)}>{order.priority}</Badge>
+            <Badge className={KITCHEN_STATUS_COLORS[order.status] || "bg-gray-100"}>{order.status}</Badge>
+            <Badge className={PRIORITY_COLORS[order.priority] || "bg-blue-100"}>{order.priority}</Badge>
           </div>
         </div>
       </CardHeader>
@@ -145,14 +111,14 @@ export function KitchenOrderCard({ order, onStatusChange }: KitchenOrderCardProp
         <div className="space-y-2 mt-2">
           <div className="text-sm font-medium">Items:</div>
           <ul className="space-y-2">
-            {order.items?.slice(0, 3).map((item: any, index: number) => (
+            {order.items?.slice(0, 3).map((item, index) => (
               <li key={index} className="text-sm flex justify-between">
                 <div className="flex items-center gap-2">
-                  <Badge variant="outline" className={getStatusColor(item.status)}>
+                  <Badge variant="outline" className={KITCHEN_STATUS_COLORS[item.status]}>
                     {item.status}
                   </Badge>
                   <span>
-                    {item.quantity}x {item.name || (item.menuItem && item.menuItem.name) || "Item"}
+                    {item.quantity}x {item.name || (typeof item.menuItem === "object" && item.menuItem.name) || "Item"}
                   </span>
                 </div>
               </li>
@@ -176,11 +142,32 @@ export function KitchenOrderCard({ order, onStatusChange }: KitchenOrderCardProp
             <div className="text-muted-foreground">{order.notes}</div>
           </div>
         )}
+
+        <div className="mt-3 grid grid-cols-3 gap-1 text-center">
+          <div className="text-xs">
+            <div className="font-medium">Pending</div>
+            <Badge variant="outline" className={pendingItems > 0 ? "bg-yellow-50" : ""}>
+              {pendingItems}
+            </Badge>
+          </div>
+          <div className="text-xs">
+            <div className="font-medium">Cooking</div>
+            <Badge variant="outline" className={cookingItems > 0 ? "bg-blue-50" : ""}>
+              {cookingItems}
+            </Badge>
+          </div>
+          <div className="text-xs">
+            <div className="font-medium">Ready</div>
+            <Badge variant="outline" className={readyItems > 0 ? "bg-green-50" : ""}>
+              {readyItems}
+            </Badge>
+          </div>
+        </div>
       </CardContent>
       <CardFooter className="flex gap-2">
         {getNextStatusButton()}
         <Button variant="outline" size="icon" onClick={() => router.push(`/kitchen/orders/${order._id}`)}>
-          <Utensils className="h-4 w-4" />
+          <ExternalLink className="h-4 w-4" />
         </Button>
       </CardFooter>
     </Card>

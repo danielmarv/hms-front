@@ -2,17 +2,18 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { useApi } from "@/hooks/use-api"
+import { useKitchenOrders, type KitchenOrderFilters } from "@/hooks/use-kitchen-orders"
 import { KitchenOrderCard } from "@/components/kitchen/kitchen-order-card"
 import { KitchenOrderFilter } from "@/components/kitchen/kitchen-order-filter"
 import { KitchenStats } from "@/components/kitchen/kitchen-stats"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Loader2, RefreshCw, ChefHat } from "lucide-react"
+import { KITCHEN_ORDER_STATUS } from "@/config/constants"
 
 export default function KitchenDashboard() {
   const router = useRouter()
-  const { request, isLoading } = useApi()
+  const { getKitchenOrders, loading } = useKitchenOrders()
   const [orders, setOrders] = useState<any[]>([])
   const [filters, setFilters] = useState<Record<string, any>>({})
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -20,29 +21,21 @@ export default function KitchenDashboard() {
 
   const fetchOrders = async () => {
     // Combine filters with active tab filter
-    const queryParams = new URLSearchParams()
+    const queryParams: KitchenOrderFilters = { ...filters }
 
     // Add tab-specific status filter
     if (activeTab === "pending") {
-      queryParams.append("status", "Pending")
+      queryParams.status = KITCHEN_ORDER_STATUS.PENDING
     } else if (activeTab === "in-progress") {
-      queryParams.append("status", "In Progress")
+      queryParams.status = KITCHEN_ORDER_STATUS.COOKING
     } else if (activeTab === "ready") {
-      queryParams.append("status", "Ready")
+      queryParams.status = KITCHEN_ORDER_STATUS.READY
     }
 
-    // Add other filters
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value && key !== "status") {
-        // Skip status if already set by tab
-        queryParams.append(key, value.toString())
-      }
-    })
-
     try {
-      const response = await request(`/kitchen/orders?${queryParams.toString()}`)
+      const response = await getKitchenOrders(queryParams)
       if (response.data) {
-        setOrders(response.data.data)
+        setOrders(response.data)
       }
     } catch (error) {
       console.error("Error fetching orders:", error)
@@ -71,13 +64,13 @@ export default function KitchenDashboard() {
           <p className="text-muted-foreground">Manage kitchen orders and operations</p>
         </div>
         <div className="flex items-center gap-2 mt-4 md:mt-0">
-          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing || loading}>
             {isRefreshing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
             Refresh
           </Button>
-          <Button size="sm">
+          <Button size="sm" onClick={() => router.push("/kitchen/chefs")}>
             <ChefHat className="h-4 w-4 mr-2" />
-            Assign Chef
+            Manage Chefs
           </Button>
         </div>
       </div>
@@ -97,7 +90,7 @@ export default function KitchenDashboard() {
             <TabsContent value="pending" className="mt-4">
               <OrdersList
                 orders={orders}
-                isLoading={isLoading}
+                isLoading={loading}
                 onStatusChange={fetchOrders}
                 emptyMessage="No pending orders"
               />
@@ -106,7 +99,7 @@ export default function KitchenDashboard() {
             <TabsContent value="in-progress" className="mt-4">
               <OrdersList
                 orders={orders}
-                isLoading={isLoading}
+                isLoading={loading}
                 onStatusChange={fetchOrders}
                 emptyMessage="No orders in progress"
               />
@@ -115,7 +108,7 @@ export default function KitchenDashboard() {
             <TabsContent value="ready" className="mt-4">
               <OrdersList
                 orders={orders}
-                isLoading={isLoading}
+                isLoading={loading}
                 onStatusChange={fetchOrders}
                 emptyMessage="No orders ready for pickup"
               />
@@ -124,7 +117,7 @@ export default function KitchenDashboard() {
             <TabsContent value="all" className="mt-4">
               <OrdersList
                 orders={orders}
-                isLoading={isLoading}
+                isLoading={loading}
                 onStatusChange={fetchOrders}
                 emptyMessage="No orders found"
               />

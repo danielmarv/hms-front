@@ -1,210 +1,128 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
-import { Search, Filter, X } from "lucide-react"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
+import { useState } from "react"
+import { Card, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-  SheetFooter,
-  SheetClose,
-} from "@/components/ui/sheet"
-import { DatePicker } from "@/components/ui/date-picker"
+import { DateRangePicker } from "@/components/ui/date-range-picker"
+import { Button } from "@/components/ui/button"
+import { format } from "date-fns"
+import { KITCHEN_ORDER_STATUS, PRIORITY_LEVELS, ORDER_TYPES } from "@/config/constants"
 
 interface KitchenOrderFilterProps {
-  onFilterChange: (filters: any) => void
+  onFilterChange: (filters: Record<string, any>) => void
 }
 
 export function KitchenOrderFilter({ onFilterChange }: KitchenOrderFilterProps) {
-  const [search, setSearch] = useState("")
-  const [status, setStatus] = useState("")
-  const [priority, setPriority] = useState("")
-  const [orderType, setOrderType] = useState("")
-  const [startDate, setStartDate] = useState<Date | undefined>(undefined)
-  const [endDate, setEndDate] = useState<Date | undefined>(undefined)
-  const [activeFilters, setActiveFilters] = useState<string[]>([])
+  const [filters, setFilters] = useState<Record<string, any>>({})
+  const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({})
 
-  // Apply filters when any filter changes
-  useEffect(() => {
-    const filters: Record<string, any> = {}
+  const handleFilterChange = (key: string, value: any) => {
+    const newFilters = { ...filters, [key]: value }
 
-    if (status) filters.status = status
-    if (priority) filters.priority = priority
-    if (orderType) filters.orderType = orderType
-    if (startDate) filters.startDate = startDate.toISOString().split("T")[0]
-    if (endDate) filters.endDate = endDate.toISOString().split("T")[0]
+    // Remove filter if value is empty or "all"
+    if (value === "" || value === "all") {
+      delete newFilters[key]
+    }
 
-    // Update active filters for display
-    const active = []
-    if (status) active.push(`Status: ${status}`)
-    if (priority) active.push(`Priority: ${priority}`)
-    if (orderType) active.push(`Type: ${orderType}`)
-    if (startDate) active.push(`From: ${startDate.toLocaleDateString()}`)
-    if (endDate) active.push(`To: ${endDate.toLocaleDateString()}`)
-
-    setActiveFilters(active)
-    onFilterChange(filters)
-  }, [status, priority, orderType, startDate, endDate, onFilterChange])
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    // You can implement search functionality here
-    console.log("Searching for:", search)
+    setFilters(newFilters)
+    onFilterChange(newFilters)
   }
 
-  const clearFilters = () => {
-    setStatus("")
-    setPriority("")
-    setOrderType("")
-    setStartDate(undefined)
-    setEndDate(undefined)
+  const handleDateRangeChange = (range: { from?: Date; to?: Date }) => {
+    setDateRange(range)
+
+    const newFilters = { ...filters }
+
+    if (range.from) {
+      newFilters.startDate = format(range.from, "yyyy-MM-dd")
+    } else {
+      delete newFilters.startDate
+    }
+
+    if (range.to) {
+      newFilters.endDate = format(range.to, "yyyy-MM-dd")
+    } else {
+      delete newFilters.endDate
+    }
+
+    setFilters(newFilters)
+    onFilterChange(newFilters)
+  }
+
+  const resetFilters = () => {
+    setFilters({})
+    setDateRange({})
+    onFilterChange({})
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-2">
-        <form onSubmit={handleSearch} className="flex-1 flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Search orders..."
-              className="pl-8"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+    <Card>
+      <CardContent className="p-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="status">Status</Label>
+            <Select value={filters.status || "all"} onValueChange={(value) => handleFilterChange("status", value)}>
+              <SelectTrigger id="status">
+                <SelectValue placeholder="All Statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value={KITCHEN_ORDER_STATUS.PENDING}>Pending</SelectItem>
+                <SelectItem value={KITCHEN_ORDER_STATUS.COOKING}>Cooking</SelectItem>
+                <SelectItem value={KITCHEN_ORDER_STATUS.READY}>Ready</SelectItem>
+                <SelectItem value={KITCHEN_ORDER_STATUS.COMPLETED}>Completed</SelectItem>
+                <SelectItem value={KITCHEN_ORDER_STATUS.CANCELLED}>Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <Button type="submit">Search</Button>
-        </form>
 
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button variant="outline" className="flex gap-2">
-              <Filter className="h-4 w-4" />
-              <span>Filter</span>
-              {activeFilters.length > 0 && (
-                <Badge variant="secondary" className="ml-1">
-                  {activeFilters.length}
-                </Badge>
-              )}
-            </Button>
-          </SheetTrigger>
-          <SheetContent>
-            <SheetHeader>
-              <SheetTitle>Filter Orders</SheetTitle>
-              <SheetDescription>Apply filters to narrow down kitchen orders</SheetDescription>
-            </SheetHeader>
-            <div className="grid gap-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
-                <Select value={status} onValueChange={setStatus}>
-                  <SelectTrigger id="status">
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="Pending">Pending</SelectItem>
-                    <SelectItem value="In Progress">In Progress</SelectItem>
-                    <SelectItem value="Ready">Ready</SelectItem>
-                    <SelectItem value="Completed">Completed</SelectItem>
-                    <SelectItem value="Cancelled">Cancelled</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+          <div className="space-y-2">
+            <Label htmlFor="priority">Priority</Label>
+            <Select value={filters.priority || "all"} onValueChange={(value) => handleFilterChange("priority", value)}>
+              <SelectTrigger id="priority">
+                <SelectValue placeholder="All Priorities" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Priorities</SelectItem>
+                <SelectItem value={PRIORITY_LEVELS.HIGH}>High</SelectItem>
+                <SelectItem value={PRIORITY_LEVELS.NORMAL}>Normal</SelectItem>
+                <SelectItem value={PRIORITY_LEVELS.LOW}>Low</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="priority">Priority</Label>
-                <Select value={priority} onValueChange={setPriority}>
-                  <SelectTrigger id="priority">
-                    <SelectValue placeholder="Select priority" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Priorities</SelectItem>
-                    <SelectItem value="High">High</SelectItem>
-                    <SelectItem value="Normal">Normal</SelectItem>
-                    <SelectItem value="Low">Low</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+          <div className="space-y-2">
+            <Label htmlFor="orderType">Order Type</Label>
+            <Select
+              value={filters.orderType || "all"}
+              onValueChange={(value) => handleFilterChange("orderType", value)}
+            >
+              <SelectTrigger id="orderType">
+                <SelectValue placeholder="All Types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value={ORDER_TYPES.DINE_IN}>Dine In</SelectItem>
+                <SelectItem value={ORDER_TYPES.TAKEAWAY}>Takeaway</SelectItem>
+                <SelectItem value={ORDER_TYPES.DELIVERY}>Delivery</SelectItem>
+                <SelectItem value={ORDER_TYPES.ROOM_SERVICE}>Room Service</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="orderType">Order Type</Label>
-                <Select value={orderType} onValueChange={setOrderType}>
-                  <SelectTrigger id="orderType">
-                    <SelectValue placeholder="Select order type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    <SelectItem value="Dine In">Dine In</SelectItem>
-                    <SelectItem value="Takeaway">Takeaway</SelectItem>
-                    <SelectItem value="Delivery">Delivery</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+          <div className="space-y-2">
+            <Label>Date Range</Label>
+            <DateRangePicker value={dateRange} onChange={handleDateRangeChange} />
+          </div>
+        </div>
 
-              <div className="space-y-2">
-                <Label>Date Range</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label htmlFor="startDate" className="text-xs">
-                      From
-                    </Label>
-                    <DatePicker date={startDate} setDate={setStartDate} className="w-full" />
-                  </div>
-                  <div>
-                    <Label htmlFor="endDate" className="text-xs">
-                      To
-                    </Label>
-                    <DatePicker date={endDate} setDate={setEndDate} className="w-full" />
-                  </div>
-                </div>
-              </div>
-            </div>
-            <SheetFooter>
-              <Button variant="outline" onClick={clearFilters} type="button">
-                Reset Filters
-              </Button>
-              <SheetClose asChild>
-                <Button type="submit">Apply Filters</Button>
-              </SheetClose>
-            </SheetFooter>
-          </SheetContent>
-        </Sheet>
-      </div>
-
-      {activeFilters.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {activeFilters.map((filter, index) => (
-            <Badge key={index} variant="secondary" className="flex items-center gap-1">
-              {filter}
-              <X
-                className="h-3 w-3 cursor-pointer"
-                onClick={() => {
-                  // Remove this specific filter
-                  if (filter.startsWith("Status:")) setStatus("")
-                  if (filter.startsWith("Priority:")) setPriority("")
-                  if (filter.startsWith("Type:")) setOrderType("")
-                  if (filter.startsWith("From:")) setStartDate(undefined)
-                  if (filter.startsWith("To:")) setEndDate(undefined)
-                }}
-              />
-            </Badge>
-          ))}
-          <Button variant="ghost" size="sm" onClick={clearFilters} className="h-6 px-2">
-            Clear all
+        <div className="mt-4 flex justify-end">
+          <Button variant="outline" onClick={resetFilters}>
+            Reset Filters
           </Button>
         </div>
-      )}
-    </div>
+      </CardContent>
+    </Card>
   )
 }

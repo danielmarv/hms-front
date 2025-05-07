@@ -3,53 +3,7 @@
 import { useState } from "react"
 import { useApi } from "./use-api"
 import { useToast } from "./use-toast"
-
-export type MenuItem = {
-  _id: string
-  name: string
-  description: string
-  price: number
-  cost: number
-  category: string
-  subcategory?: string
-  imageUrl?: string
-  availability: boolean
-  preparationTime: number
-  isVegetarian: boolean
-  isVegan: boolean
-  isGlutenFree: boolean
-  allergens?: string[]
-  spicyLevel?: number
-  calories?: number
-  ingredients?: string[]
-  tags?: string[]
-  featured: boolean
-  menuSections?: string[]
-  availableDays?: string[]
-  availableTimeStart?: string
-  availableTimeEnd?: string
-  discountPercentage?: number
-  isDiscounted: boolean
-  createdAt: string
-  updatedAt: string
-}
-
-export type MenuItemFilters = {
-  search?: string
-  category?: string
-  subcategory?: string
-  availability?: boolean
-  isVegetarian?: boolean
-  isVegan?: boolean
-  isGlutenFree?: boolean
-  featured?: boolean
-  minPrice?: number
-  maxPrice?: number
-  menuSection?: string
-  page?: number
-  limit?: number
-  sort?: string
-}
+import type { MenuItem, MenuItemFilters, ApiResponse } from "@/types"
 
 export const useMenuItems = () => {
   const { request, isLoading: apiLoading } = useApi()
@@ -70,9 +24,9 @@ export const useMenuItems = () => {
         }
       })
 
-      const response = await request<any>(`/restaurant/menu-items?${queryParams.toString()}`, "GET")
+      const response = await request<ApiResponse<MenuItem[]>>(`/restaurant/menu-items?${queryParams.toString()}`, "GET")
       setLoading(false)
-      return response.data
+      return response
     } catch (err: any) {
       setLoading(false)
       setError(err.message || "Failed to fetch menu items")
@@ -81,7 +35,13 @@ export const useMenuItems = () => {
         description: err.message || "Failed to fetch menu items",
         variant: "destructive",
       })
-      return { data: [], count: 0, total: 0, pagination: { page: 1, limit: 20, totalPages: 0 } }
+      return {
+        success: false,
+        data: [],
+        count: 0,
+        total: 0,
+        pagination: { page: 1, limit: 20, totalPages: 0 },
+      }
     }
   }
 
@@ -89,7 +49,7 @@ export const useMenuItems = () => {
     setLoading(true)
     setError(null)
     try {
-      const response = await request<any>(`/restaurant/menu-items/${id}`, "GET")
+      const response = await request<ApiResponse<MenuItem>>(`/restaurant/menu-items/${id}`, "GET")
       setLoading(false)
       return response.data
     } catch (err: any) {
@@ -108,7 +68,7 @@ export const useMenuItems = () => {
     setLoading(true)
     setError(null)
     try {
-      const response = await request<any>("/restaurant/menu-items", "POST", menuItem)
+      const response = await request<ApiResponse<MenuItem>>("/restaurant/menu-items", "POST", menuItem)
       setLoading(false)
       toast({
         title: "Success",
@@ -131,7 +91,7 @@ export const useMenuItems = () => {
     setLoading(true)
     setError(null)
     try {
-      const response = await request<any>(`/restaurant/menu-items/${id}`, "PUT", menuItem)
+      const response = await request<ApiResponse<MenuItem>>(`/restaurant/menu-items/${id}`, "PUT", menuItem)
       setLoading(false)
       toast({
         title: "Success",
@@ -154,7 +114,7 @@ export const useMenuItems = () => {
     setLoading(true)
     setError(null)
     try {
-      const response = await request<any>(`/restaurant/menu-items/${id}`, "DELETE")
+      const response = await request<ApiResponse<null>>(`/restaurant/menu-items/${id}`, "DELETE")
       setLoading(false)
       toast({
         title: "Success",
@@ -177,7 +137,11 @@ export const useMenuItems = () => {
     setLoading(true)
     setError(null)
     try {
-      const response = await request<any>(`/restaurant/menu-items/${id}/availability`, "PATCH", {})
+      const response = await request<ApiResponse<{ availability: boolean }>>(
+        `/restaurant/menu-items/${id}/availability`,
+        "PATCH",
+        {},
+      )
       setLoading(false)
       toast({
         title: "Success",
@@ -200,7 +164,11 @@ export const useMenuItems = () => {
     setLoading(true)
     setError(null)
     try {
-      const response = await request<any>(`/restaurant/menu-items/${id}/featured`, "PATCH", {})
+      const response = await request<ApiResponse<{ featured: boolean }>>(
+        `/restaurant/menu-items/${id}/featured`,
+        "PATCH",
+        {},
+      )
       setLoading(false)
       toast({
         title: "Success",
@@ -220,7 +188,7 @@ export const useMenuItems = () => {
   }
 
   return {
-    loading,
+    loading: loading || apiLoading,
     error,
     getMenuItems,
     getMenuItem,
