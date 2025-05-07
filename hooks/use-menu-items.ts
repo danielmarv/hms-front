@@ -2,12 +2,11 @@
 
 import { useState } from "react"
 import { useApi } from "./use-api"
-import { useToast } from "./use-toast"
+import { toast } from "sonner"
 import type { MenuItem, MenuItemFilters, ApiResponse } from "@/types"
 
 export const useMenuItems = () => {
   const { request, isLoading: apiLoading } = useApi()
-  const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -30,11 +29,6 @@ export const useMenuItems = () => {
     } catch (err: any) {
       setLoading(false)
       setError(err.message || "Failed to fetch menu items")
-      toast({
-        title: "Error",
-        description: err.message || "Failed to fetch menu items",
-        variant: "destructive",
-      })
       return {
         success: false,
         data: [],
@@ -55,11 +49,6 @@ export const useMenuItems = () => {
     } catch (err: any) {
       setLoading(false)
       setError(err.message || "Failed to fetch menu item")
-      toast({
-        title: "Error",
-        description: err.message || "Failed to fetch menu item",
-        variant: "destructive",
-      })
       return null
     }
   }
@@ -70,19 +59,11 @@ export const useMenuItems = () => {
     try {
       const response = await request<ApiResponse<MenuItem>>("/restaurant/menu-items", "POST", menuItem)
       setLoading(false)
-      toast({
-        title: "Success",
-        description: "Menu item created successfully",
-      })
+      toast.success("Menu item created successfully")
       return response.data
     } catch (err: any) {
       setLoading(false)
       setError(err.message || "Failed to create menu item")
-      toast({
-        title: "Error",
-        description: err.message || "Failed to create menu item",
-        variant: "destructive",
-      })
       return null
     }
   }
@@ -93,19 +74,11 @@ export const useMenuItems = () => {
     try {
       const response = await request<ApiResponse<MenuItem>>(`/restaurant/menu-items/${id}`, "PUT", menuItem)
       setLoading(false)
-      toast({
-        title: "Success",
-        description: "Menu item updated successfully",
-      })
+      toast.success("Menu item updated successfully")
       return response.data
     } catch (err: any) {
       setLoading(false)
       setError(err.message || "Failed to update menu item")
-      toast({
-        title: "Error",
-        description: err.message || "Failed to update menu item",
-        variant: "destructive",
-      })
       return null
     }
   }
@@ -116,19 +89,11 @@ export const useMenuItems = () => {
     try {
       const response = await request<ApiResponse<null>>(`/restaurant/menu-items/${id}`, "DELETE")
       setLoading(false)
-      toast({
-        title: "Success",
-        description: "Menu item deleted successfully",
-      })
+      toast.success("Menu item deleted successfully")
       return response.success
     } catch (err: any) {
       setLoading(false)
       setError(err.message || "Failed to delete menu item")
-      toast({
-        title: "Error",
-        description: err.message || "Failed to delete menu item",
-        variant: "destructive",
-      })
       return false
     }
   }
@@ -143,19 +108,11 @@ export const useMenuItems = () => {
         {},
       )
       setLoading(false)
-      toast({
-        title: "Success",
-        description: response.message || "Availability updated successfully",
-      })
+      toast.success(response.message || "Availability updated successfully")
       return response.data
     } catch (err: any) {
       setLoading(false)
       setError(err.message || "Failed to update availability")
-      toast({
-        title: "Error",
-        description: err.message || "Failed to update availability",
-        variant: "destructive",
-      })
       return null
     }
   }
@@ -170,19 +127,11 @@ export const useMenuItems = () => {
         {},
       )
       setLoading(false)
-      toast({
-        title: "Success",
-        description: response.message || "Featured status updated successfully",
-      })
+      toast.success(response.message || "Featured status updated successfully")
       return response.data
     } catch (err: any) {
       setLoading(false)
       setError(err.message || "Failed to update featured status")
-      toast({
-        title: "Error",
-        description: err.message || "Failed to update featured status",
-        variant: "destructive",
-      })
       return null
     }
   }

@@ -1,8 +1,7 @@
-// Common Types
+// Common types
 export type ApiResponse<T> = {
     success: boolean
     data?: T
-    error?: string
     message?: string
     count?: number
     total?: number
@@ -13,7 +12,7 @@ export type ApiResponse<T> = {
     }
   }
   
-  // Menu Item Types
+  // Menu Item types
   export type MenuItem = {
     _id: string
     name: string
@@ -42,8 +41,6 @@ export type ApiResponse<T> = {
     isDiscounted: boolean
     createdAt: string
     updatedAt: string
-    createdBy?: any
-    updatedBy?: any
   }
   
   export type MenuItemFilters = {
@@ -63,10 +60,44 @@ export type ApiResponse<T> = {
     sort?: string
   }
   
-  // Order Types
+  // Table types
+  export type Table = {
+    _id: string
+    number: string | number
+    section: string
+    capacity: number
+    minCapacity?: number
+    shape: string
+    width?: number
+    length?: number
+    positionX?: number
+    positionY?: number
+    rotation?: number
+    status: string
+    isActive: boolean
+    currentOrder?: string
+    currentGuests?: number
+    reservationName?: string
+    reservationPhone?: string
+    reservationTime?: string
+    lastOccupiedAt?: string
+    lastCleanedAt?: string
+    notes?: string
+    createdAt: string
+    updatedAt: string
+  }
+  
+  export type TableFilters = {
+    section?: string
+    status?: string
+    capacity?: number
+    isActive?: boolean
+  }
+  
+  // Order types
   export type OrderItem = {
     _id: string
-    menuItem: string | MenuItem
+    menuItem: string
     name: string
     quantity: number
     unitPrice: number
@@ -112,8 +143,6 @@ export type ApiResponse<T> = {
     modificationNotes?: string
     createdAt: string
     updatedAt: string
-    createdBy?: any
-    updatedBy?: any
   }
   
   export type OrderFilters = {
@@ -125,15 +154,28 @@ export type ApiResponse<T> = {
     orderType?: string
     startDate?: string
     endDate?: string
+    search?: string
     page?: number
     limit?: number
     sort?: string
   }
   
-  // Kitchen Order Types
+  export type OrderStats = {
+    byStatus: Array<{ _id: string; count: number; revenue: number }>
+    byType: Array<{ _id: string; count: number; revenue: number }>
+    daily: Array<{ _id: string; count: number; revenue: number }>
+    hourly: Array<{ _id: number; count: number; revenue: number }>
+    totals: {
+      totalOrders: number
+      totalRevenue: number
+      avgOrderValue: number
+    }
+  }
+  
+  // Kitchen Order types
   export type KitchenOrderItem = {
     _id: string
-    menuItem: string | MenuItem
+    menuItem: any
     name: string
     quantity: number
     notes?: string
@@ -147,7 +189,7 @@ export type ApiResponse<T> = {
   export type KitchenOrder = {
     _id: string
     orderNumber: string
-    order: string | Order
+    order: any
     table?: any
     room?: any
     items: KitchenOrderItem[]
@@ -167,8 +209,6 @@ export type ApiResponse<T> = {
     modificationNotes?: string
     createdAt: string
     updatedAt: string
-    createdBy?: any
-    updatedBy?: any
   }
   
   export type KitchenOrderFilters = {
@@ -180,55 +220,6 @@ export type ApiResponse<T> = {
     page?: number
     limit?: number
     sort?: string
-  }
-  
-  // Table Types
-  export type Table = {
-    _id: string
-    number: string
-    section: string
-    capacity: number
-    minCapacity?: number
-    shape?: string
-    width?: number
-    length?: number
-    positionX?: number
-    positionY?: number
-    rotation?: number
-    status: string
-    isActive: boolean
-    currentOrder?: string | Order
-    currentGuests?: number
-    reservationName?: string
-    reservationPhone?: string
-    reservationTime?: string
-    lastOccupiedAt?: string
-    lastCleanedAt?: string
-    notes?: string
-    createdAt: string
-    updatedAt: string
-    createdBy?: any
-    updatedBy?: any
-  }
-  
-  export type TableFilters = {
-    section?: string
-    status?: string
-    capacity?: number
-    isActive?: boolean
-  }
-  
-  // Analytics Types
-  export type OrderStats = {
-    byStatus: Array<{ _id: string; count: number; revenue: number }>
-    byType: Array<{ _id: string; count: number; revenue: number }>
-    daily: Array<{ _id: string; count: number; revenue: number }>
-    hourly: Array<{ _id: number; count: number; revenue: number }>
-    totals: {
-      totalOrders: number
-      totalRevenue: number
-      avgOrderValue: number
-    }
   }
   
   export type KitchenStats = {
