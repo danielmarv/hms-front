@@ -10,7 +10,7 @@ export const useKitchenOrders = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const getOrders = async (filters: KitchenOrderFilters = {}) => {
+  const getKitchenOrders = async (filters: KitchenOrderFilters = {}) => {
     setLoading(true)
     setError(null)
     try {
@@ -39,7 +39,7 @@ export const useKitchenOrders = () => {
     }
   }
 
-  const getOrder = async (id: string) => {
+  const getKitchenOrder = async (id: string) => {
     setLoading(true)
     setError(null)
     try {
@@ -53,11 +53,11 @@ export const useKitchenOrders = () => {
     }
   }
 
-  const createOrder = async (kitchenOrder: Partial<KitchenOrder>) => {
+  const createKitchenOrder = async (order: Partial<KitchenOrder>) => {
     setLoading(true)
     setError(null)
     try {
-      const response = await request<ApiResponse<KitchenOrder>>("/kitchen/orders", "POST", kitchenOrder)
+      const response = await request<ApiResponse<KitchenOrder>>("/kitchen/orders", "POST", order)
       setLoading(false)
       toast.success("Kitchen order created successfully")
       return response.data
@@ -68,11 +68,11 @@ export const useKitchenOrders = () => {
     }
   }
 
-  const updateOrder = async (id: string, kitchenOrder: Partial<KitchenOrder>) => {
+  const updateKitchenOrder = async (id: string, order: Partial<KitchenOrder>) => {
     setLoading(true)
     setError(null)
     try {
-      const response = await request<ApiResponse<KitchenOrder>>(`/kitchen/orders/${id}`, "PUT", kitchenOrder)
+      const response = await request<ApiResponse<KitchenOrder>>(`/kitchen/orders/${id}`, "PUT", order)
       setLoading(false)
       toast.success("Kitchen order updated successfully")
       return response.data
@@ -83,29 +83,29 @@ export const useKitchenOrders = () => {
     }
   }
 
-  const updateOrderStatus = async (id: string, status: string, notes?: string) => {
+  const updateKitchenOrderStatus = async (id: string, status: string, cancellationReason?: string) => {
     setLoading(true)
     setError(null)
     try {
       const response = await request<ApiResponse<KitchenOrder>>(`/kitchen/orders/${id}/status`, "PATCH", {
         status,
-        cancellationReason: notes,
+        cancellationReason,
       })
       setLoading(false)
-      toast.success(response.message || "Order status updated successfully")
+      toast.success(response.message || "Kitchen order status updated successfully")
       return response.data
     } catch (err: any) {
       setLoading(false)
-      setError(err.message || "Failed to update order status")
+      setError(err.message || "Failed to update kitchen order status")
       return null
     }
   }
 
-  const updateItemStatus = async (orderId: string, itemId: string, status: string, assignedTo?: string) => {
+  const updateKitchenOrderItemStatus = async (id: string, itemId: string, status: string, assignedTo?: string) => {
     setLoading(true)
     setError(null)
     try {
-      const response = await request<ApiResponse<KitchenOrder>>(`/kitchen/orders/${orderId}/item-status`, "PATCH", {
+      const response = await request<ApiResponse<KitchenOrder>>(`/kitchen/orders/${id}/item-status`, "PATCH", {
         itemId,
         status,
         assignedTo,
@@ -120,15 +120,15 @@ export const useKitchenOrders = () => {
     }
   }
 
-  const assignChef = async (orderId: string, chef: string) => {
+  const assignChef = async (id: string, chef: string) => {
     setLoading(true)
     setError(null)
     try {
-      const response = await request<ApiResponse<KitchenOrder>>(`/kitchen/orders/${orderId}/assign-chef`, "PATCH", {
+      const response = await request<ApiResponse<KitchenOrder>>(`/kitchen/orders/${id}/assign-chef`, "PATCH", {
         chef,
       })
       setLoading(false)
-      toast.success(response.message || "Chef assigned successfully")
+      toast.success("Chef assigned successfully")
       return response.data
     } catch (err: any) {
       setLoading(false)
@@ -161,12 +161,12 @@ export const useKitchenOrders = () => {
   return {
     loading: loading || apiLoading,
     error,
-    getOrders,
-    getOrder,
-    createOrder,
-    updateOrder,
-    updateOrderStatus,
-    updateItemStatus,
+    getKitchenOrders,
+    getKitchenOrder,
+    createKitchenOrder,
+    updateKitchenOrder,
+    updateKitchenOrderStatus,
+    updateKitchenOrderItemStatus,
     assignChef,
     getKitchenStats,
   }
