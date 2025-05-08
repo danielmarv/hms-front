@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { usePayments, type PaymentFilters } from "@/hooks/use-payments"
+import { useInvoices, type InvoiceFilters } from "@/hooks/use-invoices"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -18,36 +18,29 @@ import {
 } from "@/components/ui/pagination"
 import { Badge } from "@/components/ui/badge"
 import { DatePicker } from "@/components/ui/date-picker"
-import { Plus, Search, FileText, ReceiptIcon, RefreshCcw } from "lucide-react"
+import { Plus, Search, FileText, Send, CreditCard } from "lucide-react"
 import { format } from "date-fns"
 
-export default function PaymentsPage() {
-  const { payments, pagination, isLoading, getPayments } = usePayments()
+export default function InvoicesPage() {
+  const { invoices, pagination, isLoading, getInvoices } = useInvoices()
   const [searchQuery, setSearchQuery] = useState("")
-  const [methodFilter, setMethodFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
   const [startDate, setStartDate] = useState<Date | undefined>(undefined)
   const [endDate, setEndDate] = useState<Date | undefined>(undefined)
-  const [filters, setFilters] = useState<PaymentFilters>({
+  const [filters, setFilters] = useState<InvoiceFilters>({
     page: 1,
     limit: 10,
   })
 
   useEffect(() => {
-    getPayments(filters)
+    getInvoices(filters)
   }, [filters])
 
   // Apply filters
   const applyFilters = () => {
-    const newFilters: PaymentFilters = {
+    const newFilters: InvoiceFilters = {
       ...filters,
       page: 1, // Reset to first page when applying new filters
-    }
-
-    if (methodFilter !== "all") {
-      newFilters.method = methodFilter
-    } else {
-      delete newFilters.method
     }
 
     if (statusFilter !== "all") {
@@ -86,82 +79,44 @@ export default function PaymentsPage() {
   // Function to get badge variant based on status
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "Completed":
+      case "Paid":
         return (
           <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-            Completed
+            Paid
           </Badge>
         )
-      case "Pending":
-        return (
-          <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
-            Pending
-          </Badge>
-        )
-      case "Failed":
-        return (
-          <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-            Failed
-          </Badge>
-        )
-      case "Refunded":
-        return (
-          <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
-            Refunded
-          </Badge>
-        )
-      case "Partially Refunded":
+      case "Partially Paid":
         return (
           <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-            Partially Refunded
+            Partially Paid
+          </Badge>
+        )
+      case "Issued":
+        return (
+          <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+            Issued
+          </Badge>
+        )
+      case "Draft":
+        return (
+          <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
+            Draft
+          </Badge>
+        )
+      case "Cancelled":
+        return (
+          <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+            Cancelled
+          </Badge>
+        )
+      case "Overdue":
+        return (
+          <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+            Overdue
           </Badge>
         )
       default:
         return <Badge variant="outline">{status}</Badge>
-    }
-  }
-
-  // Function to get badge for payment method
-  const getMethodBadge = (method: string) => {
-    switch (method) {
-      case "credit_card":
-        return (
-          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-            Credit Card
-          </Badge>
-        )
-      case "cash":
-        return (
-          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-            Cash
-          </Badge>
-        )
-      case "bank_transfer":
-        return (
-          <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
-            Bank Transfer
-          </Badge>
-        )
-      case "paypal":
-        return (
-          <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200">
-            PayPal
-          </Badge>
-        )
-      case "stripe":
-        return (
-          <Badge variant="outline" className="bg-teal-50 text-teal-700 border-teal-200">
-            Stripe
-          </Badge>
-        )
-      case "mobile_money":
-        return (
-          <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
-            Mobile Money
-          </Badge>
-        )
-      default:
-        return <Badge variant="outline">{method}</Badge>
     }
   }
 
@@ -184,58 +139,45 @@ export default function PaymentsPage() {
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Payments</h1>
-          <p className="text-muted-foreground">Manage hotel payments and transactions</p>
+          <h1 className="text-3xl font-bold tracking-tight">Invoices</h1>
+          <p className="text-muted-foreground">Manage hotel invoices and billing</p>
         </div>
         <Button asChild>
-          <Link href="/dashboard/payments/new">
+          <Link href="/dashboard/invoices/new">
             <Plus className="mr-2 h-4 w-4" />
-            New Payment
+            New Invoice
           </Link>
         </Button>
       </div>
 
       <Card>
         <CardHeader className="space-y-4">
-          <CardTitle>All Payments</CardTitle>
+          <CardTitle>All Invoices</CardTitle>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-col gap-2 sm:flex-row">
               <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="search"
-                  placeholder="Search payments..."
+                  placeholder="Search invoices..."
                   className="w-full pl-8 sm:w-[250px]"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                 />
               </div>
-              <Select value={methodFilter} onValueChange={setMethodFilter}>
-                <SelectTrigger className="w-full sm:w-[150px]">
-                  <SelectValue placeholder="Payment method" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Methods</SelectItem>
-                  <SelectItem value="credit_card">Credit Card</SelectItem>
-                  <SelectItem value="cash">Cash</SelectItem>
-                  <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                  <SelectItem value="paypal">PayPal</SelectItem>
-                  <SelectItem value="stripe">Stripe</SelectItem>
-                  <SelectItem value="mobile_money">Mobile Money</SelectItem>
-                </SelectContent>
-              </Select>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-full sm:w-[150px]">
-                  <SelectValue placeholder="Status" />
+                  <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="Completed">Completed</SelectItem>
-                  <SelectItem value="Pending">Pending</SelectItem>
-                  <SelectItem value="Failed">Failed</SelectItem>
-                  <SelectItem value="Refunded">Refunded</SelectItem>
-                  <SelectItem value="Partially Refunded">Partially Refunded</SelectItem>
+                  <SelectItem value="Draft">Draft</SelectItem>
+                  <SelectItem value="Issued">Issued</SelectItem>
+                  <SelectItem value="Partially Paid">Partially Paid</SelectItem>
+                  <SelectItem value="Paid">Paid</SelectItem>
+                  <SelectItem value="Cancelled">Cancelled</SelectItem>
+                  <SelectItem value="Overdue">Overdue</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -259,11 +201,11 @@ export default function PaymentsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Receipt #</TableHead>
+                  <TableHead>Invoice #</TableHead>
                   <TableHead>Guest</TableHead>
                   <TableHead className="hidden md:table-cell">Date</TableHead>
+                  <TableHead className="hidden md:table-cell">Due Date</TableHead>
                   <TableHead>Amount</TableHead>
-                  <TableHead className="hidden md:table-cell">Method</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -272,45 +214,47 @@ export default function PaymentsPage() {
                 {isLoading ? (
                   <TableRow>
                     <TableCell colSpan={7} className="h-24 text-center">
-                      Loading payments...
+                      Loading invoices...
                     </TableCell>
                   </TableRow>
-                ) : payments.length === 0 ? (
+                ) : invoices.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="h-24 text-center">
-                      No payments found.
+                      No invoices found.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  payments.map((payment) => (
-                    <TableRow key={payment._id}>
-                      <TableCell className="font-medium">{payment.receiptNumber || "N/A"}</TableCell>
-                      <TableCell>{payment.guest.full_name}</TableCell>
-                      <TableCell className="hidden md:table-cell">{formatDate(payment.paidAt)}</TableCell>
-                      <TableCell>{formatCurrency(payment.amountPaid, payment.currency)}</TableCell>
-                      <TableCell className="hidden md:table-cell">{getMethodBadge(payment.method)}</TableCell>
-                      <TableCell>{getStatusBadge(payment.status)}</TableCell>
+                  invoices.map((invoice) => (
+                    <TableRow key={invoice._id}>
+                      <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
+                      <TableCell>{invoice.guest.full_name}</TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        {formatDate(invoice.issuedDate || invoice.createdAt)}
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">{formatDate(invoice.dueDate)}</TableCell>
+                      <TableCell>{formatCurrency(invoice.total, invoice.currency)}</TableCell>
+                      <TableCell>{getStatusBadge(invoice.status)}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="icon" asChild title="View Payment">
-                            <Link href={`/dashboard/payments/${payment._id}`}>
+                          <Button variant="ghost" size="icon" asChild title="View Invoice">
+                            <Link href={`/dashboard/invoices/${invoice._id}`}>
                               <FileText className="h-4 w-4" />
                               <span className="sr-only">View</span>
                             </Link>
                           </Button>
-                          {payment.status === "Completed" && !payment.receiptIssued && (
-                            <Button variant="ghost" size="icon" asChild title="Issue Receipt">
-                              <Link href={`/dashboard/payments/${payment._id}/receipt`}>
-                                <ReceiptIcon className="h-4 w-4" />
-                                <span className="sr-only">Receipt</span>
+                          {invoice.status !== "Paid" && invoice.status !== "Cancelled" && (
+                            <Button variant="ghost" size="icon" asChild title="Record Payment">
+                              <Link href={`/dashboard/invoices/${invoice._id}/payment`}>
+                                <CreditCard className="h-4 w-4" />
+                                <span className="sr-only">Payment</span>
                               </Link>
                             </Button>
                           )}
-                          {payment.status === "Completed" && !payment.isRefund && (
-                            <Button variant="ghost" size="icon" asChild title="Process Refund">
-                              <Link href={`/dashboard/payments/${payment._id}/refund`}>
-                                <RefreshCcw className="h-4 w-4" />
-                                <span className="sr-only">Refund</span>
+                          {(invoice.status === "Issued" || invoice.status === "Partially Paid") && (
+                            <Button variant="ghost" size="icon" asChild title="Send Invoice">
+                              <Link href={`/dashboard/invoices/${invoice._id}/send`}>
+                                <Send className="h-4 w-4" />
+                                <span className="sr-only">Send</span>
                               </Link>
                             </Button>
                           )}
