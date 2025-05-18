@@ -22,6 +22,12 @@ import {
   Menu,
   Users,
   Utensils,
+  CirclePlus,
+  CircleMinus,
+  IdCard,
+  Server,
+  FileText,
+  MailIcon,
 } from "lucide-react"
 
 interface HotelSidebarProps {
@@ -66,37 +72,37 @@ export function HotelSidebar({ user }: HotelSidebarProps) {
     },
     {
       label: "Services",
-      icon: Utensils,
+      icon: IdCard,
       href: "/dashboard/services",
       active: pathname.startsWith("/dashboard/services"),
     },
     {
       label: "Invoices",
-      icon: Utensils,
+      icon: FileText,
       href: "/dashboard/invoices",
       active: pathname.startsWith("/dashboard/invoices"),
     },
     {
       label: "Menu",
-      icon: Utensils,
+      icon: Server,
       href: "/dashboard/menu",
       active: pathname.startsWith("/dashboard/menu"),
     },
     {
       label: "Inventory",
-      icon: Utensils,
+      icon: CirclePlus,
       href: "/dashboard/inventory",
       active: pathname.startsWith("/dashboard/inventory"),
     },
     {
       label: "Events",
-      icon: Utensils,
+      icon: Calendar,
       href: "/dashboard/events",
       active: pathname.startsWith("/dashboard/events"),
     },
     {
       label: "Maintenance",
-      icon: Utensils,
+      icon: CircleMinus,
       href: "/dashboard/maintenance",
       active: pathname.startsWith("/dashboard/maintenance"),
     },
