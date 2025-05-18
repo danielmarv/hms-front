@@ -1,62 +1,62 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { toast } from "sonner"
+import { useApi } from "@/hooks/use-api"
 import type { EventType } from "./use-events"
 
 export function useEventTypes(hotelId?: string) {
   const [eventTypes, setEventTypes] = useState<EventType[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { request } = useApi()
+
+  const fetchEventTypes = useCallback(async () => {
+    try {
+      setLoading(true)
+      const endpoint = hotelId ? `/events/types?hotel_id=${hotelId}` : "/events/types"
+      const response = await request<{ event_types: EventType[] }>(endpoint, "GET")
+
+      if (response.error) {
+        throw new Error(response.error)
+      }
+
+      if (response.data && response.data.event_types) {
+        setEventTypes(response.data.event_types)
+      } else {
+        setEventTypes([])
+      }
+    } catch (err) {
+      console.error("Failed to fetch event types:", err)
+      setError(err instanceof Error ? err.message : "Failed to fetch event types")
+      toast.error("Failed to load event types")
+    } finally {
+      setLoading(false)
+    }
+  }, [hotelId, request])
 
   useEffect(() => {
-    const fetchEventTypes = async () => {
-      try {
-        setLoading(true)
-        const url = hotelId ? `/api/events/types?hotel_id=${hotelId}` : "/api/events/types"
-        const response = await fetch(url)
-
-        if (!response.ok) {
-          throw new Error(`Error fetching event types: ${response.statusText}`)
-        }
-
-        const data = await response.json()
-        setEventTypes(data.event_types)
-      } catch (err) {
-        console.error("Failed to fetch event types:", err)
-        setError(err instanceof Error ? err.message : "Failed to fetch event types")
-        toast.error("Failed to load event types")
-      } finally {
-        setLoading(false)
-      }
-    }
-
     fetchEventTypes()
-  }, [hotelId])
+  }, [fetchEventTypes])
 
   // Function to create a new event type
   const createEventType = async (eventTypeData: Partial<EventType>) => {
     try {
       setLoading(true)
-      const response = await fetch("/api/events/types", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(eventTypeData),
-      })
+      const response = await request<{ event_type: EventType }>("/events/types", "POST", eventTypeData)
 
-      if (!response.ok) {
-        throw new Error(`Error creating event type: ${response.statusText}`)
+      if (response.error) {
+        throw new Error(response.error)
       }
 
-      const data = await response.json()
+      if (response.data && response.data.event_type) {
+        // Add the new event type to the state
+        setEventTypes((prevEventTypes) => [...prevEventTypes, response.data.event_type])
+        toast.success("Event type created successfully")
+        return response.data.event_type
+      }
 
-      // Add the new event type to the state
-      setEventTypes((prevEventTypes) => [...prevEventTypes, data.event_type])
-
-      toast.success("Event type created successfully")
-      return data.event_type
+      throw new Error("Failed to create event type")
     } catch (err) {
       console.error("Failed to create event type:", err)
       setError(err instanceof Error ? err.message : "Failed to create event type")
@@ -71,27 +71,25 @@ export function useEventTypes(hotelId?: string) {
   const updateEventType = async (id: string, eventTypeData: Partial<EventType>) => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/events/types/${id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(eventTypeData),
-      })
+      const response = await request<{ event_type: EventType }>(`/events/types/${id}`, "PUT", eventTypeData)
 
-      if (!response.ok) {
-        throw new Error(`Error updating event type: ${response.statusText}`)
+      if (response.error) {
+        throw new Error(response.error)
       }
 
-      const data = await response.json()
+      if (response.data && response.data.event_type) {
+        // Update the event type in the state
+        setEventTypes((prevEventTypes) =>
+          prevEventTypes.map((eventType) =>
+            eventType._id === id ? { ...eventType, ...response.data.event_type } : eventType,
+          ),
+        )
 
-      // Update the event type in the state
-      setEventTypes((prevEventTypes) =>
-        prevEventTypes.map((eventType) => (eventType._id === id ? { ...eventType, ...data.event_type } : eventType)),
-      )
+        toast.success("Event type updated successfully")
+        return response.data.event_type
+      }
 
-      toast.success("Event type updated successfully")
-      return data.event_type
+      throw new Error("Failed to update event type")
     } catch (err) {
       console.error("Failed to update event type:", err)
       setError(err instanceof Error ? err.message : "Failed to update event type")
@@ -106,17 +104,14 @@ export function useEventTypes(hotelId?: string) {
   const deleteEventType = async (id: string) => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/events/types/${id}`, {
-        method: "DELETE",
-      })
+      const response = await request<{ success: boolean }>(`/events/types/${id}`, "DELETE")
 
-      if (!response.ok) {
-        throw new Error(`Error deleting event type: ${response.statusText}`)
+      if (response.error) {
+        throw new Error(response.error)
       }
 
       // Remove the event type from the state
       setEventTypes((prevEventTypes) => prevEventTypes.filter((eventType) => eventType._id !== id))
-
       toast.success("Event type deleted successfully")
     } catch (err) {
       console.error("Failed to delete event type:", err)
@@ -132,14 +127,17 @@ export function useEventTypes(hotelId?: string) {
   const getEventType = async (id: string) => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/events/types/${id}`)
+      const response = await request<{ event_type: EventType }>(`/events/types/${id}`, "GET")
 
-      if (!response.ok) {
-        throw new Error(`Error fetching event type: ${response.statusText}`)
+      if (response.error) {
+        throw new Error(response.error)
       }
 
-      const data = await response.json()
-      return data.event_type
+      if (response.data && response.data.event_type) {
+        return response.data.event_type
+      }
+
+      throw new Error(`Failed to fetch event type with ID ${id}`)
     } catch (err) {
       console.error(`Failed to fetch event type with ID ${id}:`, err)
       setError(err instanceof Error ? err.message : `Failed to fetch event type with ID ${id}`)
@@ -158,5 +156,6 @@ export function useEventTypes(hotelId?: string) {
     updateEventType,
     deleteEventType,
     getEventType,
+    refreshEventTypes: fetchEventTypes,
   }
 }

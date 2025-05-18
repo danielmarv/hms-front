@@ -1,250 +1,336 @@
 "use client"
 
-import { useState } from "react"
-import { toast } from "sonner"
+import { useState, useCallback } from "react"
+import { useApi } from "./use-api"
 
-export function useEventReports() {
-  const [loading, setLoading] = useState(false)
+export interface ReportDateRange {
+  start: Date
+  end: Date
+}
+
+export interface RevenueReport {
+  total_revenue: number
+  average_revenue_per_event: number
+  revenue_by_period: {
+    period: string
+    revenue: number
+  }[]
+  revenue_by_event_type: {
+    event_type: string
+    revenue: number
+    percentage: number
+  }[]
+  date_range: ReportDateRange
+}
+
+export interface EventTypeReport {
+  total_events: number
+  event_types: {
+    name: string
+    count: number
+    percentage: number
+  }[]
+  date_range: ReportDateRange
+}
+
+export interface VenueUtilizationReport {
+  venues: {
+    name: string
+    total_hours: number
+    utilization_rate: number
+    revenue: number
+    events_count: number
+  }[]
+  date_range: ReportDateRange
+}
+
+export interface ServicePopularityReport {
+  services: {
+    name: string
+    category: string
+    count: number
+    revenue: number
+    popularity_score: number
+  }[]
+  date_range: ReportDateRange
+}
+
+export interface FeedbackReport {
+  average_rating: number
+  rating_distribution: {
+    rating: number
+    count: number
+    percentage: number
+  }[]
+  feedback_by_category: {
+    category: string
+    average_rating: number
+    count: number
+  }[]
+  recent_feedback: {
+    event_id: string
+    event_name: string
+    rating: number
+    comment: string
+    date: Date
+  }[]
+  date_range: ReportDateRange
+}
+
+export function useEventReports(hotelId?: string) {
+  const { request, isLoading } = useApi()
   const [error, setError] = useState<string | null>(null)
 
   // Function to get revenue report
-  const getRevenueReport = async (hotelId: string, startDate?: Date, endDate?: Date, groupBy = "month") => {
-    try {
-      setLoading(true)
+  const getRevenueReport = useCallback(
+    async (reportHotelId: string = hotelId || "", startDate?: Date, endDate?: Date, groupBy = "month") => {
+      if (!reportHotelId) {
+        setError("Hotel ID is required")
+        return null
+      }
 
       // Build query parameters
       const params = new URLSearchParams()
-      params.append("hotel_id", hotelId)
+      params.append("hotel_id", reportHotelId)
       if (startDate) params.append("start_date", startDate.toISOString())
       if (endDate) params.append("end_date", endDate.toISOString())
       params.append("group_by", groupBy)
 
-      const response = await fetch(`/api/events/reports/revenue?${params.toString()}`)
+      const response = await request<RevenueReport>(`/events/reports/revenue?${params.toString()}`, "GET")
 
-      if (!response.ok) {
-        throw new Error(`Error fetching revenue report: ${response.statusText}`)
+      if (response.error) {
+        setError(response.error)
+        return null
       }
 
-      const data = await response.json()
-
-      // Transform dates from strings to Date objects if they exist
-      if (data.data.date_range) {
-        data.data.date_range.start = new Date(data.data.date_range.start)
-        data.data.date_range.end = new Date(data.data.date_range.end)
+      if (response.data) {
+        // Transform dates from strings to Date objects
+        return {
+          ...response.data,
+          date_range: {
+            start: new Date(response.data.date_range.start),
+            end: new Date(response.data.date_range.end),
+          },
+        }
       }
 
-      return data.data
-    } catch (err) {
-      console.error("Failed to fetch revenue report:", err)
-      setError(err instanceof Error ? err.message : "Failed to fetch revenue report")
-      toast.error("Failed to load revenue report")
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }
+      return null
+    },
+    [request, hotelId],
+  )
 
   // Function to get event type report
-  const getEventTypeReport = async (hotelId: string, startDate?: Date, endDate?: Date) => {
-    try {
-      setLoading(true)
+  const getEventTypeReport = useCallback(
+    async (reportHotelId: string = hotelId || "", startDate?: Date, endDate?: Date) => {
+      if (!reportHotelId) {
+        setError("Hotel ID is required")
+        return null
+      }
 
       // Build query parameters
       const params = new URLSearchParams()
-      params.append("hotel_id", hotelId)
+      params.append("hotel_id", reportHotelId)
       if (startDate) params.append("start_date", startDate.toISOString())
       if (endDate) params.append("end_date", endDate.toISOString())
 
-      const response = await fetch(`/api/events/reports/event-types?${params.toString()}`)
+      const response = await request<EventTypeReport>(`/events/reports/event-types?${params.toString()}`, "GET")
 
-      if (!response.ok) {
-        throw new Error(`Error fetching event type report: ${response.statusText}`)
+      if (response.error) {
+        setError(response.error)
+        return null
       }
 
-      const data = await response.json()
-
-      // Transform dates from strings to Date objects if they exist
-      if (data.data.date_range) {
-        data.data.date_range.start = new Date(data.data.date_range.start)
-        data.data.date_range.end = new Date(data.data.date_range.end)
+      if (response.data) {
+        // Transform dates from strings to Date objects
+        return {
+          ...response.data,
+          date_range: {
+            start: new Date(response.data.date_range.start),
+            end: new Date(response.data.date_range.end),
+          },
+        }
       }
 
-      return data.data
-    } catch (err) {
-      console.error("Failed to fetch event type report:", err)
-      setError(err instanceof Error ? err.message : "Failed to fetch event type report")
-      toast.error("Failed to load event type report")
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }
+      return null
+    },
+    [request, hotelId],
+  )
 
   // Function to get venue utilization report
-  const getVenueUtilizationReport = async (hotelId: string, startDate?: Date, endDate?: Date) => {
-    try {
-      setLoading(true)
+  const getVenueUtilizationReport = useCallback(
+    async (reportHotelId: string = hotelId || "", startDate?: Date, endDate?: Date) => {
+      if (!reportHotelId) {
+        setError("Hotel ID is required")
+        return null
+      }
 
       // Build query parameters
       const params = new URLSearchParams()
-      params.append("hotel_id", hotelId)
+      params.append("hotel_id", reportHotelId)
       if (startDate) params.append("start_date", startDate.toISOString())
       if (endDate) params.append("end_date", endDate.toISOString())
 
-      const response = await fetch(`/api/events/reports/venues?${params.toString()}`)
+      const response = await request<VenueUtilizationReport>(`/events/reports/venues?${params.toString()}`, "GET")
 
-      if (!response.ok) {
-        throw new Error(`Error fetching venue utilization report: ${response.statusText}`)
+      if (response.error) {
+        setError(response.error)
+        return null
       }
 
-      const data = await response.json()
-
-      // Transform dates from strings to Date objects if they exist
-      if (data.data.date_range) {
-        data.data.date_range.start = new Date(data.data.date_range.start)
-        data.data.date_range.end = new Date(data.data.date_range.end)
+      if (response.data) {
+        // Transform dates from strings to Date objects
+        return {
+          ...response.data,
+          date_range: {
+            start: new Date(response.data.date_range.start),
+            end: new Date(response.data.date_range.end),
+          },
+        }
       }
 
-      return data.data
-    } catch (err) {
-      console.error("Failed to fetch venue utilization report:", err)
-      setError(err instanceof Error ? err.message : "Failed to fetch venue utilization report")
-      toast.error("Failed to load venue utilization report")
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }
+      return null
+    },
+    [request, hotelId],
+  )
 
   // Function to get service popularity report
-  const getServicePopularityReport = async (hotelId: string, startDate?: Date, endDate?: Date) => {
-    try {
-      setLoading(true)
+  const getServicePopularityReport = useCallback(
+    async (reportHotelId: string = hotelId || "", startDate?: Date, endDate?: Date) => {
+      if (!reportHotelId) {
+        setError("Hotel ID is required")
+        return null
+      }
 
       // Build query parameters
       const params = new URLSearchParams()
-      params.append("hotel_id", hotelId)
+      params.append("hotel_id", reportHotelId)
       if (startDate) params.append("start_date", startDate.toISOString())
       if (endDate) params.append("end_date", endDate.toISOString())
 
-      const response = await fetch(`/api/events/reports/services?${params.toString()}`)
+      const response = await request<ServicePopularityReport>(`/events/reports/services?${params.toString()}`, "GET")
 
-      if (!response.ok) {
-        throw new Error(`Error fetching service popularity report: ${response.statusText}`)
+      if (response.error) {
+        setError(response.error)
+        return null
       }
 
-      const data = await response.json()
-
-      // Transform dates from strings to Date objects if they exist
-      if (data.data.date_range) {
-        data.data.date_range.start = new Date(data.data.date_range.start)
-        data.data.date_range.end = new Date(data.data.date_range.end)
+      if (response.data) {
+        // Transform dates from strings to Date objects
+        return {
+          ...response.data,
+          date_range: {
+            start: new Date(response.data.date_range.start),
+            end: new Date(response.data.date_range.end),
+          },
+        }
       }
 
-      return data.data
-    } catch (err) {
-      console.error("Failed to fetch service popularity report:", err)
-      setError(err instanceof Error ? err.message : "Failed to fetch service popularity report")
-      toast.error("Failed to load service popularity report")
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }
+      return null
+    },
+    [request, hotelId],
+  )
 
   // Function to get feedback report
-  const getFeedbackReport = async (hotelId: string, startDate?: Date, endDate?: Date) => {
-    try {
-      setLoading(true)
+  const getFeedbackReport = useCallback(
+    async (reportHotelId: string = hotelId || "", startDate?: Date, endDate?: Date) => {
+      if (!reportHotelId) {
+        setError("Hotel ID is required")
+        return null
+      }
 
       // Build query parameters
       const params = new URLSearchParams()
-      params.append("hotel_id", hotelId)
+      params.append("hotel_id", reportHotelId)
       if (startDate) params.append("start_date", startDate.toISOString())
       if (endDate) params.append("end_date", endDate.toISOString())
 
-      const response = await fetch(`/api/events/reports/feedback?${params.toString()}`)
+      const response = await request<FeedbackReport>(`/events/reports/feedback?${params.toString()}`, "GET")
 
-      if (!response.ok) {
-        throw new Error(`Error fetching feedback report: ${response.statusText}`)
+      if (response.error) {
+        setError(response.error)
+        return null
       }
 
-      const data = await response.json()
+      if (response.data) {
+        // Transform dates from strings to Date objects
+        const transformedData = {
+          ...response.data,
+          date_range: {
+            start: new Date(response.data.date_range.start),
+            end: new Date(response.data.date_range.end),
+          },
+          recent_feedback: response.data.recent_feedback.map((feedback) => ({
+            ...feedback,
+            date: new Date(feedback.date),
+          })),
+        }
 
-      // Transform dates from strings to Date objects if they exist
-      if (data.data.date_range) {
-        data.data.date_range.start = new Date(data.data.date_range.start)
-        data.data.date_range.end = new Date(data.data.date_range.end)
+        return transformedData
       }
 
-      return data.data
-    } catch (err) {
-      console.error("Failed to fetch feedback report:", err)
-      setError(err instanceof Error ? err.message : "Failed to fetch feedback report")
-      toast.error("Failed to load feedback report")
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }
+      return null
+    },
+    [request, hotelId],
+  )
 
   // Function to generate custom report
-  const generateCustomReport = async (
-    hotelId: string,
-    startDate?: Date,
-    endDate?: Date,
-    metrics: string[] = [],
-    dimensions: string[] = [],
-    filters: Record<string, string> = {},
-    sortBy?: string,
-    limit?: number,
-  ) => {
-    try {
-      setLoading(true)
-
-      // Build query parameters
-      const params = new URLSearchParams()
-      params.append("hotel_id", hotelId)
-      if (startDate) params.append("start_date", startDate.toISOString())
-      if (endDate) params.append("end_date", endDate.toISOString())
-
-      metrics.forEach((metric) => params.append("metrics[]", metric))
-      dimensions.forEach((dimension) => params.append("dimensions[]", dimension))
-
-      Object.entries(filters).forEach(([key, value]) => {
-        params.append(`filters[${key}]`, value)
-      })
-
-      if (sortBy) params.append("sort_by", sortBy)
-      if (limit) params.append("limit", limit.toString())
-
-      const response = await fetch(`/api/events/reports/custom?${params.toString()}`)
-
-      if (!response.ok) {
-        throw new Error(`Error generating custom report: ${response.statusText}`)
+  const generateCustomReport = useCallback(
+    async (
+      reportHotelId: string = hotelId || "",
+      startDate?: Date,
+      endDate?: Date,
+      metrics: string[] = [],
+      dimensions: string[] = [],
+      filters: Record<string, string> = {},
+      sortBy?: string,
+      limit?: number,
+    ) => {
+      if (!reportHotelId) {
+        setError("Hotel ID is required")
+        return null
       }
 
-      const data = await response.json()
-
-      // Transform dates from strings to Date objects if they exist
-      if (data.data.date_range) {
-        data.data.date_range.start = new Date(data.data.date_range.start)
-        data.data.date_range.end = new Date(data.data.date_range.end)
+      // Build request body
+      const requestBody = {
+        hotel_id: reportHotelId,
+        start_date: startDate?.toISOString(),
+        end_date: endDate?.toISOString(),
+        metrics,
+        dimensions,
+        filters,
+        sort_by: sortBy,
+        limit,
       }
 
-      return data.data
-    } catch (err) {
-      console.error("Failed to generate custom report:", err)
-      setError(err instanceof Error ? err.message : "Failed to generate custom report")
-      toast.error("Failed to generate custom report")
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }
+      const response = await request<any>(`/events/reports/custom`, "POST", requestBody)
+
+      if (response.error) {
+        setError(response.error)
+        return null
+      }
+
+      if (response.data) {
+        // Transform dates from strings to Date objects if they exist
+        if (response.data.date_range) {
+          return {
+            ...response.data,
+            date_range: {
+              start: new Date(response.data.date_range.start),
+              end: new Date(response.data.date_range.end),
+            },
+          }
+        }
+
+        return response.data
+      }
+
+      return null
+    },
+    [request, hotelId],
+  )
 
   return {
-    loading,
+    loading: isLoading,
     error,
     getRevenueReport,
     getEventTypeReport,

@@ -1,162 +1,150 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { toast } from "sonner"
-import type { EventService } from "./use-events"
+import { useState, useEffect, useCallback } from "react"
+import { useApi } from "./use-api"
+
+export interface EventService {
+  _id: string
+  name: string
+  description: string
+  category: string
+  price: number
+  unit: string
+  hotel_id: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
 
 export function useEventServices(hotelId?: string) {
+  const { request, isLoading } = useApi()
   const [services, setServices] = useState<EventService[]>([])
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    const fetchServices = async () => {
-      try {
-        setLoading(true)
-        const url = hotelId ? `/api/events/services?hotel=${hotelId}` : "/api/events/services"
-        const response = await fetch(url)
+  // Function to fetch all services
+  const fetchServices = useCallback(async () => {
+    const url = hotelId ? `/events/services?hotel=${hotelId}` : "/events/services"
+    const response = await request<EventService[]>(url, "GET")
 
-        if (!response.ok) {
-          throw new Error(`Error fetching services: ${response.statusText}`)
-        }
-
-        const data = await response.json()
-        setServices(data.services)
-      } catch (err) {
-        console.error("Failed to fetch services:", err)
-        setError(err instanceof Error ? err.message : "Failed to fetch services")
-        toast.error("Failed to load services")
-      } finally {
-        setLoading(false)
-      }
+    if (response.error) {
+      setError(response.error)
+      return
     }
 
+    if (response.data) {
+      setServices(response.data)
+    }
+  }, [request, hotelId])
+
+  // Load services on component mount
+  useEffect(() => {
     fetchServices()
-  }, [hotelId])
+  }, [fetchServices])
 
   // Function to create a new service
-  const createService = async (serviceData: Partial<EventService>) => {
-    try {
-      setLoading(true)
-      const response = await fetch("/api/events/services", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(serviceData),
-      })
+  const createService = useCallback(
+    async (serviceData: Partial<EventService>) => {
+      const response = await request<EventService>("/events/services", "POST", serviceData)
 
-      if (!response.ok) {
-        throw new Error(`Error creating service: ${response.statusText}`)
+      if (response.error) {
+        setError(response.error)
+        return null
       }
 
-      const data = await response.json()
+      if (response.data) {
+        // Add the new service to the state
+        setServices((prevServices) => [...prevServices, response.data])
+        return response.data
+      }
 
-      // Add the new service to the state
-      setServices((prevServices) => [...prevServices, data.service])
-
-      toast.success("Service created successfully")
-      return data.service
-    } catch (err) {
-      console.error("Failed to create service:", err)
-      setError(err instanceof Error ? err.message : "Failed to create service")
-      toast.error("Failed to create service")
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }
+      return null
+    },
+    [request],
+  )
 
   // Function to update a service
-  const updateService = async (id: string, serviceData: Partial<EventService>) => {
-    try {
-      setLoading(true)
-      const response = await fetch(`/api/events/services/${id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(serviceData),
-      })
+  const updateService = useCallback(
+    async (id: string, serviceData: Partial<EventService>) => {
+      const response = await request<EventService>(`/events/services/${id}`, "PUT", serviceData)
 
-      if (!response.ok) {
-        throw new Error(`Error updating service: ${response.statusText}`)
+      if (response.error) {
+        setError(response.error)
+        return null
       }
 
-      const data = await response.json()
+      if (response.data) {
+        // Update the service in the state
+        setServices((prevServices) =>
+          prevServices.map((service) => (service._id === id ? { ...service, ...response.data } : service)),
+        )
+        return response.data
+      }
 
-      // Update the service in the state
-      setServices((prevServices) =>
-        prevServices.map((service) => (service._id === id ? { ...service, ...data.service } : service)),
-      )
-
-      toast.success("Service updated successfully")
-      return data.service
-    } catch (err) {
-      console.error("Failed to update service:", err)
-      setError(err instanceof Error ? err.message : "Failed to update service")
-      toast.error("Failed to update service")
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }
+      return null
+    },
+    [request],
+  )
 
   // Function to delete a service
-  const deleteService = async (id: string) => {
-    try {
-      setLoading(true)
-      const response = await fetch(`/api/events/services/${id}`, {
-        method: "DELETE",
-      })
+  const deleteService = useCallback(
+    async (id: string) => {
+      const response = await request<{ success: boolean }>(`/events/services/${id}`, "DELETE")
 
-      if (!response.ok) {
-        throw new Error(`Error deleting service: ${response.statusText}`)
+      if (response.error) {
+        setError(response.error)
+        return false
       }
 
-      // Remove the service from the state
-      setServices((prevServices) => prevServices.filter((service) => service._id !== id))
+      if (response.data?.success) {
+        // Remove the service from the state
+        setServices((prevServices) => prevServices.filter((service) => service._id !== id))
+        return true
+      }
 
-      toast.success("Service deleted successfully")
-    } catch (err) {
-      console.error("Failed to delete service:", err)
-      setError(err instanceof Error ? err.message : "Failed to delete service")
-      toast.error("Failed to delete service")
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }
+      return false
+    },
+    [request],
+  )
 
   // Function to get services by category
-  const getServicesByCategory = async (category: string) => {
-    try {
-      setLoading(true)
-      const response = await fetch(`/api/events/services/category/${category}`)
+  const getServicesByCategory = useCallback(
+    async (category: string) => {
+      const response = await request<EventService[]>(`/events/services/category/${category}`, "GET")
 
-      if (!response.ok) {
-        throw new Error(`Error fetching services by category: ${response.statusText}`)
+      if (response.error) {
+        setError(response.error)
+        return []
       }
 
-      const data = await response.json()
-      return data.services
-    } catch (err) {
-      console.error(`Failed to fetch services for category ${category}:`, err)
-      setError(err instanceof Error ? err.message : `Failed to fetch services for category ${category}`)
-      toast.error("Failed to load services by category")
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }
+      return response.data || []
+    },
+    [request],
+  )
+
+  // Function to get a single service by ID
+  const getServiceById = useCallback(
+    async (id: string) => {
+      const response = await request<EventService>(`/events/services/${id}`, "GET")
+
+      if (response.error) {
+        setError(response.error)
+        return null
+      }
+
+      return response.data
+    },
+    [request],
+  )
 
   return {
     services,
-    loading,
+    loading: isLoading,
     error,
+    fetchServices,
     createService,
     updateService,
     deleteService,
     getServicesByCategory,
+    getServiceById,
   }
 }

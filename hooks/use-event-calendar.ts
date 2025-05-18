@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
-import { toast } from "sonner"
+import { useState, useCallback, useEffect } from "react"
+import { useApi } from "./use-api"
 
-interface CalendarEvent {
+export interface CalendarEvent {
   id: string
   title: string
   start: Date
@@ -19,22 +19,14 @@ interface CalendarEvent {
   }
 }
 
-export function useEventCalendar() {
-  const [loading, setLoading] = useState(false)
+export function useEventCalendar(hotelId?: string) {
+  const { request, isLoading } = useApi()
   const [error, setError] = useState<string | null>(null)
+  const [events, setEvents] = useState<CalendarEvent[]>([])
 
   // Function to get calendar events
-  const getCalendarEvents = async (
-    startDate: Date,
-    endDate: Date,
-    hotelId?: string,
-    venueId?: string,
-    eventTypeId?: string,
-    status?: string,
-  ) => {
-    try {
-      setLoading(true)
-
+  const getCalendarEvents = useCallback(
+    async (startDate: Date, endDate: Date, venueId?: string, eventTypeId?: string, status?: string) => {
       // Build query parameters
       const params = new URLSearchParams()
       params.append("start_date", startDate.toISOString())
@@ -45,44 +37,33 @@ export function useEventCalendar() {
       if (eventTypeId) params.append("event_type_id", eventTypeId)
       if (status) params.append("status", status)
 
-      const response = await fetch(`/api/events/calendar?${params.toString()}`)
+      const response = await request<CalendarEvent[]>(`/events/calendar?${params.toString()}`, "GET")
 
-      if (!response.ok) {
-        throw new Error(`Error fetching calendar events: ${response.statusText}`)
+      if (response.error) {
+        setError(response.error)
+        return []
       }
 
-      const data = await response.json()
+      if (response.data) {
+        // Transform dates from strings to Date objects
+        const eventsWithDates = response.data.map((event: any) => ({
+          ...event,
+          start: new Date(event.start),
+          end: new Date(event.end),
+        }))
 
-      // Transform dates from strings to Date objects
-      const eventsWithDates = data.data.map((event: any) => ({
-        ...event,
-        start: new Date(event.start),
-        end: new Date(event.end),
-      }))
+        setEvents(eventsWithDates)
+        return eventsWithDates
+      }
 
-      return eventsWithDates as CalendarEvent[]
-    } catch (err) {
-      console.error("Failed to fetch calendar events:", err)
-      setError(err instanceof Error ? err.message : "Failed to fetch calendar events")
-      toast.error("Failed to load calendar events")
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }
+      return []
+    },
+    [request, hotelId],
+  )
 
   // Function to get month events
-  const getMonthEvents = async (
-    year: number,
-    month: number,
-    hotelId?: string,
-    venueId?: string,
-    eventTypeId?: string,
-    status?: string,
-  ) => {
-    try {
-      setLoading(true)
-
+  const getMonthEvents = useCallback(
+    async (year: number, month: number, venueId?: string, eventTypeId?: string, status?: string) => {
       // Build query parameters
       const params = new URLSearchParams()
       if (hotelId) params.append("hotel_id", hotelId)
@@ -90,49 +71,41 @@ export function useEventCalendar() {
       if (eventTypeId) params.append("event_type_id", eventTypeId)
       if (status) params.append("status", status)
 
-      const response = await fetch(`/api/events/calendar/month/${year}/${month}?${params.toString()}`)
+      const response = await request<{
+        events: any[]
+        start_date: string
+        end_date: string
+      }>(`/events/calendar/month/${year}/${month}?${params.toString()}`, "GET")
 
-      if (!response.ok) {
-        throw new Error(`Error fetching month events: ${response.statusText}`)
+      if (response.error) {
+        setError(response.error)
+        return null
       }
 
-      const data = await response.json()
+      if (response.data) {
+        // Transform dates from strings to Date objects
+        const eventsWithDates = response.data.events.map((event: any) => ({
+          ...event,
+          start: new Date(event.start),
+          end: new Date(event.end),
+        }))
 
-      // Transform dates from strings to Date objects
-      const eventsWithDates = data.data.events.map((event: any) => ({
-        ...event,
-        start: new Date(event.start),
-        end: new Date(event.end),
-      }))
-
-      return {
-        ...data.data,
-        events: eventsWithDates as CalendarEvent[],
-        start_date: new Date(data.data.start_date),
-        end_date: new Date(data.data.end_date),
+        return {
+          ...response.data,
+          events: eventsWithDates,
+          start_date: new Date(response.data.start_date),
+          end_date: new Date(response.data.end_date),
+        }
       }
-    } catch (err) {
-      console.error("Failed to fetch month events:", err)
-      setError(err instanceof Error ? err.message : "Failed to fetch month events")
-      toast.error("Failed to load month events")
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }
+
+      return null
+    },
+    [request, hotelId],
+  )
 
   // Function to get week events
-  const getWeekEvents = async (
-    year: number,
-    week: number,
-    hotelId?: string,
-    venueId?: string,
-    eventTypeId?: string,
-    status?: string,
-  ) => {
-    try {
-      setLoading(true)
-
+  const getWeekEvents = useCallback(
+    async (year: number, week: number, venueId?: string, eventTypeId?: string, status?: string) => {
       // Build query parameters
       const params = new URLSearchParams()
       if (hotelId) params.append("hotel_id", hotelId)
@@ -140,50 +113,41 @@ export function useEventCalendar() {
       if (eventTypeId) params.append("event_type_id", eventTypeId)
       if (status) params.append("status", status)
 
-      const response = await fetch(`/api/events/calendar/week/${year}/${week}?${params.toString()}`)
+      const response = await request<{
+        events: any[]
+        start_date: string
+        end_date: string
+      }>(`/events/calendar/week/${year}/${week}?${params.toString()}`, "GET")
 
-      if (!response.ok) {
-        throw new Error(`Error fetching week events: ${response.statusText}`)
+      if (response.error) {
+        setError(response.error)
+        return null
       }
 
-      const data = await response.json()
+      if (response.data) {
+        // Transform dates from strings to Date objects
+        const eventsWithDates = response.data.events.map((event: any) => ({
+          ...event,
+          start: new Date(event.start),
+          end: new Date(event.end),
+        }))
 
-      // Transform dates from strings to Date objects
-      const eventsWithDates = data.data.events.map((event: any) => ({
-        ...event,
-        start: new Date(event.start),
-        end: new Date(event.end),
-      }))
-
-      return {
-        ...data.data,
-        events: eventsWithDates as CalendarEvent[],
-        start_date: new Date(data.data.start_date),
-        end_date: new Date(data.data.end_date),
+        return {
+          ...response.data,
+          events: eventsWithDates,
+          start_date: new Date(response.data.start_date),
+          end_date: new Date(response.data.end_date),
+        }
       }
-    } catch (err) {
-      console.error("Failed to fetch week events:", err)
-      setError(err instanceof Error ? err.message : "Failed to fetch week events")
-      toast.error("Failed to load week events")
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }
+
+      return null
+    },
+    [request, hotelId],
+  )
 
   // Function to get day events
-  const getDayEvents = async (
-    year: number,
-    month: number,
-    day: number,
-    hotelId?: string,
-    venueId?: string,
-    eventTypeId?: string,
-    status?: string,
-  ) => {
-    try {
-      setLoading(true)
-
+  const getDayEvents = useCallback(
+    async (year: number, month: number, day: number, venueId?: string, eventTypeId?: string, status?: string) => {
       // Build query parameters
       const params = new URLSearchParams()
       if (hotelId) params.append("hotel_id", hotelId)
@@ -191,116 +155,118 @@ export function useEventCalendar() {
       if (eventTypeId) params.append("event_type_id", eventTypeId)
       if (status) params.append("status", status)
 
-      const response = await fetch(`/api/events/calendar/day/${year}/${month}/${day}?${params.toString()}`)
+      const response = await request<{
+        events: any[]
+        date: string
+      }>(`/events/calendar/day/${year}/${month}/${day}?${params.toString()}`, "GET")
 
-      if (!response.ok) {
-        throw new Error(`Error fetching day events: ${response.statusText}`)
+      if (response.error) {
+        setError(response.error)
+        return null
       }
 
-      const data = await response.json()
+      if (response.data) {
+        // Transform dates from strings to Date objects
+        const eventsWithDates = response.data.events.map((event: any) => ({
+          ...event,
+          start: new Date(event.start),
+          end: new Date(event.end),
+        }))
 
-      // Transform dates from strings to Date objects
-      const eventsWithDates = data.data.events.map((event: any) => ({
-        ...event,
-        start: new Date(event.start),
-        end: new Date(event.end),
-      }))
-
-      return {
-        ...data.data,
-        events: eventsWithDates as CalendarEvent[],
-        date: new Date(data.data.date),
+        return {
+          ...response.data,
+          events: eventsWithDates,
+          date: new Date(response.data.date),
+        }
       }
-    } catch (err) {
-      console.error("Failed to fetch day events:", err)
-      setError(err instanceof Error ? err.message : "Failed to fetch day events")
-      toast.error("Failed to load day events")
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }
+
+      return null
+    },
+    [request, hotelId],
+  )
 
   // Function to check availability
-  const checkAvailability = async (venueId: string, startDate: Date, endDate: Date, eventId?: string) => {
-    try {
-      setLoading(true)
-
-      const response = await fetch("/api/events/calendar/check-availability", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          venue_id: venueId,
-          start_date: startDate.toISOString(),
-          end_date: endDate.toISOString(),
-          event_id: eventId,
-        }),
+  const checkAvailability = useCallback(
+    async (venueId: string, startDate: Date, endDate: Date, eventId?: string) => {
+      const response = await request<{
+        available: boolean
+        conflicting_events?: any[]
+      }>("/events/calendar/check-availability", "POST", {
+        venue_id: venueId,
+        start_date: startDate.toISOString(),
+        end_date: endDate.toISOString(),
+        event_id: eventId,
       })
 
-      if (!response.ok) {
-        throw new Error(`Error checking availability: ${response.statusText}`)
+      if (response.error) {
+        setError(response.error)
+        return { available: false }
       }
 
-      const data = await response.json()
-      return data.data
-    } catch (err) {
-      console.error("Failed to check availability:", err)
-      setError(err instanceof Error ? err.message : "Failed to check availability")
-      toast.error("Failed to check availability")
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }
+      return response.data || { available: false }
+    },
+    [request],
+  )
 
   // Function to get venue calendar
-  const getVenueCalendar = async (venueId: string, startDate: Date, endDate: Date, status?: string) => {
-    try {
-      setLoading(true)
-
+  const getVenueCalendar = useCallback(
+    async (venueId: string, startDate: Date, endDate: Date, status?: string) => {
       // Build query parameters
       const params = new URLSearchParams()
       params.append("start_date", startDate.toISOString())
       params.append("end_date", endDate.toISOString())
       if (status) params.append("status", status)
 
-      const response = await fetch(`/api/events/calendar/venue/${venueId}?${params.toString()}`)
-
-      if (!response.ok) {
-        throw new Error(`Error fetching venue calendar: ${response.statusText}`)
-      }
-
-      const data = await response.json()
-
-      // Transform dates from strings to Date objects
-      const eventsWithDates = data.data.events.map((event: any) => ({
-        ...event,
-        start: new Date(event.start),
-        end: new Date(event.end),
-      }))
-
-      return {
-        ...data.data,
-        events: eventsWithDates as CalendarEvent[],
+      const response = await request<{
+        events: any[]
         date_range: {
-          start: new Date(data.data.date_range.start),
-          end: new Date(data.data.date_range.end),
-        },
+          start: string
+          end: string
+        }
+      }>(`/events/calendar/venue/${venueId}?${params.toString()}`, "GET")
+
+      if (response.error) {
+        setError(response.error)
+        return null
       }
-    } catch (err) {
-      console.error("Failed to fetch venue calendar:", err)
-      setError(err instanceof Error ? err.message : "Failed to fetch venue calendar")
-      toast.error("Failed to load venue calendar")
-      throw err
-    } finally {
-      setLoading(false)
+
+      if (response.data) {
+        // Transform dates from strings to Date objects
+        const eventsWithDates = response.data.events.map((event: any) => ({
+          ...event,
+          start: new Date(event.start),
+          end: new Date(event.end),
+        }))
+
+        return {
+          ...response.data,
+          events: eventsWithDates,
+          date_range: {
+            start: new Date(response.data.date_range.start),
+            end: new Date(response.data.date_range.end),
+          },
+        }
+      }
+
+      return null
+    },
+    [request],
+  )
+
+  // Load initial events if hotelId is provided
+  useEffect(() => {
+    if (hotelId) {
+      const now = new Date()
+      const startDate = new Date(now.getFullYear(), now.getMonth(), 1)
+      const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+
+      getCalendarEvents(startDate, endDate)
     }
-  }
+  }, [hotelId, getCalendarEvents])
 
   return {
-    loading,
+    events,
+    loading: isLoading,
     error,
     getCalendarEvents,
     getMonthEvents,

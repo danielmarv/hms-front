@@ -1,62 +1,62 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { toast } from "sonner"
+import { useApi } from "@/hooks/use-api"
 import type { Venue } from "./use-events"
 
 export function useVenues(hotelId?: string) {
   const [venues, setVenues] = useState<Venue[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { request } = useApi()
+
+  const fetchVenues = useCallback(async () => {
+    try {
+      setLoading(true)
+      const endpoint = hotelId ? `/events/venues?hotel_id=${hotelId}` : "/events/venues"
+      const response = await request<{ venues: Venue[] }>(endpoint, "GET")
+
+      if (response.error) {
+        throw new Error(response.error)
+      }
+
+      if (response.data && response.data.venues) {
+        setVenues(response.data.venues)
+      } else {
+        setVenues([])
+      }
+    } catch (err) {
+      console.error("Failed to fetch venues:", err)
+      setError(err instanceof Error ? err.message : "Failed to fetch venues")
+      toast.error("Failed to load venues")
+    } finally {
+      setLoading(false)
+    }
+  }, [hotelId, request])
 
   useEffect(() => {
-    const fetchVenues = async () => {
-      try {
-        setLoading(true)
-        const url = hotelId ? `/api/events/venues?hotel_id=${hotelId}` : "/api/events/venues"
-        const response = await fetch(url)
-
-        if (!response.ok) {
-          throw new Error(`Error fetching venues: ${response.statusText}`)
-        }
-
-        const data = await response.json()
-        setVenues(data.venues)
-      } catch (err) {
-        console.error("Failed to fetch venues:", err)
-        setError(err instanceof Error ? err.message : "Failed to fetch venues")
-        toast.error("Failed to load venues")
-      } finally {
-        setLoading(false)
-      }
-    }
-
     fetchVenues()
-  }, [hotelId])
+  }, [fetchVenues])
 
   // Function to create a new venue
   const createVenue = async (venueData: Partial<Venue>) => {
     try {
       setLoading(true)
-      const response = await fetch("/api/events/venues", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(venueData),
-      })
+      const response = await request<{ venue: Venue }>("/events/venues", "POST", venueData)
 
-      if (!response.ok) {
-        throw new Error(`Error creating venue: ${response.statusText}`)
+      if (response.error) {
+        throw new Error(response.error)
       }
 
-      const data = await response.json()
+      if (response.data && response.data.venue) {
+        // Add the new venue to the state
+        setVenues((prevVenues) => [...prevVenues, response.data.venue])
+        toast.success("Venue created successfully")
+        return response.data.venue
+      }
 
-      // Add the new venue to the state
-      setVenues((prevVenues) => [...prevVenues, data.venue])
-
-      toast.success("Venue created successfully")
-      return data.venue
+      throw new Error("Failed to create venue")
     } catch (err) {
       console.error("Failed to create venue:", err)
       setError(err instanceof Error ? err.message : "Failed to create venue")
@@ -71,25 +71,23 @@ export function useVenues(hotelId?: string) {
   const updateVenue = async (id: string, venueData: Partial<Venue>) => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/events/venues/${id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(venueData),
-      })
+      const response = await request<{ venue: Venue }>(`/events/venues/${id}`, "PUT", venueData)
 
-      if (!response.ok) {
-        throw new Error(`Error updating venue: ${response.statusText}`)
+      if (response.error) {
+        throw new Error(response.error)
       }
 
-      const data = await response.json()
+      if (response.data && response.data.venue) {
+        // Update the venue in the state
+        setVenues((prevVenues) =>
+          prevVenues.map((venue) => (venue._id === id ? { ...venue, ...response.data.venue } : venue)),
+        )
 
-      // Update the venue in the state
-      setVenues((prevVenues) => prevVenues.map((venue) => (venue._id === id ? { ...venue, ...data.venue } : venue)))
+        toast.success("Venue updated successfully")
+        return response.data.venue
+      }
 
-      toast.success("Venue updated successfully")
-      return data.venue
+      throw new Error("Failed to update venue")
     } catch (err) {
       console.error("Failed to update venue:", err)
       setError(err instanceof Error ? err.message : "Failed to update venue")
@@ -104,17 +102,14 @@ export function useVenues(hotelId?: string) {
   const deleteVenue = async (id: string) => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/events/venues/${id}`, {
-        method: "DELETE",
-      })
+      const response = await request<{ success: boolean }>(`/events/venues/${id}`, "DELETE")
 
-      if (!response.ok) {
-        throw new Error(`Error deleting venue: ${response.statusText}`)
+      if (response.error) {
+        throw new Error(response.error)
       }
 
       // Remove the venue from the state
       setVenues((prevVenues) => prevVenues.filter((venue) => venue._id !== id))
-
       toast.success("Venue deleted successfully")
     } catch (err) {
       console.error("Failed to delete venue:", err)
@@ -130,14 +125,17 @@ export function useVenues(hotelId?: string) {
   const getVenue = async (id: string) => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/events/venues/${id}`)
+      const response = await request<{ venue: Venue }>(`/events/venues/${id}`, "GET")
 
-      if (!response.ok) {
-        throw new Error(`Error fetching venue: ${response.statusText}`)
+      if (response.error) {
+        throw new Error(response.error)
       }
 
-      const data = await response.json()
-      return data.venue
+      if (response.data && response.data.venue) {
+        return response.data.venue
+      }
+
+      throw new Error(`Failed to fetch venue with ID ${id}`)
     } catch (err) {
       console.error(`Failed to fetch venue with ID ${id}:`, err)
       setError(err instanceof Error ? err.message : `Failed to fetch venue with ID ${id}`)
@@ -152,16 +150,16 @@ export function useVenues(hotelId?: string) {
   const checkVenueAvailability = async (venueId: string, startDate: Date, endDate: Date) => {
     try {
       setLoading(true)
-      const response = await fetch(
-        `/api/events/venues/${venueId}/availability?start_date=${startDate.toISOString()}&end_date=${endDate.toISOString()}`,
+      const response = await request<{ available: boolean; conflicts?: any[] }>(
+        `/events/venues/${venueId}/availability?start_date=${startDate.toISOString()}&end_date=${endDate.toISOString()}`,
+        "GET",
       )
 
-      if (!response.ok) {
-        throw new Error(`Error checking venue availability: ${response.statusText}`)
+      if (response.error) {
+        throw new Error(response.error)
       }
 
-      const data = await response.json()
-      return data
+      return response.data
     } catch (err) {
       console.error("Failed to check venue availability:", err)
       setError(err instanceof Error ? err.message : "Failed to check venue availability")
@@ -181,5 +179,6 @@ export function useVenues(hotelId?: string) {
     deleteVenue,
     getVenue,
     checkVenueAvailability,
+    refreshVenues: fetchVenues,
   }
 }

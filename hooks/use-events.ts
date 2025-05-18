@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { toast } from "sonner"
+import { useApi } from "@/hooks/use-api"
 
 export interface EventType {
   _id: string
@@ -138,70 +139,67 @@ export function useEvents(hotelId?: string) {
   const [events, setEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { request } = useApi()
 
-  useEffect(() => {
-    const fetchEvents = async () => {
-      try {
-        setLoading(true)
-        const url = hotelId ? `/api/events?hotel_id=${hotelId}` : "/api/events"
-        const response = await fetch(url)
+  const fetchEvents = useCallback(async () => {
+    try {
+      setLoading(true)
+      const endpoint = hotelId ? `/events?hotel_id=${hotelId}` : "/events"
+      const response = await request<{ events: any[] }>(endpoint, "GET")
 
-        if (!response.ok) {
-          throw new Error(`Error fetching events: ${response.statusText}`)
-        }
+      if (response.error) {
+        throw new Error(response.error)
+      }
 
-        const data = await response.json()
-
+      if (response.data && response.data.events) {
         // Transform dates from strings to Date objects
-        const eventsWithDates = data.events.map((event: any) => ({
+        const eventsWithDates = response.data.events.map((event: any) => ({
           ...event,
           start_date: new Date(event.start_date),
           end_date: new Date(event.end_date),
         }))
 
         setEvents(eventsWithDates)
-      } catch (err) {
-        console.error("Failed to fetch events:", err)
-        setError(err instanceof Error ? err.message : "Failed to fetch events")
-        toast.error("Failed to load events")
-      } finally {
-        setLoading(false)
+      } else {
+        setEvents([])
       }
+    } catch (err) {
+      console.error("Failed to fetch events:", err)
+      setError(err instanceof Error ? err.message : "Failed to fetch events")
+      toast.error("Failed to load events")
+    } finally {
+      setLoading(false)
     }
+  }, [hotelId, request])
 
+  useEffect(() => {
     fetchEvents()
-  }, [hotelId])
+  }, [fetchEvents])
 
   // Function to create a new event
   const createEvent = async (eventData: Partial<Event>) => {
     try {
       setLoading(true)
-      const response = await fetch("/api/events", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(eventData),
-      })
+      const response = await request<{ event: any }>("/events", "POST", eventData)
 
-      if (!response.ok) {
-        throw new Error(`Error creating event: ${response.statusText}`)
+      if (response.error) {
+        throw new Error(response.error)
       }
 
-      const data = await response.json()
+      if (response.data && response.data.event) {
+        // Add the new event to the state
+        const newEvent = {
+          ...response.data.event,
+          start_date: new Date(response.data.event.start_date),
+          end_date: new Date(response.data.event.end_date),
+        }
 
-      // Add the new event to the state
-      setEvents((prevEvents) => [
-        ...prevEvents,
-        {
-          ...data.event,
-          start_date: new Date(data.event.start_date),
-          end_date: new Date(data.event.end_date),
-        },
-      ])
+        setEvents((prevEvents) => [...prevEvents, newEvent])
+        toast.success("Event created successfully")
+        return newEvent
+      }
 
-      toast.success("Event created successfully")
-      return data.event
+      throw new Error("Failed to create event")
     } catch (err) {
       console.error("Failed to create event:", err)
       setError(err instanceof Error ? err.message : "Failed to create event")
@@ -216,36 +214,27 @@ export function useEvents(hotelId?: string) {
   const updateEvent = async (id: string, eventData: Partial<Event>) => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/events/${id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(eventData),
-      })
+      const response = await request<{ event: any }>(`/events/${id}`, "PUT", eventData)
 
-      if (!response.ok) {
-        throw new Error(`Error updating event: ${response.statusText}`)
+      if (response.error) {
+        throw new Error(response.error)
       }
 
-      const data = await response.json()
+      if (response.data && response.data.event) {
+        // Update the event in the state
+        const updatedEvent = {
+          ...response.data.event,
+          start_date: new Date(response.data.event.start_date),
+          end_date: new Date(response.data.event.end_date),
+        }
 
-      // Update the event in the state
-      setEvents((prevEvents) =>
-        prevEvents.map((event) =>
-          event._id === id
-            ? {
-                ...event,
-                ...data.event,
-                start_date: new Date(data.event.start_date),
-                end_date: new Date(data.event.end_date),
-              }
-            : event,
-        ),
-      )
+        setEvents((prevEvents) => prevEvents.map((event) => (event._id === id ? updatedEvent : event)))
 
-      toast.success("Event updated successfully")
-      return data.event
+        toast.success("Event updated successfully")
+        return updatedEvent
+      }
+
+      throw new Error("Failed to update event")
     } catch (err) {
       console.error("Failed to update event:", err)
       setError(err instanceof Error ? err.message : "Failed to update event")
@@ -260,17 +249,14 @@ export function useEvents(hotelId?: string) {
   const deleteEvent = async (id: string) => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/events/${id}`, {
-        method: "DELETE",
-      })
+      const response = await request<{ success: boolean }>(`/events/${id}`, "DELETE")
 
-      if (!response.ok) {
-        throw new Error(`Error deleting event: ${response.statusText}`)
+      if (response.error) {
+        throw new Error(response.error)
       }
 
       // Remove the event from the state
       setEvents((prevEvents) => prevEvents.filter((event) => event._id !== id))
-
       toast.success("Event deleted successfully")
     } catch (err) {
       console.error("Failed to delete event:", err)
@@ -286,22 +272,24 @@ export function useEvents(hotelId?: string) {
   const getEvent = async (id: string) => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/events/${id}`)
+      const response = await request<{ event: any }>(`/events/${id}`, "GET")
 
-      if (!response.ok) {
-        throw new Error(`Error fetching event: ${response.statusText}`)
+      if (response.error) {
+        throw new Error(response.error)
       }
 
-      const data = await response.json()
+      if (response.data && response.data.event) {
+        // Transform dates from strings to Date objects
+        const eventWithDates = {
+          ...response.data.event,
+          start_date: new Date(response.data.event.start_date),
+          end_date: new Date(response.data.event.end_date),
+        }
 
-      // Transform dates from strings to Date objects
-      const eventWithDates = {
-        ...data.event,
-        start_date: new Date(data.event.start_date),
-        end_date: new Date(data.event.end_date),
+        return eventWithDates
       }
 
-      return eventWithDates
+      throw new Error(`Failed to fetch event with ID ${id}`)
     } catch (err) {
       console.error(`Failed to fetch event with ID ${id}:`, err)
       setError(err instanceof Error ? err.message : `Failed to fetch event with ID ${id}`)
@@ -320,5 +308,6 @@ export function useEvents(hotelId?: string) {
     updateEvent,
     deleteEvent,
     getEvent,
+    refreshEvents: fetchEvents,
   }
 }
