@@ -71,6 +71,36 @@ export function HotelSidebar({ user }: HotelSidebarProps) {
       active: pathname.startsWith("/dashboard/services"),
     },
     {
+      label: "Invoices",
+      icon: Utensils,
+      href: "/dashboard/services",
+      active: pathname.startsWith("/dashboard/services"),
+    },
+    {
+      label: "Menu",
+      icon: Utensils,
+      href: "/dashboard/services",
+      active: pathname.startsWith("/dashboard/services"),
+    },
+    {
+      label: "Inventory",
+      icon: Utensils,
+      href: "/dashboard/services",
+      active: pathname.startsWith("/dashboard/services"),
+    },
+    {
+      label: "Events",
+      icon: Utensils,
+      href: "/dashboard/services",
+      active: pathname.startsWith("/dashboard/services"),
+    },
+    {
+      label: "Maintenance",
+      icon: Utensils,
+      href: "/dashboard/services",
+      active: pathname.startsWith("/dashboard/services"),
+    },
+    {
       label: "Hotel Settings",
       icon: Hotel,
       href: "/dashboard/settings",
