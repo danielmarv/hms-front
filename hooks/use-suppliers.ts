@@ -81,8 +81,6 @@ export function useSuppliers() {
   })
   const [totalSuppliers, setTotalSuppliers] = useState(0)
 
-  // Get all suppliers with filtering, pagination, and sorting
-  // Updated getSuppliers function to match the actual API response format
   const getSuppliers = useCallback(
     async (filters: SupplierFilters = {}) => {
       const { search, category, isActive, page = 1, limit = 20, sort = "name" } = filters
