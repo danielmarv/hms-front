@@ -13,11 +13,11 @@ export function useEventBookings(hotelId?: string) {
     const fetchBookings = async () => {
       try {
         setLoading(true)
-        const url = hotelId ? `/api/events/bookings?hotel=${hotelId}` : "/api/events/bookings"
+        const url = hotelId ? `/api/events/event-report?hotel=${hotelId}` : "/api/events/event-report"
         const response = await fetch(url)
 
         if (!response.ok) {
-          throw new Error(`Error fetching bookings: ${response.statusText}`)
+          throw new Error(`Error fetching event-report: ${response.statusText}`)
         }
 
         const data = await response.json()
@@ -46,7 +46,7 @@ export function useEventBookings(hotelId?: string) {
   const createBooking = async (bookingData: Partial<EventBooking>) => {
     try {
       setLoading(true)
-      const response = await fetch("/api/events/bookings", {
+      const response = await fetch("/api/events/event-report", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -86,7 +86,7 @@ export function useEventBookings(hotelId?: string) {
   const updateBooking = async (id: string, bookingData: Partial<EventBooking>) => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/events/bookings/${id}`, {
+      const response = await fetch(`/api/events/event-report/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -130,7 +130,7 @@ export function useEventBookings(hotelId?: string) {
   const deleteBooking = async (id: string) => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/events/bookings/${id}`, {
+      const response = await fetch(`/api/events/event-report/${id}`, {
         method: "DELETE",
       })
 
@@ -156,7 +156,7 @@ export function useEventBookings(hotelId?: string) {
   const getBooking = async (id: string) => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/events/bookings/${id}`)
+      const response = await fetch(`/api/events/event-report/${id}`)
 
       if (!response.ok) {
         throw new Error(`Error fetching booking: ${response.statusText}`)
@@ -186,7 +186,7 @@ export function useEventBookings(hotelId?: string) {
   const updateBookingStatus = async (id: string, status: string, notes?: string) => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/events/bookings/${id}/status`, {
+      const response = await fetch(`/api/events/event-report/${id}/status`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -233,7 +233,7 @@ export function useEventBookings(hotelId?: string) {
   ) => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/events/bookings/${id}/payments`, {
+      const response = await fetch(`/api/events/event-report/${id}/payments`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -280,7 +280,7 @@ export function useEventBookings(hotelId?: string) {
   ) => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/events/bookings/${id}/confirm`, {
+      const response = await fetch(`/api/events/event-report/${id}/confirm`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -324,7 +324,7 @@ export function useEventBookings(hotelId?: string) {
   const cancelBooking = async (id: string, reason: string, refundAmount?: number) => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/events/bookings/${id}/cancel`, {
+      const response = await fetch(`/api/events/event-report/${id}/cancel`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -96,7 +96,7 @@ export function useEventReports(hotelId?: string) {
       if (endDate) params.append("end_date", endDate.toISOString())
       params.append("group_by", groupBy)
 
-      const response = await request<RevenueReport>(`/events/reports/revenue?${params.toString()}`, "GET")
+      const response = await request<RevenueReport>(`/events/event-report/revenue?${params.toString()}`, "GET")
 
       if (response.error) {
         setError(response.error)
@@ -133,7 +133,7 @@ export function useEventReports(hotelId?: string) {
       if (startDate) params.append("start_date", startDate.toISOString())
       if (endDate) params.append("end_date", endDate.toISOString())
 
-      const response = await request<EventTypeReport>(`/events/reports/event-types?${params.toString()}`, "GET")
+      const response = await request<EventTypeReport>(`/events/event-report/event-types?${params.toString()}`, "GET")
 
       if (response.error) {
         setError(response.error)
@@ -170,7 +170,7 @@ export function useEventReports(hotelId?: string) {
       if (startDate) params.append("start_date", startDate.toISOString())
       if (endDate) params.append("end_date", endDate.toISOString())
 
-      const response = await request<VenueUtilizationReport>(`/events/reports/venues?${params.toString()}`, "GET")
+      const response = await request<VenueUtilizationReport>(`/events/event-report/venues?${params.toString()}`, "GET")
 
       if (response.error) {
         setError(response.error)
@@ -207,7 +207,7 @@ export function useEventReports(hotelId?: string) {
       if (startDate) params.append("start_date", startDate.toISOString())
       if (endDate) params.append("end_date", endDate.toISOString())
 
-      const response = await request<ServicePopularityReport>(`/events/reports/services?${params.toString()}`, "GET")
+      const response = await request<ServicePopularityReport>(`/events/event-report/services?${params.toString()}`, "GET")
 
       if (response.error) {
         setError(response.error)
@@ -244,7 +244,7 @@ export function useEventReports(hotelId?: string) {
       if (startDate) params.append("start_date", startDate.toISOString())
       if (endDate) params.append("end_date", endDate.toISOString())
 
-      const response = await request<FeedbackReport>(`/events/reports/feedback?${params.toString()}`, "GET")
+      const response = await request<FeedbackReport>(`/events/event-report/feedback?${params.toString()}`, "GET")
 
       if (response.error) {
         setError(response.error)
@@ -302,7 +302,7 @@ export function useEventReports(hotelId?: string) {
         limit,
       }
 
-      const response = await request<any>(`/events/reports/custom`, "POST", requestBody)
+      const response = await request<any>(`/events/event-report/custom`, "POST", requestBody)
 
       if (response.error) {
         setError(response.error)

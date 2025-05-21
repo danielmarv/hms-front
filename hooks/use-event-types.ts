@@ -14,7 +14,7 @@ export function useEventTypes(hotelId?: string) {
   const fetchEventTypes = useCallback(async () => {
     try {
       setLoading(true)
-      const endpoint = hotelId ? `/events/types?hotel_id=${hotelId}` : "/events/types"
+      const endpoint = hotelId ? `/events/event-types?hotel_id=${hotelId}` : "/events/event-types"
       const response = await request<{ event_types: EventType[] }>(endpoint, "GET")
 
       if (response.error) {
@@ -43,7 +43,7 @@ export function useEventTypes(hotelId?: string) {
   const createEventType = async (eventTypeData: Partial<EventType>) => {
     try {
       setLoading(true)
-      const response = await request<{ event_type: EventType }>("/events/types", "POST", eventTypeData)
+      const response = await request<{ event_type: EventType }>("/events/event-types", "POST", eventTypeData)
 
       if (response.error) {
         throw new Error(response.error)
@@ -71,7 +71,7 @@ export function useEventTypes(hotelId?: string) {
   const updateEventType = async (id: string, eventTypeData: Partial<EventType>) => {
     try {
       setLoading(true)
-      const response = await request<{ event_type: EventType }>(`/events/types/${id}`, "PUT", eventTypeData)
+      const response = await request<{ event_type: EventType }>(`/events/event-types/${id}`, "PUT", eventTypeData)
 
       if (response.error) {
         throw new Error(response.error)
@@ -104,7 +104,7 @@ export function useEventTypes(hotelId?: string) {
   const deleteEventType = async (id: string) => {
     try {
       setLoading(true)
-      const response = await request<{ success: boolean }>(`/events/types/${id}`, "DELETE")
+      const response = await request<{ success: boolean }>(`/events/event-types/${id}`, "DELETE")
 
       if (response.error) {
         throw new Error(response.error)
@@ -127,7 +127,7 @@ export function useEventTypes(hotelId?: string) {
   const getEventType = async (id: string) => {
     try {
       setLoading(true)
-      const response = await request<{ event_type: EventType }>(`/events/types/${id}`, "GET")
+      const response = await request<{ event_type: EventType }>(`/events/event-types/${id}`, "GET")
 
       if (response.error) {
         throw new Error(response.error)

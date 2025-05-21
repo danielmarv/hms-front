@@ -37,7 +37,7 @@ export function useEventCalendar(hotelId?: string) {
       if (eventTypeId) params.append("event_type_id", eventTypeId)
       if (status) params.append("status", status)
 
-      const response = await request<CalendarEvent[]>(`/events/calendar?${params.toString()}`, "GET")
+      const response = await request<CalendarEvent[]>(`/events/event-calendar?${params.toString()}`, "GET")
 
       if (response.error) {
         setError(response.error)
@@ -75,7 +75,7 @@ export function useEventCalendar(hotelId?: string) {
         events: any[]
         start_date: string
         end_date: string
-      }>(`/events/calendar/month/${year}/${month}?${params.toString()}`, "GET")
+      }>(`/events/event-calendar/month/${year}/${month}?${params.toString()}`, "GET")
 
       if (response.error) {
         setError(response.error)
@@ -117,7 +117,7 @@ export function useEventCalendar(hotelId?: string) {
         events: any[]
         start_date: string
         end_date: string
-      }>(`/events/calendar/week/${year}/${week}?${params.toString()}`, "GET")
+      }>(`/events/event-calendar/week/${year}/${week}?${params.toString()}`, "GET")
 
       if (response.error) {
         setError(response.error)
@@ -158,7 +158,7 @@ export function useEventCalendar(hotelId?: string) {
       const response = await request<{
         events: any[]
         date: string
-      }>(`/events/calendar/day/${year}/${month}/${day}?${params.toString()}`, "GET")
+      }>(`/events/event-calendar/day/${year}/${month}/${day}?${params.toString()}`, "GET")
 
       if (response.error) {
         setError(response.error)
@@ -191,7 +191,7 @@ export function useEventCalendar(hotelId?: string) {
       const response = await request<{
         available: boolean
         conflicting_events?: any[]
-      }>("/events/calendar/check-availability", "POST", {
+      }>("/events/event-calendar/check-availability", "POST", {
         venue_id: venueId,
         start_date: startDate.toISOString(),
         end_date: endDate.toISOString(),
@@ -223,7 +223,7 @@ export function useEventCalendar(hotelId?: string) {
           start: string
           end: string
         }
-      }>(`/events/calendar/venue/${venueId}?${params.toString()}`, "GET")
+      }>(`/events/event-calendar/venue/${venueId}?${params.toString()}`, "GET")
 
       if (response.error) {
         setError(response.error)
