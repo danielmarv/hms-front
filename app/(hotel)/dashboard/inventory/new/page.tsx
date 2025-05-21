@@ -51,7 +51,6 @@ export default function NewInventoryItemPage() {
   const [suppliers, setSuppliers] = useState<any[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Initialize form
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -80,8 +79,8 @@ export default function NewInventoryItemPage() {
     const fetchSuppliers = async () => {
       try {
         const response = await request<{ data: any[] }>("/suppliers?limit=100")
-        if (response.data?.data) {
-          setSuppliers(response.data.data)
+        if (response.data) {
+          setSuppliers(response.data)
         }
       } catch (error) {
         console.error("Failed to fetch suppliers:", error)
@@ -111,7 +110,6 @@ export default function NewInventoryItemPage() {
     }
   }
 
-  // Categories from backend schema
   const categories = [
     "Food",
     "Beverage",
