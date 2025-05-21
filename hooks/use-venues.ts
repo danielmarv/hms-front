@@ -14,7 +14,7 @@ export function useVenues(hotelId?: string) {
   const fetchVenues = useCallback(async () => {
     try {
       setLoading(true)
-      const endpoint = hotelId ? `/events/venues?hotel_id=${hotelId}` : "/events/venues"
+      const endpoint = hotelId ? `/events/event-venues?hotel_id=${hotelId}` : "/events/event-venues"
       const response = await request<{ venues: Venue[] }>(endpoint, "GET")
 
       if (response.error) {
@@ -43,7 +43,7 @@ export function useVenues(hotelId?: string) {
   const createVenue = async (venueData: Partial<Venue>) => {
     try {
       setLoading(true)
-      const response = await request<{ venue: Venue }>("/events/venues", "POST", venueData)
+      const response = await request<{ venue: Venue }>("/events/event-venues", "POST", venueData)
 
       if (response.error) {
         throw new Error(response.error)
@@ -71,7 +71,7 @@ export function useVenues(hotelId?: string) {
   const updateVenue = async (id: string, venueData: Partial<Venue>) => {
     try {
       setLoading(true)
-      const response = await request<{ venue: Venue }>(`/events/venues/${id}`, "PUT", venueData)
+      const response = await request<{ venue: Venue }>(`/events/event-venues/${id}`, "PUT", venueData)
 
       if (response.error) {
         throw new Error(response.error)
@@ -102,7 +102,7 @@ export function useVenues(hotelId?: string) {
   const deleteVenue = async (id: string) => {
     try {
       setLoading(true)
-      const response = await request<{ success: boolean }>(`/events/venues/${id}`, "DELETE")
+      const response = await request<{ success: boolean }>(`/events/event-venues/${id}`, "DELETE")
 
       if (response.error) {
         throw new Error(response.error)
@@ -125,7 +125,7 @@ export function useVenues(hotelId?: string) {
   const getVenue = async (id: string) => {
     try {
       setLoading(true)
-      const response = await request<{ venue: Venue }>(`/events/venues/${id}`, "GET")
+      const response = await request<{ venue: Venue }>(`/events/event-venues/${id}`, "GET")
 
       if (response.error) {
         throw new Error(response.error)
@@ -151,7 +151,7 @@ export function useVenues(hotelId?: string) {
     try {
       setLoading(true)
       const response = await request<{ available: boolean; conflicts?: any[] }>(
-        `/events/venues/${venueId}/availability?start_date=${startDate.toISOString()}&end_date=${endDate.toISOString()}`,
+        `/events/event-venues/${venueId}/availability?start_date=${startDate.toISOString()}&end_date=${endDate.toISOString()}`,
         "GET",
       )
 
