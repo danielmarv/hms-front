@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+// import { useRouter } from "next/navigation"
 import { Plus, Search, ArrowUpDown, Trash2, Edit, Eye, FileText, ToggleLeft, ToggleRight } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -45,7 +45,6 @@ import {
 import { useSuppliers } from "@/hooks/use-suppliers"
 
 export default function SuppliersPage() {
-  const router = useRouter()
   const { suppliers, pagination, totalSuppliers, loading, error, getSuppliers, deleteSupplier, toggleSupplierStatus } =
     useSuppliers()
   console.log("Suppliers:", suppliers)
