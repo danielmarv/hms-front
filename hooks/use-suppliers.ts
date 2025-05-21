@@ -1,74 +1,109 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import { useApi, type ApiResponse } from "./use-api"
+import { useApi } from "./use-api"
+import { toast } from "sonner"
+
+export type SupplierDocument = {
+  _id: string
+  name: string
+  url: string
+  type: string
+  uploaded_at: string
+}
 
 export type Supplier = {
-  id: string
+  _id: string
   name: string
-  contactPerson: string
-  email: string
-  phone: string
-  address: string
-  city: string
-  state: string
-  country: string
-  postalCode: string
-  taxId?: string
-  paymentTerms?: string
+  code?: string
+  contact_person?: string
+  phone?: string
+  alternative_phone?: string
+  email?: string
+  website?: string
+  address?: {
+    street?: string
+    city?: string
+    state?: string
+    postal_code?: string
+    country?: string
+  }
+  supplies?: string[]
+  categories?: string[]
+  tax_id?: string
+  payment_terms?: string
+  credit_limit?: number
+  currency?: string
+  bank_details?: {
+    bank_name?: string
+    account_number?: string
+    account_name?: string
+    swift_code?: string
+  }
   notes?: string
-  category?: string
   rating?: number
-  isActive: boolean
+  is_active: boolean
+  lead_time?: number
+  minimum_order?: number
   documents?: SupplierDocument[]
   createdAt: string
   updatedAt: string
+  createdBy?: string
+  updatedBy?: string
 }
 
-export type SupplierDocument = {
-  id: string
-  name: string
-  type: string
-  url: string
-  uploadedAt: string
+export type SupplierFilters = {
+  search?: string
+  category?: string
+  isActive?: boolean
+  page?: number
+  limit?: number
+  sort?: string
 }
 
 export type PaginationData = {
-  currentPage: number
-  totalPages: number
+  page: number
   limit: number
+  totalPages: number
 }
 
 export function useSuppliers() {
   const { request, isLoading } = useApi()
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [supplier, setSupplier] = useState<Supplier | null>(null)
+  const [supplierItems, setSupplierItems] = useState<any[]>([])
   const [error, setError] = useState<string | null>(null)
   const [pagination, setPagination] = useState<PaginationData>({
-    currentPage: 1,
+    page: 1,
+    limit: 20,
     totalPages: 1,
-    limit: 10,
   })
   const [totalSuppliers, setTotalSuppliers] = useState(0)
 
-  const fetchSuppliers = useCallback(
-    async (page = 1, limit = 10, search = "", category = "", isActive = "") => {
-      let queryParams = `?page=${page}&limit=${limit}`
+  // Get all suppliers with filtering, pagination, and sorting
+  const getSuppliers = useCallback(
+    async (filters: SupplierFilters = {}) => {
+      const { search, category, isActive, page = 1, limit = 20, sort = "name" } = filters
+
+      let queryParams = `?page=${page}&limit=${limit}&sort=${sort}`
       if (search) queryParams += `&search=${encodeURIComponent(search)}`
       if (category) queryParams += `&category=${encodeURIComponent(category)}`
-      if (isActive) queryParams += `&isActive=${encodeURIComponent(isActive)}`
+      if (isActive !== undefined) queryParams += `&isActive=${isActive}`
 
       const response = await request<{
-        suppliers: Supplier[]
+        data: Supplier[]
+        count: number
+        total: number
         pagination: PaginationData
-        totalSuppliers: number
       }>(`/suppliers${queryParams}`)
 
       if (response.data) {
-        setSuppliers(response.data.suppliers)
+        setSuppliers(response.data.data)
         setPagination(response.data.pagination)
-        setTotalSuppliers(response.data.totalSuppliers)
+        setTotalSuppliers(response.data.total)
+        setError(null)
       } else {
-        setError(response.error)
+        setError(response.error || "Failed to fetch suppliers")
       }
 
       return response
@@ -76,109 +111,199 @@ export function useSuppliers() {
     [request],
   )
 
-  // Add the missing getSupplierById method
+  // Get supplier by ID
   const getSupplierById = useCallback(
-    async (id: string): Promise<ApiResponse<Supplier>> => {
-      return await request<Supplier>(`/suppliers/${id}`)
+    async (id: string) => {
+      const response = await request<{ data: Supplier }>(`/suppliers/${id}`)
+
+      if (response.data) {
+        setSupplier(response.data.data)
+        setError(null)
+      } else {
+        setError(response.error || "Failed to fetch supplier")
+      }
+
+      return response
     },
     [request],
   )
 
-  const createSupplier = useCallback(
-    async (supplierData: Omit<Supplier, "id" | "createdAt" | "updatedAt" | "documents">) => {
-      const response = await request<Supplier>("/suppliers", "POST", supplierData)
+  // Get supplier items
+  const getSupplierItems = useCallback(
+    async (id: string) => {
+      const response = await request<{ data: any[] }>(`/suppliers/${id}/items`)
+
       if (response.data) {
-        // Refresh the suppliers list after creating a new supplier
-        fetchSuppliers(pagination.currentPage, pagination.limit)
+        setSupplierItems(response.data.data)
+        setError(null)
+      } else {
+        setError(response.error || "Failed to fetch supplier items")
       }
+
       return response
     },
-    [request, fetchSuppliers, pagination],
+    [request],
   )
 
+  // Create new supplier
+  const createSupplier = useCallback(
+    async (supplierData: Partial<Supplier>) => {
+      const response = await request<{ data: Supplier }>("/suppliers", "POST", supplierData)
+
+      if (response.data) {
+        toast.success("Supplier created successfully")
+        setError(null)
+      } else {
+        setError(response.error || "Failed to create supplier")
+      }
+
+      return response
+    },
+    [request],
+  )
+
+  // Update supplier
   const updateSupplier = useCallback(
     async (id: string, supplierData: Partial<Supplier>) => {
-      const response = await request<Supplier>(`/suppliers/${id}`, "PUT", supplierData)
+      const response = await request<{ data: Supplier }>(`/suppliers/${id}`, "PUT", supplierData)
+
       if (response.data) {
-        // Update the local state with the updated supplier
-        setSuppliers((prevSuppliers) =>
-          prevSuppliers.map((supplier) => (supplier.id === id ? { ...supplier, ...response.data } : supplier)),
-        )
+        setSupplier(response.data.data)
+        toast.success("Supplier updated successfully")
+        setError(null)
+      } else {
+        setError(response.error || "Failed to update supplier")
       }
+
       return response
     },
     [request],
   )
 
+  // Delete supplier
   const deleteSupplier = useCallback(
     async (id: string) => {
-      const response = await request<{ success: boolean }>(`/suppliers/${id}`, "DELETE")
+      const response = await request<{ success: boolean; message: string }>(`/suppliers/${id}`, "DELETE")
+
       if (response.data?.success) {
-        // Remove the deleted supplier from the local state
-        setSuppliers((prevSuppliers) => prevSuppliers.filter((supplier) => supplier.id !== id))
-        setTotalSuppliers((prev) => prev - 1)
+        toast.success(response.data.message || "Supplier deleted successfully")
+        setError(null)
+        return true
+      } else {
+        setError(response.error || "Failed to delete supplier")
+        return false
       }
-      return response
     },
     [request],
   )
 
-  const uploadSupplierDocument = useCallback(async (id: string, file: File, documentType: string) => {
-    // Create a FormData object to send the file
-    const formData = new FormData()
-    formData.append("file", file)
-    formData.append("type", documentType)
+  // Toggle supplier active status
+  const toggleSupplierStatus = useCallback(
+    async (id: string) => {
+      const response = await request<{ success: boolean; message: string; data: { is_active: boolean } }>(
+        `/suppliers/${id}/toggle-status`,
+        "PATCH",
+      )
 
-    // Custom fetch for file upload since our useApi doesn't handle FormData
-    const token = localStorage.getItem("accessToken") || ""
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
+      if (response.data?.success) {
+        toast.success(response.data.message)
 
-    try {
-      const response = await fetch(`${API_URL}/suppliers/${id}/documents`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      })
+        // Update local state
+        setSuppliers((prevSuppliers) =>
+          prevSuppliers.map((s) => (s._id === id ? { ...s, is_active: response.data!.data.is_active } : s)),
+        )
 
-      const data = await response.json()
+        if (supplier && supplier._id === id) {
+          setSupplier({ ...supplier, is_active: response.data.data.is_active })
+        }
 
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to upload document")
+        setError(null)
+        return true
+      } else {
+        setError(response.error || "Failed to toggle supplier status")
+        return false
       }
+    },
+    [request, supplier],
+  )
 
-      return { data: data, error: null, isLoading: false }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to upload document"
-      return { data: null, error: errorMessage, isLoading: false }
-    }
-  }, [])
+  // Add document to supplier
+  const addSupplierDocument = useCallback(
+    async (id: string, document: { name: string; url: string; type: string }) => {
+      const response = await request<{ success: boolean; message: string; data: SupplierDocument }>(
+        `/suppliers/${id}/documents`,
+        "POST",
+        document,
+      )
 
+      if (response.data?.success) {
+        toast.success(response.data.message || "Document added successfully")
+
+        // Update local state if we have the supplier loaded
+        if (supplier && supplier._id === id) {
+          const updatedDocuments = [...(supplier.documents || []), response.data.data]
+          setSupplier({ ...supplier, documents: updatedDocuments })
+        }
+
+        setError(null)
+        return true
+      } else {
+        setError(response.error || "Failed to add document")
+        return false
+      }
+    },
+    [request, supplier],
+  )
+
+  // Remove document from supplier
   const removeSupplierDocument = useCallback(
     async (id: string, documentId: string) => {
-      return await request<{ success: boolean }>(`/suppliers/${id}/documents/${documentId}`, "DELETE")
+      const response = await request<{ success: boolean; message: string }>(
+        `/suppliers/${id}/documents/${documentId}`,
+        "DELETE",
+      )
+
+      if (response.data?.success) {
+        toast.success(response.data.message || "Document removed successfully")
+
+        // Update local state if we have the supplier loaded
+        if (supplier && supplier._id === id && supplier.documents) {
+          const updatedDocuments = supplier.documents.filter((doc) => doc._id !== documentId)
+          setSupplier({ ...supplier, documents: updatedDocuments })
+        }
+
+        setError(null)
+        return true
+      } else {
+        setError(response.error || "Failed to remove document")
+        return false
+      }
     },
-    [request],
+    [request, supplier],
   )
 
-  const getSupplierCategories = useCallback(async () => {
-    return await request<string[]>("/suppliers/categories")
-  }, [request])
+  // Clear current supplier
+  const clearSupplier = useCallback(() => {
+    setSupplier(null)
+  }, [])
 
   return {
     suppliers,
-    loading: isLoading,
-    error,
+    supplier,
+    supplierItems,
     pagination,
     totalSuppliers,
-    fetchSuppliers,
+    loading: isLoading,
+    error,
+    getSuppliers,
     getSupplierById,
+    getSupplierItems,
     createSupplier,
     updateSupplier,
     deleteSupplier,
-    uploadSupplierDocument,
+    toggleSupplierStatus,
+    addSupplierDocument,
     removeSupplierDocument,
-    getSupplierCategories,
+    clearSupplier,
   }
 }
