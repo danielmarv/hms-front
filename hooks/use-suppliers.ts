@@ -50,6 +50,7 @@ export type Supplier = {
   updatedAt: string
   createdBy?: string
   updatedBy?: string
+  __v?: number
 }
 
 export type SupplierFilters = {
@@ -81,6 +82,7 @@ export function useSuppliers() {
   const [totalSuppliers, setTotalSuppliers] = useState(0)
 
   // Get all suppliers with filtering, pagination, and sorting
+  // Updated getSuppliers function to match the actual API response format
   const getSuppliers = useCallback(
     async (filters: SupplierFilters = {}) => {
       const { search, category, isActive, page = 1, limit = 20, sort = "name" } = filters
@@ -91,14 +93,16 @@ export function useSuppliers() {
       if (isActive !== undefined) queryParams += `&isActive=${isActive}`
 
       const response = await request<{
-        data: Supplier[]
+        success: boolean
         count: number
         total: number
         pagination: PaginationData
+        data: []
       }>(`/suppliers${queryParams}`)
 
+      console.log("Suppliers response:", response)
       if (response.data) {
-        setSuppliers(response.data.data)
+        setSuppliers(response.data)
         setPagination(response.data.pagination)
         setTotalSuppliers(response.data.total)
         setError(null)

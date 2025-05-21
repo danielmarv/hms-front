@@ -48,6 +48,7 @@ export default function SuppliersPage() {
   const router = useRouter()
   const { suppliers, pagination, totalSuppliers, loading, error, getSuppliers, deleteSupplier, toggleSupplierStatus } =
     useSuppliers()
+  console.log("Suppliers:", suppliers)
 
   const [search, setSearch] = useState("")
   const [category, setCategory] = useState("")
