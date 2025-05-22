@@ -1,480 +1,687 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
-import { useRestaurantOrders } from "@/hooks/use-restaurant-orders"
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { useMenuItems } from "@/hooks/use-menu-items"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
-import { Pagination } from "@/components/ui/pagination"
-import { Skeleton } from "@/components/ui/skeleton"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { PlusCircle, Search, ChevronLeft, ChevronRight, User, MapPin } from "lucide-react"
+import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
-import { DateRangePicker } from "@/components/ui/date-range-picker"
-import { format } from "date-fns"
-import type { Order } from "@/types"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm } from "react-hook-form"
+import * as z from "zod"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 
-const ORDER_STATUS_COLORS: Record<string, string> = {
-  New: "bg-blue-100 text-blue-800",
-  Preparing: "bg-yellow-100 text-yellow-800",
-  Ready: "bg-green-100 text-green-800",
-  Served: "bg-purple-100 text-purple-800",
-  Completed: "bg-green-100 text-green-800",
-  Cancelled: "bg-red-100 text-red-800",
-}
+const menuItemSchema = z.object({
+  name: z.string().min(2, { message: "Name must be at least 2 characters" }),
+  description: z.string().min(5, { message: "Description must be at least 5 characters" }),
+  price: z.coerce.number().min(0, { message: "Price must be a positive number" }),
+  cost: z.coerce.number().min(0, { message: "Cost must be a positive number" }),
+  category: z.string().min(1, { message: "Category is required" }),
+  subcategory: z.string().optional(),
+  imageUrl: z.string().optional(),
+  availability: z.boolean().default(true),
+  preparationTime: z.coerce.number().min(1, { message: "Preparation time must be at least 1 minute" }),
+  isVegetarian: z.boolean().default(false),
+  isVegan: z.boolean().default(false),
+  isGlutenFree: z.boolean().default(false),
+  allergens: z.array(z.string()).optional(),
+  spicyLevel: z.coerce.number().min(0).max(5).optional(),
+  calories: z.coerce.number().min(0).optional(),
+  ingredients: z.array(z.string()).optional(),
+  tags: z.array(z.string()).optional(),
+  featured: z.boolean().default(false),
+  menuSections: z.array(z.string()).optional(),
+  availableDays: z.array(z.string()).optional(),
+  availableTimeStart: z.string().optional(),
+  availableTimeEnd: z.string().optional(),
+  discountPercentage: z.coerce.number().min(0).max(100).optional(),
+  isDiscounted: z.boolean().default(false),
+})
 
-const PAYMENT_STATUS_COLORS: Record<string, string> = {
-  Pending: "bg-yellow-100 text-yellow-800",
-  Paid: "bg-green-100 text-green-800",
-  Refunded: "bg-blue-100 text-blue-800",
-  Failed: "bg-red-100 text-red-800",
-}
+type MenuItemFormValues = z.infer<typeof menuItemSchema>
 
-export default function OrdersPage() {
-  const { getOrders, updateOrderStatus, updatePaymentStatus, loading: apiLoading } = useRestaurantOrders()
-  const [orders, setOrders] = useState<Order[]>([])
-  const [totalOrders, setTotalOrders] = useState(0)
-  const [currentPage, setCurrentPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
-  const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState("all")
-  const [searchQuery, setSearchQuery] = useState("")
-  const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({})
-  const [filters, setFilters] = useState({
-    page: 1,
-    limit: 10,
-    sort: "-orderedAt",
+const CATEGORIES = [
+  "Appetizers",
+  "Soups",
+  "Salads",
+  "Main Courses",
+  "Sides",
+  "Desserts",
+  "Beverages",
+  "Breakfast",
+  "Lunch",
+  "Dinner",
+  "Specials",
+]
+
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+const MENU_SECTIONS = ["Breakfast Menu", "Lunch Menu", "Dinner Menu", "Kids Menu", "Specials", "Seasonal"]
+
+const ALLERGENS = [
+  "Dairy",
+  "Eggs",
+  "Fish",
+  "Shellfish",
+  "Tree Nuts",
+  "Peanuts",
+  "Wheat",
+  "Soy",
+  "Sesame",
+  "Gluten",
+  "Mustard",
+  "Celery",
+  "Lupin",
+  "Molluscs",
+  "Sulphites",
+]
+
+export default function NewMenuItemPage() {
+  const router = useRouter()
+  const { createMenuItem, loading } = useMenuItems()
+  const [ingredients, setIngredients] = useState<string[]>([])
+  const [newIngredient, setNewIngredient] = useState("")
+  const [tags, setTags] = useState<string[]>([])
+  const [newTag, setNewTag] = useState("")
+
+  const form = useForm<MenuItemFormValues>({
+    resolver: zodResolver(menuItemSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      price: 0,
+      cost: 0,
+      category: "",
+      subcategory: "",
+      imageUrl: "",
+      availability: true,
+      preparationTime: 15,
+      isVegetarian: false,
+      isVegan: false,
+      isGlutenFree: false,
+      allergens: [],
+      spicyLevel: 0,
+      calories: 0,
+      ingredients: [],
+      tags: [],
+      featured: false,
+      menuSections: [],
+      availableDays: DAYS,
+      availableTimeStart: "06:00",
+      availableTimeEnd: "22:00",
+      discountPercentage: 0,
+      isDiscounted: false,
+    },
   })
 
-  useEffect(() => {
-    fetchOrders()
-  }, [filters])
-
-  const fetchOrders = async () => {
-    setLoading(true)
-    try {
-      const result = await getOrders(filters)
-
-      if (result && result.success && result.data) {
-        setOrders(result.data)
-        setTotalOrders(result.total || 0)
-
-        if (result.pagination) {
-          setTotalPages(result.pagination.totalPages || 1)
-          setCurrentPage(result.pagination.page || 1)
-        } else {
-          setTotalPages(1)
-          setCurrentPage(1)
-        }
-      } else {
-        setOrders([])
-        setTotalOrders(0)
-        setTotalPages(1)
-        setCurrentPage(1)
-      }
-    } catch (error) {
-      console.error("Error fetching orders:", error)
-      setOrders([])
-      setTotalOrders(0)
-      setTotalPages(1)
-      setCurrentPage(1)
-    } finally {
-      setLoading(false)
+  const addIngredient = () => {
+    if (newIngredient.trim() !== "") {
+      setIngredients([...ingredients, newIngredient.trim()])
+      setNewIngredient("")
     }
   }
 
-  const handleTabChange = (value: string) => {
-    setActiveTab(value)
-    setFilters((prev) => ({
-      ...prev,
-      orderStatus: value === "all" ? undefined : value,
-      page: 1,
-    }))
+  const removeIngredient = (index: number) => {
+    setIngredients(ingredients.filter((_, i) => i !== index))
   }
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    // For simplicity, we're just searching by order number
-    setFilters((prev) => ({
-      ...prev,
-      search: searchQuery,
-      page: 1,
-    }))
+  const addTag = () => {
+    if (newTag.trim() !== "") {
+      setTags([...tags, newTag.trim()])
+      setNewTag("")
+    }
   }
 
-  const handleDateRangeChange = (range: { from?: Date; to?: Date }) => {
-    setDateRange(range)
-    setFilters((prev) => ({
-      ...prev,
-      startDate: range.from ? format(range.from, "yyyy-MM-dd") : undefined,
-      endDate: range.to ? format(range.to, "yyyy-MM-dd") : undefined,
-      page: 1,
-    }))
+  const removeTag = (index: number) => {
+    setTags(tags.filter((_, i) => i !== index))
   }
 
-  const handleOrderTypeChange = (value: string) => {
-    setFilters((prev) => ({
-      ...prev,
-      orderType: value === "all" ? undefined : value,
-      page: 1,
-    }))
-  }
+  const onSubmit = async (data: MenuItemFormValues) => {
+    // Add the ingredients and tags to the form data
+    data.ingredients = ingredients
+    data.tags = tags
 
-  const handlePaymentStatusChange = (value: string) => {
-    setFilters((prev) => ({
-      ...prev,
-      paymentStatus: value === "all" ? undefined : value,
-      page: 1,
-    }))
-  }
-
-  const handlePageChange = (page: number) => {
-    setFilters((prev) => ({
-      ...prev,
-      page,
-    }))
-  }
-
-  const handleUpdateOrderStatus = async (id: string, status: string) => {
-    const result = await updateOrderStatus(id, status)
+    const result = await createMenuItem(data)
     if (result) {
-      fetchOrders()
+      router.push("/dashboard/menu")
     }
   }
-
-  const handleUpdatePaymentStatus = async (id: string, status: string) => {
-    const result = await updatePaymentStatus(id, status)
-    if (result) {
-      fetchOrders()
-    }
-  }
-
-  const isLoading = loading || apiLoading
 
   return (
     <div className="container mx-auto p-6">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">Order Management</h1>
-          <p className="text-muted-foreground">Manage customer orders and track status</p>
-        </div>
-        <Link href="/dashboard/orders/new">
-          <Button>
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Create Order
-          </Button>
-        </Link>
-      </div>
+      <Link href="/dashboard/menu">
+        <Button variant="outline" className="mb-6">
+          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Menu
+        </Button>
+      </Link>
 
-      <Tabs defaultValue="all" value={activeTab} onValueChange={handleTabChange} className="mb-6">
-        <TabsList className="grid grid-cols-6 w-full max-w-3xl">
-          <TabsTrigger value="all">All Orders</TabsTrigger>
-          <TabsTrigger value="New">New</TabsTrigger>
-          <TabsTrigger value="Preparing">Preparing</TabsTrigger>
-          <TabsTrigger value="Ready">Ready</TabsTrigger>
-          <TabsTrigger value="Served">Served</TabsTrigger>
-          <TabsTrigger value="Completed">Completed</TabsTrigger>
-        </TabsList>
-      </Tabs>
+      <Card>
+        <CardHeader>
+          <CardTitle>Add New Menu Item</CardTitle>
+          <CardDescription>Create a new dish or beverage for your restaurant menu</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-6">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Item Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g. Grilled Salmon" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <form onSubmit={handleSearch} className="flex w-full max-w-sm items-center space-x-2">
-          <Input
-            type="search"
-            placeholder="Search order number..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-          <Button type="submit">
-            <Search className="h-4 w-4" />
-          </Button>
-        </form>
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description</FormLabel>
+                        <FormControl>
+                          <Textarea placeholder="Describe the dish, flavors, and preparation method" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-        <div className="flex flex-1 gap-2 flex-wrap">
-          <DateRangePicker value={dateRange} onChange={handleDateRangeChange} />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="price"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Price ($)</FormLabel>
+                          <FormControl>
+                            <Input type="number" min="0" step="0.01" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-          <Select defaultValue="all" onValueChange={handleOrderTypeChange}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="Order Type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="Dine In">Dine In</SelectItem>
-              <SelectItem value="Takeaway">Takeaway</SelectItem>
-              <SelectItem value="Delivery">Delivery</SelectItem>
-              <SelectItem value="Room Service">Room Service</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select defaultValue="all" onValueChange={handlePaymentStatusChange}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="Payment Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Payments</SelectItem>
-              <SelectItem value="Pending">Pending</SelectItem>
-              <SelectItem value="Paid">Paid</SelectItem>
-              <SelectItem value="Refunded">Refunded</SelectItem>
-              <SelectItem value="Failed">Failed</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {isLoading ? (
-        <div className="space-y-4">
-          {Array(5)
-            .fill(0)
-            .map((_, i) => (
-              <Card key={i}>
-                <CardHeader className="pb-2">
-                  <Skeleton className="h-6 w-1/4" />
-                  <Skeleton className="h-4 w-1/3" />
-                </CardHeader>
-                <CardContent>
-                  <div className="flex justify-between">
-                    <div className="space-y-2">
-                      <Skeleton className="h-4 w-24" />
-                      <Skeleton className="h-4 w-32" />
-                    </div>
-                    <div className="space-y-2">
-                      <Skeleton className="h-4 w-24" />
-                      <Skeleton className="h-4 w-32" />
-                    </div>
-                    <div className="space-y-2">
-                      <Skeleton className="h-4 w-24" />
-                      <Skeleton className="h-4 w-32" />
-                    </div>
-                    <div className="space-y-2">
-                      <Skeleton className="h-10 w-28" />
-                    </div>
+                    <FormField
+                      control={form.control}
+                      name="cost"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Cost ($)</FormLabel>
+                          <FormControl>
+                            <Input type="number" min="0" step="0.01" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-        </div>
-      ) : orders.length === 0 ? (
-        <Card className="p-8 text-center">
-          <div className="mb-4 flex justify-center">
-            <Search className="h-12 w-12 text-muted-foreground" />
-          </div>
-          <h3 className="text-lg font-semibold">No orders found</h3>
-          <p className="text-muted-foreground mt-2">
-            Try adjusting your search or filters to find what you're looking for.
-          </p>
-          <Button
-            className="mt-4"
-            onClick={() =>
-              setFilters({
-                page: 1,
-                limit: 10,
-                sort: "-orderedAt",
-              })
-            }
-          >
-            Reset Filters
-          </Button>
-        </Card>
-      ) : (
-        <>
-          <div className="space-y-4">
-            {orders.map((order) => (
-              <Card key={order._id}>
-                <CardHeader className="pb-2">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-lg">Order #{order.orderNumber}</CardTitle>
-                      <CardDescription>{new Date(order.orderedAt).toLocaleString()}</CardDescription>
-                    </div>
-                    <div className="flex gap-2">
-                      <Badge className={ORDER_STATUS_COLORS[order.orderStatus] || "bg-gray-100"}>
-                        {order.orderStatus}
-                      </Badge>
-                      <Badge className={PAYMENT_STATUS_COLORS[order.paymentStatus] || "bg-gray-100"}>
-                        {order.paymentStatus}
-                      </Badge>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap justify-between gap-4">
-                    <div>
-                      <p className="text-sm font-medium">Order Type</p>
-                      <p className="text-sm text-muted-foreground flex items-center mt-1">
-                        {order.orderType === "Delivery" ? (
-                          <MapPin className="mr-1 h-4 w-4" />
-                        ) : order.orderType === "Room Service" ? (
-                          <User className="mr-1 h-4 w-4" />
-                        ) : (
-                          <MapPin className="mr-1 h-4 w-4" />
-                        )}
-                        {order.orderType}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">Items</p>
-                      <p className="text-sm text-muted-foreground mt-1">{order.items.length} items</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">Total</p>
-                      <p className="text-sm font-bold text-green-600 mt-1">${order.totalAmount.toFixed(2)}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">Customer</p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {order.customerName || (order.guest && order.guest.full_name) || "Walk-in Customer"}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Link href={`/dashboard/orders/${order._id}`}>
-                        <Button variant="outline" size="sm">
-                          View Details
-                        </Button>
-                      </Link>
 
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button variant="outline" size="sm">
-                            Update Status
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Update Order Status</DialogTitle>
-                            <DialogDescription>Change the status for order #{order.orderNumber}</DialogDescription>
-                          </DialogHeader>
-                          <div className="grid gap-4 py-4">
-                            <div className="grid grid-cols-2 gap-2">
-                              <Button
-                                variant={order.orderStatus === "New" ? "default" : "outline"}
-                                onClick={() => handleUpdateOrderStatus(order._id, "New")}
-                              >
-                                New
-                              </Button>
-                              <Button
-                                variant={order.orderStatus === "Preparing" ? "default" : "outline"}
-                                onClick={() => handleUpdateOrderStatus(order._id, "Preparing")}
-                              >
-                                Preparing
-                              </Button>
-                              <Button
-                                variant={order.orderStatus === "Ready" ? "default" : "outline"}
-                                onClick={() => handleUpdateOrderStatus(order._id, "Ready")}
-                              >
-                                Ready
-                              </Button>
-                              <Button
-                                variant={order.orderStatus === "Served" ? "default" : "outline"}
-                                onClick={() => handleUpdateOrderStatus(order._id, "Served")}
-                              >
-                                Served
-                              </Button>
-                              <Button
-                                variant={order.orderStatus === "Completed" ? "default" : "outline"}
-                                onClick={() => handleUpdateOrderStatus(order._id, "Completed")}
-                              >
-                                Completed
-                              </Button>
-                              <Button
-                                variant={order.orderStatus === "Cancelled" ? "destructive" : "outline"}
-                                onClick={() => handleUpdateOrderStatus(order._id, "Cancelled")}
-                              >
-                                Cancelled
-                              </Button>
-                            </div>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
+                  <FormField
+                    control={form.control}
+                    name="category"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Category</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a category" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {CATEGORIES.map((category) => (
+                              <SelectItem key={category} value={category}>
+                                {category}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button variant="outline" size="sm">
-                            Payment
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Update Payment Status</DialogTitle>
-                            <DialogDescription>
-                              Change the payment status for order #{order.orderNumber}
-                            </DialogDescription>
-                          </DialogHeader>
-                          <div className="grid gap-4 py-4">
-                            <div className="grid grid-cols-2 gap-2">
-                              <Button
-                                variant={order.paymentStatus === "Pending" ? "default" : "outline"}
-                                onClick={() => handleUpdatePaymentStatus(order._id, "Pending")}
-                              >
-                                Pending
-                              </Button>
-                              <Button
-                                variant={order.paymentStatus === "Paid" ? "default" : "outline"}
-                                onClick={() => handleUpdatePaymentStatus(order._id, "Paid")}
-                              >
-                                Paid
-                              </Button>
-                              <Button
-                                variant={order.paymentStatus === "Refunded" ? "default" : "outline"}
-                                onClick={() => handleUpdatePaymentStatus(order._id, "Refunded")}
-                              >
-                                Refunded
-                              </Button>
-                              <Button
-                                variant={order.paymentStatus === "Failed" ? "destructive" : "outline"}
-                                onClick={() => handleUpdatePaymentStatus(order._id, "Failed")}
-                              >
-                                Failed
-                              </Button>
-                            </div>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  <FormField
+                    control={form.control}
+                    name="subcategory"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Subcategory (Optional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g. Pasta, Seafood, etc." {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-          {totalPages > 1 && (
-            <div className="flex justify-center mt-6">
-              <Pagination>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={currentPage === 1}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <div className="flex items-center mx-4">
-                  Page {currentPage} of {totalPages}
+                  <FormField
+                    control={form.control}
+                    name="preparationTime"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Preparation Time (minutes)</FormLabel>
+                        <FormControl>
+                          <Input type="number" min="1" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="imageUrl"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Image URL (Optional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="https://example.com/image.jpg" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                >
-                  <ChevronRight className="h-4 w-4" />
+
+                <div className="space-y-6">
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium">Dietary Information</h3>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="isVegetarian"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                            <FormControl>
+                              <input
+                                type="checkbox"
+                                checked={field.value}
+                                onChange={field.onChange}
+                                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                              <FormLabel>Vegetarian</FormLabel>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="isVegan"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                            <FormControl>
+                              <input
+                                type="checkbox"
+                                checked={field.value}
+                                onChange={field.onChange}
+                                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                              <FormLabel>Vegan</FormLabel>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <FormField
+                      control={form.control}
+                      name="isGlutenFree"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                          <FormControl>
+                            <input
+                              type="checkbox"
+                              checked={field.value}
+                              onChange={field.onChange}
+                              className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel>Gluten Free</FormLabel>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="allergens"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Allergens</FormLabel>
+                          <div className="space-y-2">
+                            <div className="grid grid-cols-2 gap-2">
+                              {ALLERGENS.map((allergen) => (
+                                <div key={allergen} className="flex items-center space-x-2">
+                                  <input
+                                    type="checkbox"
+                                    id={`allergen-${allergen}`}
+                                    checked={field.value?.includes(allergen) || false}
+                                    onChange={(e) => {
+                                      const currentAllergens = field.value || []
+                                      if (e.target.checked) {
+                                        field.onChange([...currentAllergens, allergen])
+                                      } else {
+                                        field.onChange(currentAllergens.filter((a) => a !== allergen))
+                                      }
+                                    }}
+                                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                  />
+                                  <label htmlFor={`allergen-${allergen}`} className="text-sm">
+                                    {allergen}
+                                  </label>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="spicyLevel"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Spicy Level (0-5)</FormLabel>
+                          <FormControl>
+                            <Input type="number" min="0" max="5" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="calories"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Calories (Optional)</FormLabel>
+                          <FormControl>
+                            <Input type="number" min="0" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-medium">Ingredients</h3>
+                      <div className="flex space-x-2">
+                        <Input
+                          value={newIngredient}
+                          onChange={(e) => setNewIngredient(e.target.value)}
+                          placeholder="Add ingredient"
+                          className="flex-1"
+                        />
+                        <Button type="button" onClick={addIngredient} variant="outline">
+                          Add
+                        </Button>
+                      </div>
+                      {ingredients.length > 0 && (
+                        <div className="mt-2 space-y-2">
+                          {ingredients.map((ingredient, index) => (
+                            <div key={index} className="flex items-center justify-between rounded-md border p-2">
+                              <span>{ingredient}</span>
+                              <Button type="button" onClick={() => removeIngredient(index)} variant="ghost" size="sm">
+                                Remove
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-medium">Tags</h3>
+                      <div className="flex space-x-2">
+                        <Input
+                          value={newTag}
+                          onChange={(e) => setNewTag(e.target.value)}
+                          placeholder="Add tag"
+                          className="flex-1"
+                        />
+                        <Button type="button" onClick={addTag} variant="outline">
+                          Add
+                        </Button>
+                      </div>
+                      {tags.length > 0 && (
+                        <div className="mt-2 space-y-2">
+                          {tags.map((tag, index) => (
+                            <div key={index} className="flex items-center justify-between rounded-md border p-2">
+                              <span>{tag}</span>
+                              <Button type="button" onClick={() => removeTag(index)} variant="ghost" size="sm">
+                                Remove
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <FormField
+                      control={form.control}
+                      name="featured"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                          <FormControl>
+                            <input
+                              type="checkbox"
+                              checked={field.value}
+                              onChange={field.onChange}
+                              className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel>Featured Item</FormLabel>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="menuSections"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Menu Sections</FormLabel>
+                          <div className="space-y-2">
+                            <div className="grid grid-cols-2 gap-2">
+                              {MENU_SECTIONS.map((section) => (
+                                <div key={section} className="flex items-center space-x-2">
+                                  <input
+                                    type="checkbox"
+                                    id={`section-${section}`}
+                                    checked={field.value?.includes(section) || false}
+                                    onChange={(e) => {
+                                      const currentSections = field.value || []
+                                      if (e.target.checked) {
+                                        field.onChange([...currentSections, section])
+                                      } else {
+                                        field.onChange(currentSections.filter((s) => s !== section))
+                                      }
+                                    }}
+                                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                  />
+                                  <label htmlFor={`section-${section}`} className="text-sm">
+                                    {section}
+                                  </label>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-medium">Availability</h3>
+                      <FormField
+                        control={form.control}
+                        name="availability"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                            <FormControl>
+                              <input
+                                type="checkbox"
+                                checked={field.value}
+                                onChange={field.onChange}
+                                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                              <FormLabel>Available</FormLabel>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="availableDays"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Available Days</FormLabel>
+                            <div className="space-y-2">
+                              <div className="grid grid-cols-2 gap-2">
+                                {DAYS.map((day) => (
+                                  <div key={day} className="flex items-center space-x-2">
+                                    <input
+                                      type="checkbox"
+                                      id={`day-${day}`}
+                                      checked={field.value?.includes(day) || false}
+                                      onChange={(e) => {
+                                        const currentDays = field.value || []
+                                        if (e.target.checked) {
+                                          field.onChange([...currentDays, day])
+                                        } else {
+                                          field.onChange(currentDays.filter((d) => d !== day))
+                                        }
+                                      }}
+                                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                    />
+                                    <label htmlFor={`day-${day}`} className="text-sm">
+                                      {day}
+                                    </label>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="availableTimeStart"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Available From</FormLabel>
+                              <FormControl>
+                                <Input type="time" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="availableTimeEnd"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Available Until</FormLabel>
+                              <FormControl>
+                                <Input type="time" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-medium">Discount</h3>
+                      <FormField
+                        control={form.control}
+                        name="isDiscounted"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                            <FormControl>
+                              <input
+                                type="checkbox"
+                                checked={field.value}
+                                onChange={field.onChange}
+                                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                              <FormLabel>Apply Discount</FormLabel>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="discountPercentage"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Discount Percentage (%)</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min="0"
+                                max="100"
+                                disabled={!form.watch("isDiscounted")}
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-4">
+                <Button type="button" variant="outline" onClick={() => router.back()}>
+                  Cancel
                 </Button>
-              </Pagination>
-            </div>
-          )}
-        </>
-      )}
+                <Button type="submit" disabled={loading}>
+                  {loading ? "Saving..." : "Save Menu Item"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
     </div>
   )
 }
