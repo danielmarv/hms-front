@@ -28,6 +28,7 @@ import {
   Server,
   FileText,
   MailIcon,
+  TrendingUp,
 } from "lucide-react"
 
 interface HotelSidebarProps {
@@ -45,6 +46,12 @@ export function HotelSidebar({ user }: HotelSidebarProps) {
       icon: LayoutDashboard,
       href: "/dashboard",
       active: pathname === "/dashboard",
+    },
+    {
+      label: "Analytics",
+      icon: TrendingUp,
+      href: "/dashboard/analytics",
+      active: pathname.startsWith("/dashboard/analytics"),
     },
     {
       label: "Bookings",

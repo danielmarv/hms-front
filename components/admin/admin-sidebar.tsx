@@ -22,6 +22,7 @@ import {
   Users,
   FolderSyncIcon as Sync,
   Key,
+  TrendingUp,
 } from "lucide-react"
 
 interface AdminSidebarProps {
@@ -69,6 +70,12 @@ export function AdminSidebar({ user }: AdminSidebarProps) {
       icon: Sync,
       href: "/admin/sync",
       active: pathname.startsWith("/admin/sync"),
+    },
+    {
+      label: "Analytics",
+      icon: TrendingUp,
+      href: "/admin/analytics",
+      active: pathname.startsWith("/admin/analytics"),
     },
     {
       label: "Settings",
