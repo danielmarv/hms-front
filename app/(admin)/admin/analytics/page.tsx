@@ -28,7 +28,7 @@ import { Users, DollarSign, Calendar, BedDouble, Wrench, Utensils, Server, Refre
 const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884D8", "#82CA9D"]
 
 export default function AdminAnalyticsPage() {
-  const { dashboardData, realTimeData, isLoading, getDashboardAnalytics, getRealTimeAnalytics } = useAnalytics()
+  const { dashboardData, realTimeData, isLoading, error, getDashboardAnalytics, getRealTimeAnalytics } = useAnalytics()
   const [selectedPeriod, setSelectedPeriod] = useState<AnalyticsPeriod>("30")
   const [autoRefresh, setAutoRefresh] = useState(false)
 
@@ -55,11 +55,26 @@ export default function AdminAnalyticsPage() {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
-    }).format(amount)
+    }).format(amount || 0)
   }
 
   const formatPercentage = (value: number) => {
-    return `${value.toFixed(1)}%`
+    return `${(value || 0).toFixed(1)}%`
+  }
+
+  // Show error state
+  if (error && !dashboardData) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <h2 className="text-lg font-semibold text-red-600">Error Loading Analytics</h2>
+          <p className="text-muted-foreground mt-2">{error}</p>
+          <Button onClick={() => getDashboardAnalytics(selectedPeriod)} className="mt-4">
+            Retry
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   if (isLoading && !dashboardData) {
@@ -86,6 +101,13 @@ export default function AdminAnalyticsPage() {
       </div>
     )
   }
+
+  // Add a fallback for when data exists but is empty
+  const hasData =
+    dashboardData &&
+    (dashboardData.modules.bookings.totalBookings > 0 ||
+      dashboardData.modules.revenue.totalRevenue > 0 ||
+      dashboardData.modules.rooms.totalRooms > 0)
 
   return (
     <div className="space-y-6">
@@ -215,8 +237,20 @@ export default function AdminAnalyticsPage() {
         </div>
       )}
 
-      {/* Detailed Analytics Tabs */}
-      {dashboardData && (
+      {/* Show empty state if no data */}
+      {dashboardData && !hasData && (
+        <Card className="p-8">
+          <div className="text-center">
+            <h3 className="text-lg font-semibold">No Data Available</h3>
+            <p className="text-muted-foreground mt-2">
+              There's no data for the selected period. Try selecting a different time range or check back later.
+            </p>
+          </div>
+        </Card>
+      )}
+
+      {/* Rest of the component remains the same but add empty state checks for charts */}
+      {dashboardData && hasData && (
         <Tabs defaultValue="bookings" className="space-y-4">
           <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8">
             <TabsTrigger value="bookings">Bookings</TabsTrigger>
@@ -278,15 +312,20 @@ export default function AdminAnalyticsPage() {
                   <CardDescription>Daily booking volume over time</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={dashboardData.modules.bookings.bookingTrends}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="_id" />
-                      <YAxis />
-                      <Tooltip />
-                      <Line type="monotone" dataKey="count" stroke="#8884d8" strokeWidth={2} />
-                    </LineChart>
-                  </ResponsiveContainer>
+                  {dashboardData.modules.bookings.bookingTrends &&
+                  dashboardData.modules.bookings.bookingTrends.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart data={dashboardData.modules.bookings.bookingTrends}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="_id" />
+                        <YAxis />
+                        <Tooltip />
+                        <Line type="monotone" dataKey="count" stroke="#8884d8" strokeWidth={2} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <p>No booking trends data available.</p>
+                  )}
                 </CardContent>
               </Card>
 
@@ -296,25 +335,30 @@ export default function AdminAnalyticsPage() {
                   <CardDescription>Distribution by booking source</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={dashboardData.modules.bookings.channelDistribution}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ _id, count }) => `${_id}: ${count}`}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="count"
-                      >
-                        {dashboardData.modules.bookings.channelDistribution.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  {dashboardData.modules.bookings.channelDistribution &&
+                  dashboardData.modules.bookings.channelDistribution.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie
+                          data={dashboardData.modules.bookings.channelDistribution}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ _id, count }) => `${_id}: ${count}`}
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="count"
+                        >
+                          {dashboardData.modules.bookings.channelDistribution.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <p>No booking channel data available.</p>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -366,15 +410,19 @@ export default function AdminAnalyticsPage() {
                 <CardDescription>Revenue trends over time</CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={400}>
-                  <AreaChart data={dashboardData.modules.revenue.dailyRevenue}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="_id" />
-                    <YAxis />
-                    <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                    <Area type="monotone" dataKey="revenue" stroke="#8884d8" fill="#8884d8" fillOpacity={0.6} />
-                  </AreaChart>
-                </ResponsiveContainer>
+                {dashboardData.modules.revenue.dailyRevenue && dashboardData.modules.revenue.dailyRevenue.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={400}>
+                    <AreaChart data={dashboardData.modules.revenue.dailyRevenue}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="_id" />
+                      <YAxis />
+                      <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                      <Area type="monotone" dataKey="revenue" stroke="#8884d8" fill="#8884d8" fillOpacity={0.6} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <p>No daily revenue data available.</p>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -423,21 +471,26 @@ export default function AdminAnalyticsPage() {
                 <CardDescription>Revenue and bookings by room type</CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={400}>
-                  <BarChart data={dashboardData.modules.rooms.roomTypePerformance}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="_id" />
-                    <YAxis />
-                    <Tooltip
-                      formatter={(value, name) => [
-                        name === "revenue" ? formatCurrency(Number(value)) : value,
-                        name === "revenue" ? "Revenue" : "Bookings",
-                      ]}
-                    />
-                    <Bar dataKey="bookings" fill="#8884d8" />
-                    <Bar dataKey="revenue" fill="#82ca9d" />
-                  </BarChart>
-                </ResponsiveContainer>
+                {dashboardData.modules.rooms.roomTypePerformance &&
+                dashboardData.modules.rooms.roomTypePerformance.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={400}>
+                    <BarChart data={dashboardData.modules.rooms.roomTypePerformance}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="_id" />
+                      <YAxis />
+                      <Tooltip
+                        formatter={(value, name) => [
+                          name === "revenue" ? formatCurrency(Number(value)) : value,
+                          name === "revenue" ? "Revenue" : "Bookings",
+                        ]}
+                      />
+                      <Bar dataKey="bookings" fill="#8884d8" />
+                      <Bar dataKey="revenue" fill="#82ca9d" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <p>No room type performance data available.</p>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -484,15 +537,20 @@ export default function AdminAnalyticsPage() {
                 <CardDescription>Guest distribution by country</CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={400}>
-                  <BarChart data={dashboardData.modules.guests.countryDistribution.slice(0, 10)}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="_id" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="count" fill="#8884d8" />
-                  </BarChart>
-                </ResponsiveContainer>
+                {dashboardData.modules.guests.countryDistribution &&
+                dashboardData.modules.guests.countryDistribution.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={400}>
+                    <BarChart data={dashboardData.modules.guests.countryDistribution.slice(0, 10)}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="_id" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="count" fill="#8884d8" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <p>No guest country distribution data available.</p>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -545,15 +603,20 @@ export default function AdminAnalyticsPage() {
                 <CardDescription>Top selling items by quantity</CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={400}>
-                  <BarChart data={dashboardData.modules.restaurant.popularItems.slice(0, 10)}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="_id" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="quantity" fill="#8884d8" />
-                  </BarChart>
-                </ResponsiveContainer>
+                {dashboardData.modules.restaurant.popularItems &&
+                dashboardData.modules.restaurant.popularItems.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={400}>
+                    <BarChart data={dashboardData.modules.restaurant.popularItems.slice(0, 10)}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="_id" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="quantity" fill="#8884d8" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <p>No popular menu items data available.</p>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -605,25 +668,30 @@ export default function AdminAnalyticsPage() {
                   <CardDescription>Inventory value by category</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={dashboardData.modules.inventory.categoryDistribution}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ _id, totalValue }) => `${_id}: ${formatCurrency(totalValue)}`}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="totalValue"
-                      >
-                        {dashboardData.modules.inventory.categoryDistribution.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  {dashboardData.modules.inventory.categoryDistribution &&
+                  dashboardData.modules.inventory.categoryDistribution.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie
+                          data={dashboardData.modules.inventory.categoryDistribution}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ _id, totalValue }) => `${_id}: ${formatCurrency(totalValue)}`}
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="totalValue"
+                        >
+                          {dashboardData.modules.inventory.categoryDistribution.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <p>No inventory category distribution data available.</p>
+                  )}
                 </CardContent>
               </Card>
 
@@ -633,15 +701,20 @@ export default function AdminAnalyticsPage() {
                   <CardDescription>Suppliers by inventory value</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={dashboardData.modules.inventory.supplierPerformance.slice(0, 5)}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="_id" />
-                      <YAxis />
-                      <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                      <Bar dataKey="totalValue" fill="#8884d8" />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  {dashboardData.modules.inventory.supplierPerformance &&
+                  dashboardData.modules.inventory.supplierPerformance.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={dashboardData.modules.inventory.supplierPerformance.slice(0, 5)}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="_id" />
+                        <YAxis />
+                        <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                        <Bar dataKey="totalValue" fill="#8884d8" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <p>No inventory supplier performance data available.</p>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -696,15 +769,20 @@ export default function AdminAnalyticsPage() {
                   <CardDescription>Maintenance issues breakdown</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={dashboardData.modules.maintenance.issuesByType}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="_id" />
-                      <YAxis />
-                      <Tooltip />
-                      <Bar dataKey="count" fill="#8884d8" />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  {dashboardData.modules.maintenance.issuesByType &&
+                  dashboardData.modules.maintenance.issuesByType.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={dashboardData.modules.maintenance.issuesByType}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="_id" />
+                        <YAxis />
+                        <Tooltip />
+                        <Bar dataKey="count" fill="#8884d8" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <p>No maintenance issues by type data available.</p>
+                  )}
                 </CardContent>
               </Card>
 
@@ -714,16 +792,21 @@ export default function AdminAnalyticsPage() {
                   <CardDescription>New vs completed issues over time</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={dashboardData.modules.maintenance.maintenanceTrends}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="_id" />
-                      <YAxis />
-                      <Tooltip />
-                      <Line type="monotone" dataKey="newIssues" stroke="#8884d8" strokeWidth={2} />
-                      <Line type="monotone" dataKey="completedIssues" stroke="#82ca9d" strokeWidth={2} />
-                    </LineChart>
-                  </ResponsiveContainer>
+                  {dashboardData.modules.maintenance.maintenanceTrends &&
+                  dashboardData.modules.maintenance.maintenanceTrends.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart data={dashboardData.modules.maintenance.maintenanceTrends}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="_id" />
+                        <YAxis />
+                        <Tooltip />
+                        <Line type="monotone" dataKey="newIssues" stroke="#8884d8" strokeWidth={2} />
+                        <Line type="monotone" dataKey="completedIssues" stroke="#82ca9d" strokeWidth={2} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <p>No maintenance trends data available.</p>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -774,15 +857,19 @@ export default function AdminAnalyticsPage() {
                   <CardDescription>System actions breakdown</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={dashboardData.modules.system.systemLogs.slice(0, 10)}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="_id" />
-                      <YAxis />
-                      <Tooltip />
-                      <Bar dataKey="count" fill="#8884d8" />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  {dashboardData.modules.system.systemLogs && dashboardData.modules.system.systemLogs.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={dashboardData.modules.system.systemLogs.slice(0, 10)}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="_id" />
+                        <YAxis />
+                        <Tooltip />
+                        <Bar dataKey="count" fill="#8884d8" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <p>No system activity data available.</p>
+                  )}
                 </CardContent>
               </Card>
 
@@ -792,15 +879,19 @@ export default function AdminAnalyticsPage() {
                   <CardDescription>Most used API endpoints</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={dashboardData.modules.system.apiUsage.slice(0, 10)}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="_id" />
-                      <YAxis />
-                      <Tooltip />
-                      <Bar dataKey="requestCount" fill="#82ca9d" />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  {dashboardData.modules.system.apiUsage && dashboardData.modules.system.apiUsage.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={dashboardData.modules.system.apiUsage.slice(0, 10)}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="_id" />
+                        <YAxis />
+                        <Tooltip />
+                        <Bar dataKey="requestCount" fill="#82ca9d" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <p>No API usage data available.</p>
+                  )}
                 </CardContent>
               </Card>
             </div>

@@ -188,8 +188,183 @@ export const useAnalytics = () => {
     async (period: AnalyticsPeriod = "30") => {
       try {
         const response = await request<{ data: DashboardAnalytics }>(`/analytics/dashboard?period=${period}`)
-        if (response.success && response.data) {
-          setDashboardData(response.data.data)
+        if (response.data?.data) {
+          // Helper function to merge defaults with API data
+          const mergeWithDefaults = <T extends Record<string, any>>(defaults: T, apiData: Partial<T>): T => {
+            const result = { ...defaults }
+            Object.keys(apiData).forEach((key) => {
+              if (apiData[key] !== undefined && apiData[key] !== null) {
+                (result as Record<string, any>)[key] = apiData[key]
+              }
+            })
+            return result
+          }
+
+          const data = response.data.data
+          const processedData: DashboardAnalytics = {
+            ...data,
+            summary: mergeWithDefaults(
+              {
+                totalRevenue: 0,
+                totalBookings: 0,
+                occupancyRate: 0,
+                guestSatisfaction: 0,
+                systemUptime: 0,
+              },
+              data.summary || {},
+            ),
+            modules: {
+              ...data.modules,
+              bookings: mergeWithDefaults(
+                {
+                  totalBookings: 0,
+                  confirmedBookings: 0,
+                  cancelledBookings: 0,
+                  checkedInBookings: 0,
+                  checkedOutBookings: 0,
+                  totalRevenue: 0,
+                  averageStayDuration: 0,
+                  cancellationRate: 0,
+                  bookingTrends: [] as Array<{ _id: string; count: number; revenue: number }>,
+                  channelDistribution: [] as Array<{ _id: string; count: number; revenue: number }>,
+                },
+                data.modules.bookings || {},
+              ),
+              revenue: mergeWithDefaults(
+                {
+                  totalRevenue: 0,
+                  totalInvoices: 0,
+                  averageInvoiceValue: 0,
+                  roomRevenue: 0,
+                  restaurantRevenue: 0,
+                  eventRevenue: 0,
+                  serviceRevenue: 0,
+                  dailyRevenue: [] as Array<{ _id: string; revenue: number; count: number }>,
+                  paymentMethods: [] as Array<{ _id: string; count: number; amount: number }>,
+                },
+                data.modules.revenue || {},
+              ),
+              guests: mergeWithDefaults(
+                {
+                  totalGuests: 0,
+                  uniqueCountries: 0,
+                  averageAge: 0,
+                  countryDistribution: [] as Array<{ _id: string; count: number }>,
+                  repeatGuestData: { repeat: 0, new: 0 },
+                  satisfactionRate: 85,
+                  loyaltyRate: "0",
+                },
+                data.modules.guests || {},
+              ),
+              rooms: mergeWithDefaults(
+                {
+                  totalRooms: 0,
+                  occupiedRooms: 0,
+                  availableRooms: 0,
+                  occupancyRate: 0,
+                  roomStatusDistribution: {},
+                  roomTypePerformance: [] as Array<{
+                    _id: string
+                    bookings: number
+                    revenue: number
+                    averageRate: number
+                  }>,
+                },
+                data.modules.rooms || {},
+              ),
+              maintenance: mergeWithDefaults(
+                {
+                  totalIssues: 0,
+                  pendingIssues: 0,
+                  inProgressIssues: 0,
+                  completedIssues: 0,
+                  averageResolutionTime: 0,
+                  resolutionRate: 0,
+                  issuesByType: [] as Array<{ _id: string; count: number; avgResolutionTime: number }>,
+                  maintenanceTrends: [] as Array<{ _id: string; newIssues: number; completedIssues: number }>,
+                },
+                data.modules.maintenance || {},
+              ),
+              restaurant: mergeWithDefaults(
+                {
+                  totalOrders: 0,
+                  totalRevenue: 0,
+                  averageOrderValue: 0,
+                  pendingOrders: 0,
+                  completedOrders: 0,
+                  cancelledOrders: 0,
+                  popularItems: [] as Array<{ _id: string; quantity: number; revenue: number }>,
+                  kitchenPerformance: {
+                    averagePreparationTime: 0,
+                    totalKitchenOrders: 0,
+                  },
+                },
+                data.modules.restaurant || {},
+              ),
+              inventory: mergeWithDefaults(
+                {
+                  totalItems: 0,
+                  totalValue: 0,
+                  lowStockItems: 0,
+                  outOfStockItems: 0,
+                  categoryDistribution: [] as Array<{ _id: string; itemCount: number; totalValue: number }>,
+                  supplierPerformance: [] as Array<{ _id: string; itemCount: number; totalValue: number }>,
+                },
+                data.modules.inventory || {},
+              ),
+              staff: mergeWithDefaults(
+                {
+                  totalStaff: 0,
+                  activeStaff: 0,
+                  inactiveStaff: 0,
+                  roleDistribution: [] as Array<{ _id: string; count: number }>,
+                  housekeeping: {
+                    totalTasks: 0,
+                    completedTasks: 0,
+                    pendingTasks: 0,
+                  },
+                  activityLogs: [] as Array<{ _id: string; activityCount: number }>,
+                },
+                data.modules.staff || {},
+              ),
+              events: mergeWithDefaults(
+                {
+                  totalEvents: 0,
+                  upcomingEvents: 0,
+                  completedEvents: 0,
+                  bookings: {
+                    totalBookings: 0,
+                    totalRevenue: 0,
+                    averageBookingValue: 0,
+                  },
+                  eventTypeDistribution: [] as Array<{ _id: string; count: number }>,
+                },
+                data.modules.events || {},
+              ),
+              system: mergeWithDefaults(
+                {
+                  uptime: 0,
+                  memoryUsage: {
+                    rss: 0,
+                    heapTotal: 0,
+                    heapUsed: 0,
+                    external: 0,
+                  },
+                  systemLogs: [] as Array<{ _id: string; count: number }>,
+                  errorLogs: [] as Array<{ _id: string; errorCount: number }>,
+                  apiUsage: [] as Array<{ _id: string; requestCount: number }>,
+                  performance: {
+                    cpuUsage: { user: 0, system: 0 },
+                    nodeVersion: "",
+                    platform: "",
+                  },
+                },
+                data.modules.system || {},
+              ),
+            },
+          }
+
+          setDashboardData(processedData)
           setError(null)
         }
         return response
@@ -204,7 +379,7 @@ export const useAnalytics = () => {
   const getRealTimeAnalytics = useCallback(async () => {
     try {
       const response = await request<{ data: RealTimeAnalytics }>("/analytics/realtime")
-      if (response.success && response.data) {
+      if (response.data?.data) {
         setRealTimeData(response.data.data)
         setError(null)
       }
