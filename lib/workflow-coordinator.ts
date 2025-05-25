@@ -1,267 +1,42 @@
 "use client"
 
-import { toast } from "sonner"
-
-export type WorkflowEvent = {
-  type: string
-  module: string
-  data: any
-  timestamp: Date
-  userId?: string
-}
-
-export type WorkflowStep = {
-  id: string
-  name: string
-  module: string
-  action: string
-  dependencies?: string[]
-  autoExecute?: boolean
-  condition?: (data: any) => boolean
-}
-
-export type Workflow = {
+type WorkflowStep = {
   id: string
   name: string
   description: string
+  status: "pending" | "in-progress" | "completed" | "failed" | "skipped"
+  automated: boolean
+  dependencies?: string[]
+  data?: any
+  error?: string
+  completedAt?: Date
+}
+
+type Workflow = {
+  id: string
+  name: string
+  description: string
+  status: "pending" | "in-progress" | "completed" | "failed"
   steps: WorkflowStep[]
-  triggers: string[]
-  active: boolean
+  createdAt: Date
+  completedAt?: Date
+  context: any
 }
 
 class WorkflowCoordinator {
   private workflows: Map<string, Workflow> = new Map()
   private eventListeners: Map<string, Function[]> = new Map()
-  private pendingSteps: Map<string, any> = new Map()
 
-  constructor() {
-    this.initializeDefaultWorkflows()
-  }
-
-  private initializeDefaultWorkflows() {
-    // Guest Check-in Workflow
-    this.registerWorkflow({
-      id: "guest-checkin",
-      name: "Guest Check-in Process",
-      description: "Complete guest check-in with room assignment and payment",
-      triggers: ["booking.confirmed", "guest.arrived"],
-      active: true,
-      steps: [
-        {
-          id: "verify-booking",
-          name: "Verify Booking",
-          module: "bookings",
-          action: "verify",
-          autoExecute: true,
-        },
-        {
-          id: "assign-room",
-          name: "Assign Room",
-          module: "rooms",
-          action: "assign",
-          dependencies: ["verify-booking"],
-          autoExecute: true,
-        },
-        {
-          id: "create-keycard",
-          name: "Create Key Card",
-          module: "access",
-          action: "create_keycard",
-          dependencies: ["assign-room"],
-          autoExecute: false,
-        },
-        {
-          id: "process-payment",
-          name: "Process Payment",
-          module: "payments",
-          action: "process",
-          dependencies: ["verify-booking"],
-          autoExecute: false,
-        },
-        {
-          id: "update-housekeeping",
-          name: "Update Housekeeping",
-          module: "housekeeping",
-          action: "room_occupied",
-          dependencies: ["assign-room"],
-          autoExecute: true,
-        },
-      ],
-    })
-
-    // Restaurant Order Workflow
-    this.registerWorkflow({
-      id: "restaurant-order",
-      name: "Restaurant Order Process",
-      description: "Process restaurant orders from creation to completion",
-      triggers: ["order.created"],
-      active: true,
-      steps: [
-        {
-          id: "validate-order",
-          name: "Validate Order",
-          module: "orders",
-          action: "validate",
-          autoExecute: true,
-        },
-        {
-          id: "send-to-kitchen",
-          name: "Send to Kitchen",
-          module: "kitchen",
-          action: "receive_order",
-          dependencies: ["validate-order"],
-          autoExecute: true,
-        },
-        {
-          id: "prepare-order",
-          name: "Prepare Order",
-          module: "kitchen",
-          action: "prepare",
-          dependencies: ["send-to-kitchen"],
-          autoExecute: false,
-        },
-        {
-          id: "notify-service",
-          name: "Notify Service Staff",
-          module: "notifications",
-          action: "notify_staff",
-          dependencies: ["prepare-order"],
-          autoExecute: true,
-        },
-        {
-          id: "serve-order",
-          name: "Serve Order",
-          module: "service",
-          action: "serve",
-          dependencies: ["notify-service"],
-          autoExecute: false,
-        },
-        {
-          id: "process-payment",
-          name: "Process Payment",
-          module: "payments",
-          action: "process",
-          dependencies: ["serve-order"],
-          autoExecute: false,
-        },
-      ],
-    })
-
-    // Guest Check-out Workflow
-    this.registerWorkflow({
-      id: "guest-checkout",
-      name: "Guest Check-out Process",
-      description: "Complete guest check-out with billing and room cleaning",
-      triggers: ["checkout.initiated"],
-      active: true,
-      steps: [
-        {
-          id: "generate-bill",
-          name: "Generate Final Bill",
-          module: "billing",
-          action: "generate_final_bill",
-          autoExecute: true,
-        },
-        {
-          id: "process-payment",
-          name: "Process Final Payment",
-          module: "payments",
-          action: "process_final",
-          dependencies: ["generate-bill"],
-          autoExecute: false,
-        },
-        {
-          id: "deactivate-keycard",
-          name: "Deactivate Key Card",
-          module: "access",
-          action: "deactivate_keycard",
-          dependencies: ["process-payment"],
-          autoExecute: true,
-        },
-        {
-          id: "schedule-cleaning",
-          name: "Schedule Room Cleaning",
-          module: "housekeeping",
-          action: "schedule_checkout_cleaning",
-          dependencies: ["deactivate-keycard"],
-          autoExecute: true,
-        },
-        {
-          id: "update-room-status",
-          name: "Update Room Status",
-          module: "rooms",
-          action: "set_dirty",
-          dependencies: ["schedule-cleaning"],
-          autoExecute: true,
-        },
-      ],
-    })
-
-    // Maintenance Request Workflow
-    this.registerWorkflow({
-      id: "maintenance-request",
-      name: "Maintenance Request Process",
-      description: "Handle maintenance requests from creation to completion",
-      triggers: ["maintenance.requested"],
-      active: true,
-      steps: [
-        {
-          id: "assess-priority",
-          name: "Assess Priority",
-          module: "maintenance",
-          action: "assess_priority",
-          autoExecute: true,
-        },
-        {
-          id: "assign-technician",
-          name: "Assign Technician",
-          module: "maintenance",
-          action: "assign_technician",
-          dependencies: ["assess-priority"],
-          autoExecute: true,
-        },
-        {
-          id: "notify-guest",
-          name: "Notify Guest",
-          module: "notifications",
-          action: "notify_guest",
-          dependencies: ["assign-technician"],
-          autoExecute: true,
-          condition: (data) => data.roomOccupied,
-        },
-        {
-          id: "complete-work",
-          name: "Complete Work",
-          module: "maintenance",
-          action: "complete",
-          dependencies: ["assign-technician"],
-          autoExecute: false,
-        },
-        {
-          id: "update-room-status",
-          name: "Update Room Status",
-          module: "rooms",
-          action: "maintenance_complete",
-          dependencies: ["complete-work"],
-          autoExecute: true,
-        },
-      ],
-    })
-  }
-
-  registerWorkflow(workflow: Workflow) {
-    this.workflows.set(workflow.id, workflow)
-  }
-
-  addEventListener(eventType: string, callback: Function) {
-    if (!this.eventListeners.has(eventType)) {
-      this.eventListeners.set(eventType, [])
+  // Event system
+  addEventListener(event: string, callback: Function) {
+    if (!this.eventListeners.has(event)) {
+      this.eventListeners.set(event, [])
     }
-    this.eventListeners.get(eventType)!.push(callback)
+    this.eventListeners.get(event)!.push(callback)
   }
 
-  removeEventListener(eventType: string, callback: Function) {
-    const listeners = this.eventListeners.get(eventType)
+  removeEventListener(event: string, callback: Function) {
+    const listeners = this.eventListeners.get(event)
     if (listeners) {
       const index = listeners.indexOf(callback)
       if (index > -1) {
@@ -270,286 +45,442 @@ class WorkflowCoordinator {
     }
   }
 
-  async triggerEvent(event: WorkflowEvent) {
-    console.log(`Workflow event triggered: ${event.type}`, event)
+  private emit(event: string, data: any) {
+    // Emit to specific event listeners
+    const listeners = this.eventListeners.get(event) || []
+    listeners.forEach((callback) => callback(data))
 
-    // Notify event listeners
-    const listeners = this.eventListeners.get(event.type) || []
-    listeners.forEach((callback) => {
-      try {
-        callback(event)
-      } catch (error) {
-        console.error("Error in event listener:", error)
-      }
-    })
-
-    // Find workflows that should be triggered
-    for (const workflow of this.workflows.values()) {
-      if (workflow.active && workflow.triggers.includes(event.type)) {
-        await this.executeWorkflow(workflow.id, event.data)
-      }
-    }
+    // Emit to wildcard listeners
+    const wildcardListeners = this.eventListeners.get("*") || []
+    wildcardListeners.forEach((callback) => callback({ type: event, ...data }))
   }
 
-  async executeWorkflow(workflowId: string, data: any) {
+  // Workflow management
+  createWorkflow(name: string, description: string, steps: Omit<WorkflowStep, "status">[], context: any = {}): string {
+    const workflowId = `wf_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
+    const workflow: Workflow = {
+      id: workflowId,
+      name,
+      description,
+      status: "pending",
+      steps: steps.map((step) => ({ ...step, status: "pending" })),
+      createdAt: new Date(),
+      context,
+    }
+
+    this.workflows.set(workflowId, workflow)
+    this.emit("workflow.created", { workflowId, workflow })
+
+    // Auto-start the workflow
+    this.executeWorkflow(workflowId)
+
+    return workflowId
+  }
+
+  async executeWorkflow(workflowId: string) {
     const workflow = this.workflows.get(workflowId)
     if (!workflow) {
-      console.error(`Workflow not found: ${workflowId}`)
-      return
+      throw new Error(`Workflow ${workflowId} not found`)
     }
 
-    console.log(`Executing workflow: ${workflow.name}`)
-
-    const executedSteps = new Set<string>()
-    const context = { ...data, workflowId, startTime: new Date() }
-
-    // Execute steps in dependency order
-    while (executedSteps.size < workflow.steps.length) {
-      let progressMade = false
-
-      for (const step of workflow.steps) {
-        if (executedSteps.has(step.id)) continue
-
-        // Check if dependencies are met
-        const dependenciesMet = !step.dependencies || step.dependencies.every((dep) => executedSteps.has(dep))
-
-        if (!dependenciesMet) continue
-
-        // Check condition if present
-        if (step.condition && !step.condition(context)) {
-          executedSteps.add(step.id)
-          progressMade = true
-          continue
-        }
-
-        try {
-          if (step.autoExecute) {
-            await this.executeStep(step, context)
-            executedSteps.add(step.id)
-            progressMade = true
-          } else {
-            // Store step for manual execution
-            this.pendingSteps.set(`${workflowId}-${step.id}`, {
-              workflow,
-              step,
-              context,
-            })
-
-            // Notify that manual step is required
-            toast.info(`Manual step required: ${step.name}`)
-            executedSteps.add(step.id)
-            progressMade = true
-          }
-        } catch (error) {
-          console.error(`Error executing step ${step.id}:`, error)
-          toast.error(`Failed to execute: ${step.name}`)
-          break
-        }
-      }
-
-      if (!progressMade) {
-        console.error("Workflow execution stuck - no progress made")
-        break
-      }
-    }
-  }
-
-  async executeStep(step: WorkflowStep, context: any) {
-    console.log(`Executing step: ${step.name}`)
-
-    // Simulate step execution based on module and action
-    switch (step.module) {
-      case "bookings":
-        await this.executeBookingAction(step.action, context)
-        break
-      case "rooms":
-        await this.executeRoomAction(step.action, context)
-        break
-      case "payments":
-        await this.executePaymentAction(step.action, context)
-        break
-      case "kitchen":
-        await this.executeKitchenAction(step.action, context)
-        break
-      case "housekeeping":
-        await this.executeHousekeepingAction(step.action, context)
-        break
-      case "maintenance":
-        await this.executeMaintenanceAction(step.action, context)
-        break
-      case "notifications":
-        await this.executeNotificationAction(step.action, context)
-        break
-      default:
-        console.warn(`Unknown module: ${step.module}`)
-    }
-  }
-
-  async executePendingStep(stepKey: string) {
-    const pendingStep = this.pendingSteps.get(stepKey)
-    if (!pendingStep) {
-      console.error(`Pending step not found: ${stepKey}`)
-      return
-    }
+    workflow.status = "in-progress"
+    this.emit("workflow.started", { workflowId, workflow })
 
     try {
-      await this.executeStep(pendingStep.step, pendingStep.context)
-      this.pendingSteps.delete(stepKey)
-      toast.success(`Completed: ${pendingStep.step.name}`)
+      for (const step of workflow.steps) {
+        await this.executeStep(workflowId, step.id)
+      }
+
+      workflow.status = "completed"
+      workflow.completedAt = new Date()
+      this.emit("workflow.completed", { workflowId, workflow })
     } catch (error) {
-      console.error(`Error executing pending step:`, error)
-      toast.error(`Failed to complete: ${pendingStep.step.name}`)
+      workflow.status = "failed"
+      this.emit("workflow.failed", { workflowId, workflow, error })
     }
   }
 
-  getPendingSteps(): Array<{ key: string; workflow: string; step: string; context: any }> {
-    const pending = []
-    for (const [key, value] of this.pendingSteps.entries()) {
-      pending.push({
-        key,
-        workflow: value.workflow.name,
-        step: value.step.name,
-        context: value.context,
+  async executeStep(workflowId: string, stepId: string) {
+    const workflow = this.workflows.get(workflowId)
+    if (!workflow) return
+
+    const step = workflow.steps.find((s) => s.id === stepId)
+    if (!step) return
+
+    // Check dependencies
+    if (step.dependencies) {
+      const dependenciesMet = step.dependencies.every((depId) => {
+        const depStep = workflow.steps.find((s) => s.id === depId)
+        return depStep?.status === "completed"
       })
-    }
-    return pending
-  }
 
-  // Module-specific action executors
-  private async executeBookingAction(action: string, context: any) {
-    switch (action) {
-      case "verify":
-        // Verify booking exists and is valid
-        console.log("Verifying booking:", context.bookingId)
-        break
-      default:
-        console.warn(`Unknown booking action: ${action}`)
+      if (!dependenciesMet) {
+        step.status = "pending"
+        return
+      }
     }
-  }
 
-  private async executeRoomAction(action: string, context: any) {
-    switch (action) {
-      case "assign":
-        console.log("Assigning room:", context.roomId)
-        break
-      case "set_dirty":
-        console.log("Setting room as dirty:", context.roomId)
-        break
-      case "maintenance_complete":
-        console.log("Maintenance completed for room:", context.roomId)
-        break
-      default:
-        console.warn(`Unknown room action: ${action}`)
-    }
-  }
+    step.status = "in-progress"
+    this.emit("step.started", { workflowId, stepId, step })
 
-  private async executePaymentAction(action: string, context: any) {
-    switch (action) {
-      case "process":
-        console.log("Processing payment:", context.amount)
-        break
-      case "process_final":
-        console.log("Processing final payment:", context.amount)
-        break
-      default:
-        console.warn(`Unknown payment action: ${action}`)
+    try {
+      if (step.automated) {
+        await this.executeAutomatedStep(workflow, step)
+      } else {
+        // Manual step - emit event for UI to handle
+        this.emit("step.manual", { workflowId, stepId, step })
+        return // Don't complete automatically
+      }
+
+      step.status = "completed"
+      step.completedAt = new Date()
+      this.emit("step.completed", { workflowId, stepId, step })
+    } catch (error) {
+      step.status = "failed"
+      step.error = error instanceof Error ? error.message : String(error)
+      this.emit("step.failed", { workflowId, stepId, step, error })
+      throw error
     }
   }
 
-  private async executeKitchenAction(action: string, context: any) {
-    switch (action) {
-      case "receive_order":
-        console.log("Kitchen received order:", context.orderId)
+  private async executeAutomatedStep(workflow: Workflow, step: WorkflowStep) {
+    // Simulate API calls and automated processes
+    switch (step.id) {
+      case "validate_guest_info":
+        // Validate guest information
+        await this.delay(1000)
         break
-      case "prepare":
-        console.log("Preparing order:", context.orderId)
+
+      case "check_room_availability":
+        // Check room availability
+        await this.delay(1500)
         break
+
+      case "assign_room":
+        // Assign room to guest
+        await this.delay(1000)
+        break
+
+      case "process_payment":
+        // Process payment
+        await this.delay(2000)
+        break
+
+      case "update_room_status":
+        // Update room status
+        await this.delay(500)
+        break
+
+      case "notify_housekeeping":
+        // Notify housekeeping
+        await this.delay(500)
+        this.emit("housekeeping.notification", {
+          room: workflow.context.room,
+          type: "checkout_cleaning",
+          priority: "normal",
+        })
+        break
+
+      case "generate_invoice":
+        // Generate invoice
+        await this.delay(1500)
+        break
+
+      case "send_kitchen_order":
+        // Send order to kitchen
+        await this.delay(800)
+        this.emit("kitchen.order", {
+          orderId: workflow.context.orderId,
+          items: workflow.context.items,
+        })
+        break
+
+      case "update_inventory":
+        // Update inventory
+        await this.delay(1000)
+        break
+
       default:
-        console.warn(`Unknown kitchen action: ${action}`)
+        // Generic automated step
+        await this.delay(1000)
     }
   }
 
-  private async executeHousekeepingAction(action: string, context: any) {
-    switch (action) {
-      case "room_occupied":
-        console.log("Room marked as occupied:", context.roomId)
-        break
-      case "schedule_checkout_cleaning":
-        console.log("Scheduled checkout cleaning:", context.roomId)
-        break
-      default:
-        console.warn(`Unknown housekeeping action: ${action}`)
+  completeManualStep(workflowId: string, stepId: string, data?: any) {
+    const workflow = this.workflows.get(workflowId)
+    if (!workflow) return
+
+    const step = workflow.steps.find((s) => s.id === stepId)
+    if (!step) return
+
+    step.status = "completed"
+    step.completedAt = new Date()
+    step.data = data
+
+    this.emit("step.completed", { workflowId, stepId, step })
+
+    // Continue with next steps
+    this.continueWorkflow(workflowId)
+  }
+
+  private async continueWorkflow(workflowId: string) {
+    const workflow = this.workflows.get(workflowId)
+    if (!workflow) return
+
+    // Find next pending steps that have their dependencies met
+    const pendingSteps = workflow.steps.filter((step) => step.status === "pending")
+
+    for (const step of pendingSteps) {
+      const dependenciesMet =
+        !step.dependencies ||
+        step.dependencies.every((depId) => {
+          const depStep = workflow.steps.find((s) => s.id === depId)
+          return depStep?.status === "completed"
+        })
+
+      if (dependenciesMet) {
+        await this.executeStep(workflowId, step.id)
+      }
+    }
+
+    // Check if workflow is complete
+    const allCompleted = workflow.steps.every((step) => step.status === "completed" || step.status === "skipped")
+
+    if (allCompleted) {
+      workflow.status = "completed"
+      workflow.completedAt = new Date()
+      this.emit("workflow.completed", { workflowId, workflow })
     }
   }
 
-  private async executeMaintenanceAction(action: string, context: any) {
-    switch (action) {
-      case "assess_priority":
-        console.log("Assessing maintenance priority:", context.requestId)
-        break
-      case "assign_technician":
-        console.log("Assigning technician:", context.requestId)
-        break
-      case "complete":
-        console.log("Completing maintenance:", context.requestId)
-        break
-      default:
-        console.warn(`Unknown maintenance action: ${action}`)
-    }
+  getWorkflow(workflowId: string): Workflow | undefined {
+    return this.workflows.get(workflowId)
   }
 
-  private async executeNotificationAction(action: string, context: any) {
-    switch (action) {
-      case "notify_staff":
-        console.log("Notifying staff:", context.message)
-        toast.info("Staff notified: Order ready for service")
-        break
-      case "notify_guest":
-        console.log("Notifying guest:", context.message)
-        toast.info("Guest notified about maintenance")
-        break
-      default:
-        console.warn(`Unknown notification action: ${action}`)
-    }
+  getAllWorkflows(): Workflow[] {
+    return Array.from(this.workflows.values())
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms))
+  }
+
+  // Predefined workflow templates
+  createCheckInWorkflow(guestData: any, roomData: any) {
+    return this.createWorkflow(
+      "Guest Check-In",
+      "Complete guest check-in process",
+      [
+        {
+          id: "validate_guest_info",
+          name: "Validate Guest Information",
+          description: "Verify guest details and identification",
+          automated: true,
+        },
+        {
+          id: "check_room_availability",
+          name: "Check Room Availability",
+          description: "Confirm room is available and ready",
+          automated: true,
+          dependencies: ["validate_guest_info"],
+        },
+        {
+          id: "assign_room",
+          name: "Assign Room",
+          description: "Assign room to guest",
+          automated: true,
+          dependencies: ["check_room_availability"],
+        },
+        {
+          id: "process_payment",
+          name: "Process Payment",
+          description: "Process payment or deposit",
+          automated: false,
+          dependencies: ["assign_room"],
+        },
+        {
+          id: "update_room_status",
+          name: "Update Room Status",
+          description: "Mark room as occupied",
+          automated: true,
+          dependencies: ["process_payment"],
+        },
+        {
+          id: "provide_room_keys",
+          name: "Provide Room Keys",
+          description: "Give keys and welcome packet to guest",
+          automated: false,
+          dependencies: ["update_room_status"],
+        },
+      ],
+      { guest: guestData, room: roomData },
+    )
+  }
+
+  createCheckOutWorkflow(guestData: any, roomData: any) {
+    return this.createWorkflow(
+      "Guest Check-Out",
+      "Complete guest check-out process",
+      [
+        {
+          id: "generate_invoice",
+          name: "Generate Final Invoice",
+          description: "Create final bill with all charges",
+          automated: true,
+        },
+        {
+          id: "process_payment",
+          name: "Process Final Payment",
+          description: "Collect any outstanding payments",
+          automated: false,
+          dependencies: ["generate_invoice"],
+        },
+        {
+          id: "collect_room_keys",
+          name: "Collect Room Keys",
+          description: "Retrieve room keys from guest",
+          automated: false,
+          dependencies: ["process_payment"],
+        },
+        {
+          id: "update_room_status",
+          name: "Update Room Status",
+          description: "Mark room as vacant/dirty",
+          automated: true,
+          dependencies: ["collect_room_keys"],
+        },
+        {
+          id: "notify_housekeeping",
+          name: "Notify Housekeeping",
+          description: "Alert housekeeping for room cleaning",
+          automated: true,
+          dependencies: ["update_room_status"],
+        },
+      ],
+      { guest: guestData, room: roomData },
+    )
+  }
+
+  createRestaurantOrderWorkflow(orderData: any) {
+    return this.createWorkflow(
+      "Restaurant Order",
+      "Process restaurant order from creation to completion",
+      [
+        {
+          id: "validate_order",
+          name: "Validate Order",
+          description: "Check menu items and availability",
+          automated: true,
+        },
+        {
+          id: "calculate_total",
+          name: "Calculate Total",
+          description: "Calculate order total with taxes",
+          automated: true,
+          dependencies: ["validate_order"],
+        },
+        {
+          id: "send_kitchen_order",
+          name: "Send to Kitchen",
+          description: "Forward order to kitchen for preparation",
+          automated: true,
+          dependencies: ["calculate_total"],
+        },
+        {
+          id: "update_inventory",
+          name: "Update Inventory",
+          description: "Deduct ingredients from inventory",
+          automated: true,
+          dependencies: ["send_kitchen_order"],
+        },
+        {
+          id: "prepare_order",
+          name: "Prepare Order",
+          description: "Kitchen prepares the order",
+          automated: false,
+          dependencies: ["update_inventory"],
+        },
+        {
+          id: "serve_order",
+          name: "Serve Order",
+          description: "Deliver order to customer",
+          automated: false,
+          dependencies: ["prepare_order"],
+        },
+      ],
+      { order: orderData },
+    )
+  }
+
+  createMaintenanceWorkflow(maintenanceData: any) {
+    return this.createWorkflow(
+      "Maintenance Request",
+      "Handle maintenance request from report to completion",
+      [
+        {
+          id: "assess_priority",
+          name: "Assess Priority",
+          description: "Determine urgency and priority level",
+          automated: true,
+        },
+        {
+          id: "assign_technician",
+          name: "Assign Technician",
+          description: "Assign appropriate maintenance staff",
+          automated: false,
+          dependencies: ["assess_priority"],
+        },
+        {
+          id: "update_room_status",
+          name: "Update Room Status",
+          description: "Mark room as under maintenance if needed",
+          automated: true,
+          dependencies: ["assign_technician"],
+        },
+        {
+          id: "perform_maintenance",
+          name: "Perform Maintenance",
+          description: "Complete the maintenance work",
+          automated: false,
+          dependencies: ["update_room_status"],
+        },
+        {
+          id: "verify_completion",
+          name: "Verify Completion",
+          description: "Inspect and verify work completion",
+          automated: false,
+          dependencies: ["perform_maintenance"],
+        },
+        {
+          id: "restore_room_status",
+          name: "Restore Room Status",
+          description: "Return room to available status",
+          automated: true,
+          dependencies: ["verify_completion"],
+        },
+      ],
+      { maintenance: maintenanceData },
+    )
   }
 }
 
-// Global workflow coordinator instance
+// Create singleton instance
 export const workflowCoordinator = new WorkflowCoordinator()
 
 // Helper functions for common workflows
-export const triggerCheckin = (bookingData: any) => {
-  workflowCoordinator.triggerEvent({
-    type: "booking.confirmed",
-    module: "bookings",
-    data: bookingData,
-    timestamp: new Date(),
-  })
+export const triggerCheckIn = (guestData: any, roomData: any) => {
+  return workflowCoordinator.createCheckInWorkflow(guestData, roomData)
+}
+
+export const triggerCheckOut = (guestData: any, roomData: any) => {
+  return workflowCoordinator.createCheckOutWorkflow(guestData, roomData)
 }
 
 export const triggerRestaurantOrder = (orderData: any) => {
-  workflowCoordinator.triggerEvent({
-    type: "order.created",
-    module: "orders",
-    data: orderData,
-    timestamp: new Date(),
-  })
-}
-
-export const triggerCheckout = (checkoutData: any) => {
-  workflowCoordinator.triggerEvent({
-    type: "checkout.initiated",
-    module: "bookings",
-    data: checkoutData,
-    timestamp: new Date(),
-  })
+  return workflowCoordinator.createRestaurantOrderWorkflow(orderData)
 }
 
 export const triggerMaintenanceRequest = (maintenanceData: any) => {
-  workflowCoordinator.triggerEvent({
-    type: "maintenance.requested",
-    module: "maintenance",
-    data: maintenanceData,
-    timestamp: new Date(),
-  })
+  return workflowCoordinator.createMaintenanceWorkflow(maintenanceData)
 }

@@ -2,153 +2,116 @@
 
 import { useState } from "react"
 import { useApi } from "./use-api"
-
-export type MaintenanceStatus = "pending" | "in_progress" | "resolved" | "unresolved"
+import { toast } from "sonner"
 
 export type MaintenanceRequest = {
   _id: string
-  room: {
+  type: string
+  priority: "low" | "medium" | "high" | "urgent"
+  status: "pending" | "assigned" | "in-progress" | "completed" | "cancelled"
+  description: string
+  room?: {
     _id: string
     number: string
     floor: string
-    building: string
-    status: string
   }
-  title: string
-  description: string
-  status: MaintenanceStatus
-  priority: "low" | "medium" | "high" | "critical"
-  reported_by: {
+  reportedBy: {
     _id: string
-    name: string
+    full_name: string
   }
-  assigned_to?: {
+  assignedTo?: {
     _id: string
-    name: string
+    full_name: string
   }
-  estimated_cost?: number
-  actual_cost?: number
-  resolved_at?: string
+  estimatedCost?: number
+  actualCost?: number
+  scheduledDate?: string
+  completedDate?: string
+  notes?: string
+  images?: string[]
   createdAt: string
   updatedAt: string
 }
 
 export type MaintenanceFilters = {
+  type?: string
+  priority?: string
+  status?: string
   room?: string
-  status?: MaintenanceStatus
-  assigned_to?: string
-  reported_by?: string
+  assignedTo?: string
   startDate?: string
   endDate?: string
-  sort?: string
-  limit?: number
   page?: number
+  limit?: number
+  sort?: string
 }
 
-export type MaintenanceStats = {
-  total: number
-  pending: number
-  in_progress: number
-  resolved: number
-  unresolved: number
-  totalCost: number
-  avgCost: number
-}
-
-export function useMaintenance() {
+export const useMaintenanceRequests = () => {
   const { request, isLoading } = useApi()
-  const [requests, setRequests] = useState<MaintenanceRequest[]>([])
-  const [stats, setStats] = useState<MaintenanceStats | null>(null)
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 10,
-    totalPages: 1,
-    total: 0,
-  })
+  const [maintenanceRequests, setMaintenanceRequests] = useState<MaintenanceRequest[]>([])
 
-  const fetchRequests = async (filters: MaintenanceFilters = {}) => {
-    const queryParams = new URLSearchParams()
-
-    // Add filters to query params
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== "") {
-        queryParams.append(key, String(value))
-      }
-    })
-
-    const { data, error } = await request<{
-      data: MaintenanceRequest[]
-      pagination: {
-        page: number
-        limit: number
-        totalPages: number
-      }
-      total: number
-    }>(`/maintenance?${queryParams.toString()}`)
-
-    if (data && !error) {
-      setRequests(data.data)
-      setPagination({
-        page: data.pagination.page,
-        limit: data.pagination.limit,
-        totalPages: data.pagination.totalPages,
-        total: data.total,
+  const getMaintenanceRequests = async (filters: MaintenanceFilters = {}) => {
+    try {
+      const queryParams = new URLSearchParams()
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== "") {
+          queryParams.append(key, String(value))
+        }
       })
-      return data.data
+
+      const response = await request<{
+        data: MaintenanceRequest[]
+        count: number
+        total: number
+        pagination: { page: number; limit: number; totalPages: number }
+      }>(`/maintenance?${queryParams.toString()}`)
+
+      if (response.data) {
+        setMaintenanceRequests(response.data.data || [])
+      }
+
+      return response
+    } catch (error) {
+      console.error("Error fetching maintenance requests:", error)
+      return { success: false, message: "Failed to fetch maintenance requests" }
     }
-
-    return []
   }
 
-  const fetchRequestById = async (id: string) => {
-    const { data, error } = await request<{ data: MaintenanceRequest }>(`/maintenance/${id}`)
-    return error ? null : data?.data
-  }
+  const createMaintenanceRequest = async (data: Partial<MaintenanceRequest>) => {
+    try {
+      const response = await request<MaintenanceRequest>("/maintenance", "POST", data)
 
-  const createRequest = async (requestData: Partial<MaintenanceRequest>) => {
-    const { data, error } = await request<{ data: MaintenanceRequest }>("/maintenance", "POST", requestData)
-    return { data: error ? null : data?.data, error }
-  }
+      if (response.success) {
+        toast.success("Maintenance request created successfully")
+      }
 
-  const updateRequest = async (id: string, requestData: Partial<MaintenanceRequest>) => {
-    const { data, error } = await request<{ data: MaintenanceRequest }>(`/maintenance/${id}`, "PUT", requestData)
-    return { data: error ? null : data?.data, error }
-  }
-
-  const deleteRequest = async (id: string) => {
-    const { data, error } = await request<{ message: string }>(`/maintenance/${id}`, "DELETE")
-    return { success: !error, message: error || data?.message }
-  }
-
-  const assignRequest = async (id: string, assignedTo: string) => {
-    const { data, error } = await request<{ data: MaintenanceRequest }>(`/maintenance/${id}/assign`, "PATCH", {
-      assignedTo,
-    })
-    return { data: error ? null : data?.data, error }
-  }
-
-  const fetchStats = async () => {
-    const { data, error } = await request<{ data: MaintenanceStats }>("/maintenance/stats")
-
-    if (data && !error) {
-      setStats(data.data)
-      return data.data
+      return response
+    } catch (error) {
+      console.error("Error creating maintenance request:", error)
+      return { success: false, message: "Failed to create maintenance request" }
     }
+  }
 
-    return null
+  const updateMaintenanceRequest = async (id: string, data: Partial<MaintenanceRequest>) => {
+    try {
+      const response = await request<MaintenanceRequest>(`/maintenance/${id}`, "PUT", data)
+
+      if (response.success) {
+        toast.success("Maintenance request updated successfully")
+      }
+
+      return response
+    } catch (error) {
+      console.error("Error updating maintenance request:", error)
+      return { success: false, message: "Failed to update maintenance request" }
+    }
   }
 
   return {
-    requests,
-    stats,
-    pagination,
+    maintenanceRequests,
+    getMaintenanceRequests,
+    createMaintenanceRequest,
+    updateMaintenanceRequest,
     isLoading,
-    fetchRequests,
-    fetchRequestById,
-    createRequest,
-    updateRequest,
-    deleteRequest,
-    assignRequest,
-    fetchStats,
   }
 }

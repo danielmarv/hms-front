@@ -5,108 +5,164 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import {
-  ShoppingCart,
-  Users,
-  DollarSign,
-  Clock,
-  ChefHat,
-  AlertTriangle,
-  Star,
-  Utensils,
-  Calendar,
-  Package,
-} from "lucide-react"
+import { Skeleton } from "@/components/ui/skeleton"
+import { ShoppingCart, Users, DollarSign, Clock, ChefHat, AlertTriangle, Star, Utensils, Package } from "lucide-react"
 import Link from "next/link"
 import { workflowCoordinator, triggerRestaurantOrder } from "@/lib/workflow-coordinator"
+import { useRestaurantOrders } from "@/hooks/use-restaurant-orders"
+import { useMenuItems } from "@/hooks/use-menu-items"
+import { useTables } from "@/hooks/use-tables"
+import { useKitchenOrders } from "@/hooks/use-kitchen-orders"
+import { toast } from "sonner"
 
 export default function RestaurantDashboard() {
+  const { getOrders, getOrderStats, loading: ordersLoading } = useRestaurantOrders()
+  const { getMenuItems, loading: menuLoading } = useMenuItems()
+  const { getTables, loading: tablesLoading } = useTables()
+  const { getKitchenOrders, getKitchenStats, loading: kitchenLoading } = useKitchenOrders()
+
   const [stats, setStats] = useState({
-    totalOrders: 45,
-    activeOrders: 12,
-    completedOrders: 33,
-    totalRevenue: 2850,
-    averageOrderValue: 63.33,
-    tablesOccupied: 18,
-    totalTables: 25,
-    kitchenQueue: 8,
+    totalOrders: 0,
+    activeOrders: 0,
+    completedOrders: 0,
+    totalRevenue: 0,
+    averageOrderValue: 0,
+    tablesOccupied: 0,
+    totalTables: 0,
+    kitchenQueue: 0,
     averageWaitTime: 25,
     customerSatisfaction: 4.6,
   })
 
-  const [activeOrders, setActiveOrders] = useState([
-    {
-      id: "ORD-001",
-      table: "Table 5",
-      items: 3,
-      total: 85.5,
-      status: "preparing",
-      time: "15 min",
-      priority: "normal",
-    },
-    {
-      id: "ORD-002",
-      table: "Table 12",
-      items: 2,
-      total: 42.0,
-      status: "ready",
-      time: "22 min",
-      priority: "high",
-    },
-    {
-      id: "ORD-003",
-      table: "Room 301",
-      items: 4,
-      total: 125.75,
-      status: "new",
-      time: "2 min",
-      priority: "normal",
-    },
-  ])
+  const [activeOrders, setActiveOrders] = useState([])
+  const [popularItems, setPopularItems] = useState([])
+  const [tableStatus, setTableStatus] = useState([])
 
-  const [popularItems, setPopularItems] = useState([
-    { name: "Grilled Salmon", orders: 12, revenue: 360 },
-    { name: "Caesar Salad", orders: 8, revenue: 120 },
-    { name: "Beef Tenderloin", orders: 6, revenue: 270 },
-    { name: "Pasta Carbonara", orders: 10, revenue: 180 },
-  ])
+  useEffect(() => {
+    loadRestaurantData()
+  }, [])
 
-  const [tableStatus, setTableStatus] = useState([
-    { number: 1, status: "occupied", guests: 4, server: "Alice", time: "45 min" },
-    { number: 2, status: "available", guests: 0, server: null, time: null },
-    { number: 3, status: "reserved", guests: 2, server: "Bob", time: "30 min" },
-    { number: 4, status: "occupied", guests: 6, server: "Carol", time: "20 min" },
-    { number: 5, status: "cleaning", guests: 0, server: null, time: "5 min" },
-  ])
+  const loadRestaurantData = async () => {
+    try {
+      // Load order statistics
+      const orderStatsResponse = await getOrderStats()
+      if (orderStatsResponse) {
+        setStats((prev) => ({
+          ...prev,
+          totalOrders: orderStatsResponse.totalOrders || 0,
+          totalRevenue: orderStatsResponse.totalRevenue || 0,
+          averageOrderValue: orderStatsResponse.averageOrderValue || 0,
+        }))
+      }
+
+      // Load active orders
+      const ordersResponse = await getOrders({
+        status: "pending,preparing,ready",
+        limit: 10,
+        sort: "-createdAt",
+      })
+      if (ordersResponse.data) {
+        setActiveOrders(
+          ordersResponse.data.map((order) => ({
+            id: order._id,
+            table: order.table?.number ? `Table ${order.table.number}` : order.deliveryInfo?.room || "Takeaway",
+            items: order.items?.length || 0,
+            total: order.totalAmount || 0,
+            status: order.status,
+            time: new Date(order.createdAt).toLocaleTimeString(),
+            priority: order.priority || "normal",
+          })),
+        )
+
+        setStats((prev) => ({
+          ...prev,
+          activeOrders: ordersResponse.data.filter((o) => ["pending", "preparing"].includes(o.status)).length,
+          completedOrders: ordersResponse.data.filter((o) => o.status === "completed").length,
+        }))
+      }
+
+      // Load kitchen statistics
+      const kitchenStatsResponse = await getKitchenStats()
+      if (kitchenStatsResponse) {
+        setStats((prev) => ({
+          ...prev,
+          kitchenQueue: kitchenStatsResponse.activeOrders || 0,
+        }))
+      }
+
+      // Load tables
+      const tablesResponse = await getTables()
+      if (tablesResponse.data) {
+        const tables = tablesResponse.data
+        setTableStatus(
+          tables.slice(0, 5).map((table) => ({
+            number: table.number,
+            status: table.status,
+            guests: table.currentGuests || 0,
+            server: table.assignedServer || null,
+            time: table.lastUpdated ? new Date(table.lastUpdated).toLocaleTimeString() : null,
+          })),
+        )
+
+        setStats((prev) => ({
+          ...prev,
+          totalTables: tables.length,
+          tablesOccupied: tables.filter((t) => t.status === "occupied").length,
+        }))
+      }
+
+      // Load popular menu items
+      const menuResponse = await getMenuItems({
+        featured: true,
+        limit: 4,
+        sort: "-popularity",
+      })
+      if (menuResponse.data) {
+        setPopularItems(
+          menuResponse.data.map((item) => ({
+            name: item.name,
+            orders: item.orderCount || Math.floor(Math.random() * 20), // Simulated for now
+            revenue: (item.orderCount || 5) * item.price,
+          })),
+        )
+      }
+    } catch (error) {
+      console.error("Error loading restaurant data:", error)
+      toast.error("Failed to load restaurant data")
+    }
+  }
 
   useEffect(() => {
     // Listen for workflow events
     const handleWorkflowEvent = (event: any) => {
       console.log("Restaurant received workflow event:", event)
-      // Update dashboard based on workflow events
-      if (event.type === "order.created") {
-        // Refresh active orders
-        // In a real app, you would fetch from API
+      // Refresh data when workflows complete
+      if (event.type === "order.created" || event.type === "order.updated") {
+        loadRestaurantData()
       }
     }
 
     workflowCoordinator.addEventListener("order.created", handleWorkflowEvent)
+    workflowCoordinator.addEventListener("order.updated", handleWorkflowEvent)
 
     return () => {
       workflowCoordinator.removeEventListener("order.created", handleWorkflowEvent)
+      workflowCoordinator.removeEventListener("order.updated", handleWorkflowEvent)
     }
   }, [])
 
   const getOrderStatusBadge = (status: string) => {
     switch (status) {
-      case "new":
-        return <Badge className="bg-blue-100 text-blue-800">New</Badge>
+      case "pending":
+        return <Badge className="bg-blue-100 text-blue-800">Pending</Badge>
       case "preparing":
         return <Badge className="bg-yellow-100 text-yellow-800">Preparing</Badge>
       case "ready":
         return <Badge className="bg-green-100 text-green-800">Ready</Badge>
       case "served":
         return <Badge className="bg-purple-100 text-purple-800">Served</Badge>
+      case "completed":
+        return <Badge className="bg-gray-100 text-gray-800">Completed</Badge>
       default:
         return <Badge variant="outline">{status}</Badge>
     }
@@ -135,6 +191,37 @@ export default function RestaurantDashboard() {
       items: [{ name: "Sample Item", quantity: 1, price: 25.0 }],
       total: 25.0,
     })
+
+    // Refresh data after creating order
+    setTimeout(() => {
+      loadRestaurantData()
+    }, 1000)
+  }
+
+  const isLoading = ordersLoading || menuLoading || tablesLoading || kitchenLoading
+
+  if (isLoading) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-[300px]" />
+          <Skeleton className="h-4 w-[500px]" />
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+          {[...Array(5)].map((_, i) => (
+            <Card key={i}>
+              <CardHeader>
+                <Skeleton className="h-4 w-[100px]" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-[60px]" />
+                <Skeleton className="h-3 w-[120px] mt-2" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -178,7 +265,7 @@ export default function RestaurantDashboard() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${stats.totalRevenue}</div>
+            <div className="text-2xl font-bold">${stats.totalRevenue.toFixed(0)}</div>
             <p className="text-xs text-muted-foreground">${stats.averageOrderValue.toFixed(2)} avg order</p>
           </CardContent>
         </Card>
@@ -193,7 +280,7 @@ export default function RestaurantDashboard() {
               {stats.tablesOccupied}/{stats.totalTables}
             </div>
             <p className="text-xs text-muted-foreground">
-              {((stats.tablesOccupied / stats.totalTables) * 100).toFixed(0)}% occupancy
+              {stats.totalTables > 0 ? ((stats.tablesOccupied / stats.totalTables) * 100).toFixed(0) : 0}% occupancy
             </p>
           </CardContent>
         </Card>
@@ -232,31 +319,35 @@ export default function RestaurantDashboard() {
           <CardContent>
             <ScrollArea className="h-[300px]">
               <div className="space-y-4">
-                {activeOrders.map((order) => (
-                  <div key={order.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium">{order.id}</p>
-                          {order.priority === "high" && <AlertTriangle className="h-4 w-4 text-red-500" />}
+                {activeOrders.length > 0 ? (
+                  activeOrders.map((order) => (
+                    <div key={order.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium">{order.id.slice(-6)}</p>
+                            {order.priority === "high" && <AlertTriangle className="h-4 w-4 text-red-500" />}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {order.table} • {order.items} items • ${order.total.toFixed(2)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            <Clock className="inline h-3 w-3 mr-1" />
+                            {order.time}
+                          </p>
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                          {order.table} • {order.items} items • ${order.total}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          <Clock className="inline h-3 w-3 mr-1" />
-                          {order.time}
-                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {getOrderStatusBadge(order.status)}
+                        <Button size="sm" variant="outline" asChild>
+                          <Link href={`/restaurant/orders/${order.id}`}>View</Link>
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {getOrderStatusBadge(order.status)}
-                      <Button size="sm" variant="outline" asChild>
-                        <Link href={`/restaurant/orders/${order.id}`}>View</Link>
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">No active orders</p>
+                )}
               </div>
             </ScrollArea>
           </CardContent>
@@ -270,20 +361,24 @@ export default function RestaurantDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {popularItems.map((item, index) => (
-                <div key={item.name} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-100 text-orange-600 text-sm font-medium">
-                      {index + 1}
+              {popularItems.length > 0 ? (
+                popularItems.map((item, index) => (
+                  <div key={item.name} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-100 text-orange-600 text-sm font-medium">
+                        {index + 1}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">{item.name}</p>
+                        <p className="text-xs text-muted-foreground">{item.orders} orders</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium">{item.name}</p>
-                      <p className="text-xs text-muted-foreground">{item.orders} orders</p>
-                    </div>
+                    <p className="text-sm font-medium">${item.revenue.toFixed(0)}</p>
                   </div>
-                  <p className="text-sm font-medium">${item.revenue}</p>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">No popular items data</p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -292,26 +387,30 @@ export default function RestaurantDashboard() {
         <Card className="lg:col-span-3">
           <CardHeader>
             <CardTitle>Table Status</CardTitle>
-            <CardDescription>Current status of all restaurant tables</CardDescription>
+            <CardDescription>Current status of restaurant tables</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-              {tableStatus.map((table) => (
-                <div key={table.number} className="p-4 border rounded-lg space-y-2">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-medium">Table {table.number}</h3>
-                    {getTableStatusBadge(table.status)}
+              {tableStatus.length > 0 ? (
+                tableStatus.map((table) => (
+                  <div key={table.number} className="p-4 border rounded-lg space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-medium">Table {table.number}</h3>
+                      {getTableStatusBadge(table.status)}
+                    </div>
+                    {table.guests > 0 && <p className="text-sm text-muted-foreground">{table.guests} guests</p>}
+                    {table.server && <p className="text-sm text-muted-foreground">Server: {table.server}</p>}
+                    {table.time && (
+                      <p className="text-xs text-muted-foreground">
+                        <Clock className="inline h-3 w-3 mr-1" />
+                        {table.time}
+                      </p>
+                    )}
                   </div>
-                  {table.guests > 0 && <p className="text-sm text-muted-foreground">{table.guests} guests</p>}
-                  {table.server && <p className="text-sm text-muted-foreground">Server: {table.server}</p>}
-                  {table.time && (
-                    <p className="text-xs text-muted-foreground">
-                      <Clock className="inline h-3 w-3 mr-1" />
-                      {table.time}
-                    </p>
-                  )}
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground col-span-5">No table data available</p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -338,9 +437,9 @@ export default function RestaurantDashboard() {
               </Link>
             </Button>
             <Button variant="outline" className="h-20 flex-col gap-2" asChild>
-              <Link href="/restaurant/reservations">
-                <Calendar className="h-6 w-6" />
-                Reservations
+              <Link href="/restaurant/tables">
+                <Users className="h-6 w-6" />
+                Table Management
               </Link>
             </Button>
             <Button variant="outline" className="h-20 flex-col gap-2" asChild>

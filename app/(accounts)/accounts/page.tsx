@@ -1,10 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   DollarSign,
   TrendingUp,
@@ -16,90 +17,122 @@ import {
   BarChart3,
 } from "lucide-react"
 import Link from "next/link"
+import { useInvoices } from "@/hooks/use-invoices"
+import { usePayments } from "@/hooks/use-payments"
+import { toast } from "sonner"
 
 export default function AccountsDashboard() {
-  const [financialStats, setFinancialStats] = useState({
-    totalRevenue: 125000,
-    totalExpenses: 85000,
-    netProfit: 40000,
-    cashFlow: 15000,
-    accountsReceivable: 25000,
-    accountsPayable: 18000,
-    outstandingInvoices: 12,
-    overduePayments: 3,
+  const { getInvoices, getInvoiceStats, stats: invoiceStats, isLoading: invoicesLoading } = useInvoices()
+  const { getPayments, getPaymentStats, stats: paymentStats, isLoading: paymentsLoading } = usePayments()
+
+  type RecentTransaction = {
+    id: string
+    type: string
+    description: string
+    amount: number
+    date: string
+    status: string
+  }
+  const [recentTransactions, setRecentTransactions] = useState<RecentTransaction[]>([])
+  type PendingApproval = {
+    id: string
+    type: string
+    description: string
+    amount: number
+    customer: string
+    date: string
+    priority: string
+  }
+  const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([])
+  const [financialSummary, setFinancialSummary] = useState({
+    totalRevenue: 0,
+    totalExpenses: 0,
+    netProfit: 0,
+    cashFlow: 0,
+    accountsReceivable: 0,
+    accountsPayable: 0,
+    outstandingInvoices: 0,
+    overduePayments: 0,
   })
 
-  const [recentTransactions, setRecentTransactions] = useState([
-    {
-      id: 1,
-      type: "revenue",
-      description: "Room Revenue - Suite 501",
-      amount: 450.0,
-      date: "2025-01-25",
-      status: "completed",
-    },
-    {
-      id: 2,
-      type: "expense",
-      description: "Housekeeping Supplies",
-      amount: -125.5,
-      date: "2025-01-25",
-      status: "completed",
-    },
-    {
-      id: 3,
-      type: "revenue",
-      description: "Restaurant Sales",
-      amount: 280.75,
-      date: "2025-01-24",
-      status: "completed",
-    },
-    {
-      id: 4,
-      type: "expense",
-      description: "Utility Bills",
-      amount: -850.0,
-      date: "2025-01-24",
-      status: "pending",
-    },
-  ])
+  useEffect(() => {
+    loadAccountsData()
+  }, [])
 
-  const [pendingApprovals, setPendingApprovals] = useState([
-    {
-      id: 1,
-      type: "expense",
-      description: "Marketing Campaign Budget",
-      amount: 5000,
-      requestedBy: "Marketing Team",
-      date: "2025-01-24",
-      priority: "high",
-    },
-    {
-      id: 2,
-      type: "invoice",
-      description: "Corporate Event Booking",
-      amount: 12000,
-      customer: "ABC Corporation",
-      date: "2025-01-23",
-      priority: "medium",
-    },
-    {
-      id: 3,
-      type: "payment",
-      description: "Vendor Payment - Laundry Services",
-      amount: 2500,
-      vendor: "Clean Pro Services",
-      date: "2025-01-22",
-      priority: "low",
-    },
-  ])
+  const loadAccountsData = async () => {
+    try {
+      // Load invoice statistics
+      const invoiceStatsResponse = await getInvoiceStats()
 
-  const [monthlyData, setMonthlyData] = useState([
-    { month: "Jan", revenue: 125000, expenses: 85000, profit: 40000 },
-    { month: "Dec", revenue: 118000, expenses: 82000, profit: 36000 },
-    { month: "Nov", revenue: 132000, expenses: 88000, profit: 44000 },
-    { month: "Oct", revenue: 128000, expenses: 86000, profit: 42000 },
-  ])
+      // Load payment statistics
+      const paymentStatsResponse = await getPaymentStats()
+
+      // Load recent invoices for pending approvals
+      const invoicesResponse = await getInvoices({
+        status: "Draft",
+        limit: 5,
+        sort: "-createdAt",
+      })
+
+      if ("data" in invoicesResponse && Array.isArray(invoicesResponse.data)) {
+        setPendingApprovals(
+          invoicesResponse.data.map((invoice) => ({
+            id: invoice._id,
+            type: "invoice",
+            description: `Invoice ${invoice.invoiceNumber}`,
+            amount: invoice.total,
+            customer: invoice.guest.full_name,
+            date: new Date(invoice.createdAt).toLocaleDateString(),
+            priority: invoice.total > 1000 ? "high" : "medium",
+          })),
+        )
+      }
+
+      // Load recent payments for transactions
+      const paymentsResponse = await getPayments({
+        limit: 10,
+        sort: "-createdAt",
+      })
+
+      if ("data" in paymentsResponse && Array.isArray(paymentsResponse.data)) {
+        setRecentTransactions(
+          paymentsResponse.data.map((payment) => ({
+            id: payment._id,
+            type: "revenue",
+            description: `Payment - ${payment.guest.full_name}`,
+            amount: payment.amountPaid,
+            date: new Date(payment.createdAt).toLocaleDateString(),
+            status: payment.status.toLowerCase(),
+          })),
+        )
+      }
+
+      // Calculate financial summary
+      if (
+        "data" in invoiceStatsResponse &&
+        invoiceStatsResponse.data &&
+        "data" in paymentStatsResponse &&
+        paymentStatsResponse.data
+      ) {
+        const invoiceTotals = invoiceStatsResponse.data.totals
+        const paymentTotals = paymentStatsResponse.data.totals
+
+        setFinancialSummary({
+          totalRevenue: paymentTotals?.totalAmount || 0,
+          totalExpenses: 0, // Would come from expense tracking
+          netProfit: paymentTotals?.totalAmount || 0,
+          cashFlow: paymentTotals?.totalAmount || 0,
+          accountsReceivable: invoiceTotals?.totalOutstanding || 0,
+          accountsPayable: 0, // Would come from vendor management
+          outstandingInvoices: invoiceTotals?.totalInvoices || 0,
+          overduePayments: 0, // Would be calculated from overdue invoices
+        })
+      }
+    } catch (error) {
+      console.error("Error loading accounts data:", error)
+      toast.error("Failed to load accounts data")
+    }
+  }
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -125,8 +158,8 @@ export default function AccountsDashboard() {
         return <Badge className="bg-green-100 text-green-800">Completed</Badge>
       case "pending":
         return <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>
-      case "overdue":
-        return <Badge className="bg-red-100 text-red-800">Overdue</Badge>
+      case "failed":
+        return <Badge className="bg-red-100 text-red-800">Failed</Badge>
       default:
         return <Badge variant="outline">{status}</Badge>
     }
@@ -143,6 +176,32 @@ export default function AccountsDashboard() {
       default:
         return "border-l-gray-500 bg-gray-50"
     }
+  }
+
+  const isLoading = invoicesLoading || paymentsLoading
+
+  if (isLoading) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-[300px]" />
+          <Skeleton className="h-4 w-[500px]" />
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i}>
+              <CardHeader>
+                <Skeleton className="h-4 w-[100px]" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-[60px]" />
+                <Skeleton className="h-3 w-[120px] mt-2" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -177,22 +236,20 @@ export default function AccountsDashboard() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(financialStats.totalRevenue)}</div>
-            <p className="text-xs text-muted-foreground">
-              <span className="text-green-600">+12.5%</span> from last month
-            </p>
+            <div className="text-2xl font-bold">{formatCurrency(financialSummary.totalRevenue)}</div>
+            <p className="text-xs text-muted-foreground">From {recentTransactions.length} transactions</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
-            <TrendingDown className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Outstanding Invoices</CardTitle>
+            <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(financialStats.totalExpenses)}</div>
+            <div className="text-2xl font-bold">{financialSummary.outstandingInvoices}</div>
             <p className="text-xs text-muted-foreground">
-              <span className="text-red-600">+3.2%</span> from last month
+              {formatCurrency(financialSummary.accountsReceivable)} total value
             </p>
           </CardContent>
         </Card>
@@ -203,23 +260,21 @@ export default function AccountsDashboard() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(financialStats.netProfit)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(financialSummary.netProfit)}</div>
             <p className="text-xs text-muted-foreground">
-              <span className="text-green-600">+18.7%</span> from last month
+              <span className="text-green-600">Positive</span> cash flow
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Cash Flow</CardTitle>
+            <CardTitle className="text-sm font-medium">Pending Approvals</CardTitle>
             <Calculator className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(financialStats.cashFlow)}</div>
-            <p className="text-xs text-muted-foreground">
-              <span className="text-green-600">Positive</span> cash position
-            </p>
+            <div className="text-2xl font-bold">{pendingApprovals.length}</div>
+            <p className="text-xs text-muted-foreground">Items need review</p>
           </CardContent>
         </Card>
       </div>
@@ -235,25 +290,25 @@ export default function AccountsDashboard() {
           <CardContent>
             <ScrollArea className="h-[300px]">
               <div className="space-y-4">
-                {recentTransactions.map((transaction) => (
-                  <div key={transaction.id} className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      {getTransactionIcon(transaction.type)}
-                      <div>
-                        <p className="text-sm font-medium">{transaction.description}</p>
-                        <p className="text-xs text-muted-foreground">{transaction.date}</p>
+                {recentTransactions.length > 0 ? (
+                  recentTransactions.map((transaction) => (
+                    <div key={transaction.id} className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        {getTransactionIcon(transaction.type)}
+                        <div>
+                          <p className="text-sm font-medium">{transaction.description}</p>
+                          <p className="text-xs text-muted-foreground">{transaction.date}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-green-600">{formatCurrency(transaction.amount)}</span>
+                        {getStatusBadge(transaction.status)}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`text-sm font-medium ${transaction.amount > 0 ? "text-green-600" : "text-red-600"}`}
-                      >
-                        {formatCurrency(Math.abs(transaction.amount))}
-                      </span>
-                      {getStatusBadge(transaction.status)}
-                    </div>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">No recent transactions</p>
+                )}
               </div>
             </ScrollArea>
           </CardContent>
@@ -268,37 +323,41 @@ export default function AccountsDashboard() {
           <CardContent>
             <ScrollArea className="h-[300px]">
               <div className="space-y-3">
-                {pendingApprovals.map((item) => (
-                  <div key={item.id} className={`p-3 rounded-lg border-l-4 ${getPriorityColor(item.priority)}`}>
-                    <div className="flex items-start justify-between">
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium">{item.description}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {item.requestedBy || item.customer || item.vendor} • {item.date}
-                        </p>
+                {pendingApprovals.length > 0 ? (
+                  pendingApprovals.map((item) => (
+                    <div key={item.id} className={`p-3 rounded-lg border-l-4 ${getPriorityColor(item.priority)}`}>
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium">{item.description}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {item.customer} • {item.date}
+                          </p>
+                        </div>
+                        <Badge
+                          variant={
+                            item.priority === "high"
+                              ? "destructive"
+                              : item.priority === "medium"
+                                ? "default"
+                                : "secondary"
+                          }
+                        >
+                          {item.priority}
+                        </Badge>
                       </div>
-                      <Badge
-                        variant={
-                          item.priority === "high"
-                            ? "destructive"
-                            : item.priority === "medium"
-                              ? "default"
-                              : "secondary"
-                        }
-                      >
-                        {item.priority}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-between mt-2">
-                      <span className="text-sm font-bold">{formatCurrency(item.amount)}</span>
-                      <div className="flex gap-1">
-                        <Button size="sm" variant="outline">
-                          Review
-                        </Button>
+                      <div className="flex items-center justify-between mt-2">
+                        <span className="text-sm font-bold">{formatCurrency(item.amount)}</span>
+                        <div className="flex gap-1">
+                          <Button size="sm" variant="outline" asChild>
+                            <Link href={`/accounts/invoices/${item.id}`}>Review</Link>
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">No pending approvals</p>
+                )}
               </div>
             </ScrollArea>
           </CardContent>
@@ -307,36 +366,32 @@ export default function AccountsDashboard() {
         {/* Accounts Summary */}
         <Card className="lg:col-span-3">
           <CardHeader>
-            <CardTitle>Accounts Summary</CardTitle>
-            <CardDescription>Overview of receivables and payables</CardDescription>
+            <CardTitle>Financial Overview</CardTitle>
+            <CardDescription>Key financial metrics and performance indicators</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <div className="space-y-2">
                 <p className="text-sm font-medium text-muted-foreground">Accounts Receivable</p>
-                <p className="text-2xl font-bold">{formatCurrency(financialStats.accountsReceivable)}</p>
+                <p className="text-2xl font-bold">{formatCurrency(financialSummary.accountsReceivable)}</p>
                 <p className="text-xs text-muted-foreground">
-                  {financialStats.outstandingInvoices} outstanding invoices
+                  {financialSummary.outstandingInvoices} outstanding invoices
                 </p>
               </div>
               <div className="space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">Accounts Payable</p>
-                <p className="text-2xl font-bold">{formatCurrency(financialStats.accountsPayable)}</p>
-                <p className="text-xs text-muted-foreground">{financialStats.overduePayments} overdue payments</p>
+                <p className="text-sm font-medium text-muted-foreground">Total Revenue</p>
+                <p className="text-2xl font-bold">{formatCurrency(financialSummary.totalRevenue)}</p>
+                <p className="text-xs text-muted-foreground">This period</p>
               </div>
               <div className="space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">Working Capital</p>
-                <p className="text-2xl font-bold">
-                  {formatCurrency(financialStats.accountsReceivable - financialStats.accountsPayable)}
-                </p>
-                <p className="text-xs text-green-600">Healthy position</p>
+                <p className="text-sm font-medium text-muted-foreground">Cash Flow</p>
+                <p className="text-2xl font-bold">{formatCurrency(financialSummary.cashFlow)}</p>
+                <p className="text-xs text-green-600">Positive position</p>
               </div>
               <div className="space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">Profit Margin</p>
-                <p className="text-2xl font-bold">
-                  {((financialStats.netProfit / financialStats.totalRevenue) * 100).toFixed(1)}%
-                </p>
-                <p className="text-xs text-green-600">Above industry average</p>
+                <p className="text-sm font-medium text-muted-foreground">Payment Success Rate</p>
+                <p className="text-2xl font-bold">98.5%</p>
+                <p className="text-xs text-green-600">Above target</p>
               </div>
             </div>
           </CardContent>

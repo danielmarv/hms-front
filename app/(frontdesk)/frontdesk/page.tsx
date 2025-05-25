@@ -9,108 +9,94 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Users, Calendar, CreditCard, Key, UserCheck, UserX, Clock, AlertTriangle } from "lucide-react"
 import Link from "next/link"
 import { workflowCoordinator } from "@/lib/workflow-coordinator"
+import { useRooms } from "@/hooks/use-rooms"
+import { useGuests } from "@/hooks/use-guests"
+import { useHousekeeping } from "@/hooks/use-housekeeping"
+import { Skeleton } from "@/components/ui/skeleton"
+import { toast } from "sonner"
 
 export default function FrontDeskDashboard() {
-  const [stats, setStats] = useState({
-    occupancy: 85,
-    availableRooms: 15,
-    totalRooms: 100,
-    checkInsToday: 12,
-    checkOutsToday: 8,
-    pendingCheckIns: 5,
-    pendingCheckOuts: 3,
-    maintenanceRequests: 2,
-    guestComplaints: 1,
-  })
+  const { fetchRooms, fetchRoomStats, roomStats, isLoading: roomsLoading } = useRooms()
+  const { getGuests, getGuestStatistics, guestStats, isLoading: guestsLoading } = useGuests()
+  const { getMaintenanceRequests, isLoading: maintenanceLoading } = useHousekeeping()
 
-  const [recentActivity, setRecentActivity] = useState([
-    {
-      id: 1,
-      type: "checkin",
-      guest: "John Smith",
-      room: "301",
-      time: "10:30 AM",
-      status: "completed",
-    },
-    {
-      id: 2,
-      type: "checkout",
-      guest: "Sarah Johnson",
-      room: "205",
-      time: "11:15 AM",
-      status: "pending",
-    },
-    {
-      id: 3,
-      type: "maintenance",
-      description: "AC not working",
-      room: "412",
-      time: "09:45 AM",
-      status: "in-progress",
-    },
-    {
-      id: 4,
-      type: "payment",
-      guest: "Michael Brown",
-      amount: "$450.00",
-      time: "10:00 AM",
-      status: "completed",
-    },
-  ])
+  const [recentActivity, setRecentActivity] = useState([])
+  const [pendingTasks, setPendingTasks] = useState([])
+  const [upcomingArrivals, setUpcomingArrivals] = useState([])
+  const [maintenanceRequests, setMaintenanceRequests] = useState([])
 
-  const [pendingTasks, setPendingTasks] = useState([
-    {
-      id: 1,
-      title: "Process late checkout - Room 308",
-      priority: "high",
-      time: "30 min ago",
-    },
-    {
-      id: 2,
-      title: "Verify payment for reservation #12345",
-      priority: "medium",
-      time: "1 hour ago",
-    },
-    {
-      id: 3,
-      title: "Update guest preferences for VIP arrival",
-      priority: "low",
-      time: "2 hours ago",
-    },
-  ])
+  useEffect(() => {
+    loadDashboardData()
+  }, [])
 
-  const [upcomingArrivals, setUpcomingArrivals] = useState([
-    {
-      id: 1,
-      guest: "Emily Davis",
-      room: "Suite 501",
-      time: "2:00 PM",
-      status: "confirmed",
-      vip: true,
-    },
-    {
-      id: 2,
-      guest: "Robert Wilson",
-      room: "310",
-      time: "3:30 PM",
-      status: "confirmed",
-      vip: false,
-    },
-    {
-      id: 3,
-      guest: "Lisa Anderson",
-      room: "205",
-      time: "4:15 PM",
-      status: "pending",
-      vip: false,
-    },
-  ])
+  const loadDashboardData = async () => {
+    try {
+      // Load room statistics
+      await fetchRoomStats()
+
+      // Load guest statistics
+      await getGuestStatistics()
+
+      // Load recent guests for upcoming arrivals
+      const guestsResponse = await getGuests({ limit: 10, sort: "-createdAt" })
+      if (guestsResponse.data) {
+        setUpcomingArrivals(
+          guestsResponse.data.slice(0, 5).map((guest) => ({
+            id: guest._id,
+            guest: guest.full_name,
+            room: "TBD", // Would come from booking data
+            time: new Date().toLocaleTimeString(),
+            status: "confirmed",
+            vip: guest.vip,
+          })),
+        )
+      }
+
+      // Load maintenance requests
+      const maintenanceResponse = await getMaintenanceRequests({ status: "pending", limit: 5 })
+      if (maintenanceResponse.data) {
+        setMaintenanceRequests(maintenanceResponse.data)
+        setPendingTasks(
+          maintenanceResponse.data.map((req) => ({
+            id: req._id,
+            title: `${req.type} - Room ${req.room?.number || "N/A"}`,
+            priority: req.priority,
+            time: new Date(req.createdAt).toLocaleString(),
+          })),
+        )
+      }
+
+      // Simulate recent activity (in real app, this would come from activity logs)
+      setRecentActivity([
+        {
+          id: 1,
+          type: "checkin",
+          guest: "Recent Check-in",
+          room: "301",
+          time: new Date().toLocaleTimeString(),
+          status: "completed",
+        },
+        {
+          id: 2,
+          type: "maintenance",
+          description: "Maintenance Request",
+          room: "412",
+          time: new Date().toLocaleTimeString(),
+          status: "pending",
+        },
+      ])
+    } catch (error) {
+      console.error("Error loading dashboard data:", error)
+      toast.error("Failed to load dashboard data")
+    }
+  }
 
   useEffect(() => {
     // Listen for workflow events
     const handleWorkflowEvent = (event: any) => {
       console.log("Front desk received workflow event:", event)
-      // Update dashboard based on workflow events
+      // Refresh data when workflows complete
+      loadDashboardData()
     }
 
     workflowCoordinator.addEventListener("*", handleWorkflowEvent)
@@ -161,6 +147,36 @@ export default function FrontDeskDashboard() {
     }
   }
 
+  const isLoading = roomsLoading || guestsLoading || maintenanceLoading
+
+  if (isLoading) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-[300px]" />
+          <Skeleton className="h-4 w-[500px]" />
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i}>
+              <CardHeader>
+                <Skeleton className="h-4 w-[100px]" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-[60px]" />
+                <Skeleton className="h-3 w-[120px] mt-2" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  const occupancyRate = roomStats ? Math.round(((roomStats.total - roomStats.available) / roomStats.total) * 100) : 0
+  const availableRooms = roomStats?.available || 0
+  const totalRooms = roomStats?.total || 0
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -193,30 +209,32 @@ export default function FrontDeskDashboard() {
             <Key className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.occupancy}%</div>
-            <p className="text-xs text-muted-foreground">{stats.availableRooms} rooms available</p>
+            <div className="text-2xl font-bold">{occupancyRate}%</div>
+            <p className="text-xs text-muted-foreground">{availableRooms} rooms available</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Check-ins Today</CardTitle>
-            <UserCheck className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Total Guests</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.checkInsToday}</div>
-            <p className="text-xs text-muted-foreground">{stats.pendingCheckIns} pending</p>
+            <div className="text-2xl font-bold">{guestStats?.totalGuests || 0}</div>
+            <p className="text-xs text-muted-foreground">{guestStats?.vipGuests || 0} VIP guests</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Check-outs Today</CardTitle>
-            <UserX className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Room Status</CardTitle>
+            <Key className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.checkOutsToday}</div>
-            <p className="text-xs text-muted-foreground">{stats.pendingCheckOuts} pending</p>
+            <div className="text-2xl font-bold">{roomStats?.occupied || 0}</div>
+            <p className="text-xs text-muted-foreground">
+              {roomStats?.cleaning || 0} cleaning, {roomStats?.maintenance || 0} maintenance
+            </p>
           </CardContent>
         </Card>
 
@@ -226,10 +244,8 @@ export default function FrontDeskDashboard() {
             <AlertTriangle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.maintenanceRequests + stats.guestComplaints}</div>
-            <p className="text-xs text-muted-foreground">
-              {stats.maintenanceRequests} maintenance, {stats.guestComplaints} complaints
-            </p>
+            <div className="text-2xl font-bold">{maintenanceRequests.length}</div>
+            <p className="text-xs text-muted-foreground">Maintenance requests pending</p>
           </CardContent>
         </Card>
       </div>
@@ -245,27 +261,30 @@ export default function FrontDeskDashboard() {
           <CardContent>
             <ScrollArea className="h-[300px]">
               <div className="space-y-4">
-                {recentActivity.map((activity) => (
-                  <div key={activity.id} className="flex items-center justify-between space-x-4">
-                    <div className="flex items-center space-x-3">
-                      {getActivityIcon(activity.type)}
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium leading-none">
-                          {activity.type === "checkin" && `Check-in: ${activity.guest}`}
-                          {activity.type === "checkout" && `Check-out: ${activity.guest}`}
-                          {activity.type === "maintenance" && activity.description}
-                          {activity.type === "payment" && `Payment: ${activity.guest}`}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {activity.room && `Room ${activity.room} • `}
-                          {activity.amount && `${activity.amount} • `}
-                          {activity.time}
-                        </p>
+                {recentActivity.length > 0 ? (
+                  recentActivity.map((activity) => (
+                    <div key={activity.id} className="flex items-center justify-between space-x-4">
+                      <div className="flex items-center space-x-3">
+                        {getActivityIcon(activity.type)}
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium leading-none">
+                            {activity.type === "checkin" && `Check-in: ${activity.guest}`}
+                            {activity.type === "checkout" && `Check-out: ${activity.guest}`}
+                            {activity.type === "maintenance" && activity.description}
+                            {activity.type === "payment" && `Payment: ${activity.guest}`}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {activity.room && `Room ${activity.room} • `}
+                            {activity.time}
+                          </p>
+                        </div>
                       </div>
+                      {getStatusBadge(activity.status)}
                     </div>
-                    {getStatusBadge(activity.status)}
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">No recent activity</p>
+                )}
               </div>
             </ScrollArea>
           </CardContent>
@@ -280,25 +299,29 @@ export default function FrontDeskDashboard() {
           <CardContent>
             <ScrollArea className="h-[300px]">
               <div className="space-y-3">
-                {pendingTasks.map((task) => (
-                  <div key={task.id} className={`p-3 rounded-lg border-l-4 ${getPriorityColor(task.priority)}`}>
-                    <p className="text-sm font-medium">{task.title}</p>
-                    <div className="flex items-center justify-between mt-2">
-                      <p className="text-xs text-muted-foreground">{task.time}</p>
-                      <Badge
-                        variant={
-                          task.priority === "high"
-                            ? "destructive"
-                            : task.priority === "medium"
-                              ? "default"
-                              : "secondary"
-                        }
-                      >
-                        {task.priority}
-                      </Badge>
+                {pendingTasks.length > 0 ? (
+                  pendingTasks.map((task) => (
+                    <div key={task.id} className={`p-3 rounded-lg border-l-4 ${getPriorityColor(task.priority)}`}>
+                      <p className="text-sm font-medium">{task.title}</p>
+                      <div className="flex items-center justify-between mt-2">
+                        <p className="text-xs text-muted-foreground">{task.time}</p>
+                        <Badge
+                          variant={
+                            task.priority === "high"
+                              ? "destructive"
+                              : task.priority === "medium"
+                                ? "default"
+                                : "secondary"
+                          }
+                        >
+                          {task.priority}
+                        </Badge>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">No pending tasks</p>
+                )}
               </div>
             </ScrollArea>
           </CardContent>
@@ -307,40 +330,44 @@ export default function FrontDeskDashboard() {
         {/* Upcoming Arrivals */}
         <Card className="lg:col-span-3">
           <CardHeader>
-            <CardTitle>Upcoming Arrivals</CardTitle>
-            <CardDescription>Guests expected to arrive today</CardDescription>
+            <CardTitle>Recent Guests</CardTitle>
+            <CardDescription>Recently registered guests</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {upcomingArrivals.map((arrival) => (
-                <div key={arrival.id} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <Avatar>
-                      <AvatarFallback>
-                        {arrival.guest
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium">{arrival.guest}</p>
-                        {arrival.vip && <Badge className="bg-purple-100 text-purple-800">VIP</Badge>}
+              {upcomingArrivals.length > 0 ? (
+                upcomingArrivals.map((arrival) => (
+                  <div key={arrival.id} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <Avatar>
+                        <AvatarFallback>
+                          {arrival.guest
+                            .split(" ")
+                            .map((n) => n[0])
+                            .join("")}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium">{arrival.guest}</p>
+                          {arrival.vip && <Badge className="bg-purple-100 text-purple-800">VIP</Badge>}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {arrival.room} • {arrival.time}
+                        </p>
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        {arrival.room} • Expected: {arrival.time}
-                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {getStatusBadge(arrival.status)}
+                      <Button size="sm" variant="outline" asChild>
+                        <Link href={`/frontdesk/guests/${arrival.id}`}>View</Link>
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {getStatusBadge(arrival.status)}
-                    <Button size="sm" variant="outline">
-                      Prepare
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">No recent guests</p>
+              )}
             </div>
           </CardContent>
         </Card>
