@@ -15,6 +15,30 @@ import { useTables } from "@/hooks/use-tables"
 import { useKitchenOrders } from "@/hooks/use-kitchen-orders"
 import { toast } from "sonner"
 
+interface OrderItem {
+  id: string
+  table: string
+  items: number
+  total: number
+  status: string
+  time: string
+  priority: string
+}
+
+interface PopularItem {
+  name: string
+  orders: number
+  revenue: number
+}
+
+interface TableItem {
+  number: string
+  status: string
+  guests: number
+  server: string | null
+  time: string | null
+}
+
 export default function RestaurantDashboard() {
   const { getOrders, getOrderStats, loading: ordersLoading } = useRestaurantOrders()
   const { getMenuItems, loading: menuLoading } = useMenuItems()
@@ -34,9 +58,9 @@ export default function RestaurantDashboard() {
     customerSatisfaction: 4.6,
   })
 
-  const [activeOrders, setActiveOrders] = useState([])
-  const [popularItems, setPopularItems] = useState([])
-  const [tableStatus, setTableStatus] = useState([])
+  const [activeOrders, setActiveOrders] = useState<OrderItem[]>([])
+  const [popularItems, setPopularItems] = useState<PopularItem[]>([])
+  const [tableStatus, setTableStatus] = useState<TableItem[]>([])
 
   useEffect(() => {
     loadRestaurantData()
@@ -46,24 +70,23 @@ export default function RestaurantDashboard() {
     try {
       // Load order statistics
       const orderStatsResponse = await getOrderStats()
-      if (orderStatsResponse) {
+      if (orderStatsResponse?.data) {
         setStats((prev) => ({
           ...prev,
-          totalOrders: orderStatsResponse.totalOrders || 0,
-          totalRevenue: orderStatsResponse.totalRevenue || 0,
-          averageOrderValue: orderStatsResponse.averageOrderValue || 0,
+          totalOrders: orderStatsResponse.data?.totalOrders || 0,
+          totalRevenue: orderStatsResponse.data?.totalRevenue || 0,
+          averageOrderValue: orderStatsResponse.data?.averageOrderValue || 0,
         }))
       }
 
       // Load active orders
       const ordersResponse = await getOrders({
-        status: "pending,preparing,ready",
         limit: 10,
         sort: "-createdAt",
       })
-      if (ordersResponse.data) {
+      if (ordersResponse?.data && Array.isArray(ordersResponse.data)) {
         setActiveOrders(
-          ordersResponse.data.map((order) => ({
+          ordersResponse.data.map((order: any) => ({
             id: order._id,
             table: order.table?.number ? `Table ${order.table.number}` : order.deliveryInfo?.room || "Takeaway",
             items: order.items?.length || 0,
@@ -76,26 +99,30 @@ export default function RestaurantDashboard() {
 
         setStats((prev) => ({
           ...prev,
-          activeOrders: ordersResponse.data.filter((o) => ["pending", "preparing"].includes(o.status)).length,
-          completedOrders: ordersResponse.data.filter((o) => o.status === "completed").length,
+          activeOrders: Array.isArray(ordersResponse.data)
+            ? ordersResponse.data.filter((o: any) => ["pending", "preparing"].includes(o.status)).length
+            : 0,
+          completedOrders: Array.isArray(ordersResponse.data)
+            ? ordersResponse.data.filter((o: any) => o.status === "completed").length
+            : 0,
         }))
       }
 
       // Load kitchen statistics
       const kitchenStatsResponse = await getKitchenStats()
-      if (kitchenStatsResponse) {
+      if (kitchenStatsResponse?.data) {
         setStats((prev) => ({
           ...prev,
-          kitchenQueue: kitchenStatsResponse.activeOrders || 0,
+          kitchenQueue: kitchenStatsResponse.data?.activeOrders || 0,
         }))
       }
 
       // Load tables
       const tablesResponse = await getTables()
-      if (tablesResponse.data) {
+      if (tablesResponse?.data && Array.isArray(tablesResponse.data)) {
         const tables = tablesResponse.data
         setTableStatus(
-          tables.slice(0, 5).map((table) => ({
+          tables.slice(0, 5).map((table: any) => ({
             number: table.number,
             status: table.status,
             guests: table.currentGuests || 0,
@@ -107,7 +134,7 @@ export default function RestaurantDashboard() {
         setStats((prev) => ({
           ...prev,
           totalTables: tables.length,
-          tablesOccupied: tables.filter((t) => t.status === "occupied").length,
+          tablesOccupied: tables.filter((t: any) => t.status === "occupied").length,
         }))
       }
 
@@ -117,9 +144,9 @@ export default function RestaurantDashboard() {
         limit: 4,
         sort: "-popularity",
       })
-      if (menuResponse.data) {
+      if (menuResponse?.data && Array.isArray(menuResponse.data)) {
         setPopularItems(
-          menuResponse.data.map((item) => ({
+          menuResponse.data.map((item: any) => ({
             name: item.name,
             orders: item.orderCount || Math.floor(Math.random() * 20), // Simulated for now
             revenue: (item.orderCount || 5) * item.price,

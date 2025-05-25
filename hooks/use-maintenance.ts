@@ -81,7 +81,7 @@ export const useMaintenanceRequests = () => {
     try {
       const response = await request<MaintenanceRequest>("/maintenance", "POST", data)
 
-      if (response.success) {
+      if (response.data) {
         toast.success("Maintenance request created successfully")
       }
 
@@ -96,7 +96,7 @@ export const useMaintenanceRequests = () => {
     try {
       const response = await request<MaintenanceRequest>(`/maintenance/${id}`, "PUT", data)
 
-      if (response.success) {
+      if (response.data) {
         toast.success("Maintenance request updated successfully")
       }
 

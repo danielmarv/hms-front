@@ -11,19 +11,45 @@ import Link from "next/link"
 import { workflowCoordinator } from "@/lib/workflow-coordinator"
 import { useRooms } from "@/hooks/use-rooms"
 import { useGuests } from "@/hooks/use-guests"
-import { useHousekeeping } from "@/hooks/use-housekeeping"
+import { useMaintenanceRequests } from "@/hooks/use-maintenance"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
+
+interface ActivityItem {
+  id: number
+  type: string
+  guest?: string
+  room?: string
+  time: string
+  status: string
+  description?: string
+}
+
+interface TaskItem {
+  id: string
+  title: string
+  priority: string
+  time: string
+}
+
+interface ArrivalItem {
+  id: string
+  guest: string
+  room: string
+  time: string
+  status: string
+  vip: boolean
+}
 
 export default function FrontDeskDashboard() {
   const { fetchRooms, fetchRoomStats, roomStats, isLoading: roomsLoading } = useRooms()
   const { getGuests, getGuestStatistics, guestStats, isLoading: guestsLoading } = useGuests()
-  const { getMaintenanceRequests, isLoading: maintenanceLoading } = useHousekeeping()
+  const { getMaintenanceRequests, isLoading: maintenanceLoading } = useMaintenanceRequests()
 
-  const [recentActivity, setRecentActivity] = useState([])
-  const [pendingTasks, setPendingTasks] = useState([])
-  const [upcomingArrivals, setUpcomingArrivals] = useState([])
-  const [maintenanceRequests, setMaintenanceRequests] = useState([])
+  const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([])
+  const [pendingTasks, setPendingTasks] = useState<TaskItem[]>([])
+  const [upcomingArrivals, setUpcomingArrivals] = useState<ArrivalItem[]>([])
+  const [maintenanceRequests, setMaintenanceRequests] = useState<any[]>([])
 
   useEffect(() => {
     loadDashboardData()
@@ -39,25 +65,25 @@ export default function FrontDeskDashboard() {
 
       // Load recent guests for upcoming arrivals
       const guestsResponse = await getGuests({ limit: 10, sort: "-createdAt" })
-      if (guestsResponse.data) {
+      if (guestsResponse.data && Array.isArray(guestsResponse.data)) {
         setUpcomingArrivals(
-          guestsResponse.data.slice(0, 5).map((guest) => ({
+          guestsResponse.data.slice(0, 5).map((guest: any) => ({
             id: guest._id,
             guest: guest.full_name,
             room: "TBD", // Would come from booking data
             time: new Date().toLocaleTimeString(),
             status: "confirmed",
-            vip: guest.vip,
+            vip: guest.vip || false,
           })),
         )
       }
 
       // Load maintenance requests
       const maintenanceResponse = await getMaintenanceRequests({ status: "pending", limit: 5 })
-      if (maintenanceResponse.data) {
+      if ("data" in maintenanceResponse && Array.isArray(maintenanceResponse.data)) {
         setMaintenanceRequests(maintenanceResponse.data)
         setPendingTasks(
-          maintenanceResponse.data.map((req) => ({
+          maintenanceResponse.data.map((req: any) => ({
             id: req._id,
             title: `${req.type} - Room ${req.room?.number || "N/A"}`,
             priority: req.priority,
@@ -343,7 +369,7 @@ export default function FrontDeskDashboard() {
                         <AvatarFallback>
                           {arrival.guest
                             .split(" ")
-                            .map((n) => n[0])
+                            .map((n: string) => n[0])
                             .join("")}
                         </AvatarFallback>
                       </Avatar>

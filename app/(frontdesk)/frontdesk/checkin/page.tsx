@@ -14,7 +14,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "sonner"
 import { Search, UserCheck, Phone, Mail, Calendar, Users } from "lucide-react"
-import { triggerCheckin } from "@/lib/workflow-coordinator"
+import { triggerCheckIn } from "@/lib/workflow-coordinator"
 
 export default function CheckInPage() {
   const router = useRouter()
@@ -99,7 +99,7 @@ export default function CheckInPage() {
 
     try {
       // Trigger check-in workflow
-      await triggerCheckin({
+      await triggerCheckIn({
         bookingId: selectedBooking.id,
         guestId: selectedBooking.guest.id,
         roomId: checkInData.roomNumber,
