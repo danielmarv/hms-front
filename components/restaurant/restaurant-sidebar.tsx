@@ -51,7 +51,7 @@ const navigation = [
   },
   {
     name: "Kitchen Display",
-    href: "/restaurant/kitchen",
+    href: "/kitchen",
     icon: ChefHat,
   },
   {
