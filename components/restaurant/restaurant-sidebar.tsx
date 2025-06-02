@@ -100,11 +100,11 @@ export function RestaurantSidebar({ user }: RestaurantSidebarProps) {
   const [open, setOpen] = useState(false)
 
   const SidebarContent = () => (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col bg-sidebar">
       {/* Header */}
-      <div className="flex h-16 items-center border-b px-6">
-        <div className="flex items-center gap-2 font-semibold">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-600 text-white">
+      <div className="flex h-16 items-center border-b border-sidebar-border px-6">
+        <div className="flex items-center gap-2 font-semibold text-sidebar-foreground">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
             <Utensils className="h-4 w-4" />
           </div>
           <span className="text-lg">Restaurant</span>
@@ -124,8 +124,8 @@ export function RestaurantSidebar({ user }: RestaurantSidebarProps) {
                 className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                   isActive
-                    ? "bg-orange-600 text-white"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                 )}
               >
                 <item.icon className="h-4 w-4" />
@@ -137,13 +137,16 @@ export function RestaurantSidebar({ user }: RestaurantSidebarProps) {
       </ScrollArea>
 
       {/* User Menu */}
-      <div className="border-t p-4">
+      <div className="border-t border-sidebar-border p-4">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="w-full justify-start gap-3 px-3">
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-3 px-3 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            >
               <Avatar className="h-8 w-8">
                 <AvatarImage src={user?.avatar || "/placeholder.svg"} />
-                <AvatarFallback>
+                <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground">
                   {user?.full_name
                     ?.split(" ")
                     .map((n: string) => n[0])
@@ -153,7 +156,7 @@ export function RestaurantSidebar({ user }: RestaurantSidebarProps) {
               </Avatar>
               <div className="flex flex-col items-start text-sm">
                 <span className="font-medium">{user?.full_name || "Restaurant Manager"}</span>
-                <span className="text-xs text-muted-foreground">Restaurant Team</span>
+                <span className="text-xs text-sidebar-foreground/70">Restaurant Team</span>
               </div>
             </Button>
           </DropdownMenuTrigger>
@@ -193,7 +196,7 @@ export function RestaurantSidebar({ user }: RestaurantSidebarProps) {
 
       {/* Desktop Sidebar */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
-        <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r bg-white">
+        <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r border-sidebar-border bg-sidebar">
           <SidebarContent />
         </div>
       </div>

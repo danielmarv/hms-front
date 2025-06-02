@@ -17,11 +17,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
-  Users,
+  Hotel,
   Calendar,
+  Users,
   CreditCard,
-  Key,
-  Bell,
   Settings,
   LogOut,
   Menu,
@@ -31,7 +30,7 @@ import {
   ClipboardList,
   Phone,
   MessageSquare,
-  AlertTriangle,
+  Key,
 } from "lucide-react"
 
 const navigation = [
@@ -56,6 +55,16 @@ const navigation = [
     icon: Calendar,
   },
   {
+    name: "Guest Services",
+    href: "/frontdesk/services",
+    icon: Phone,
+  },
+  {
+    name: "Room Status",
+    href: "/frontdesk/rooms",
+    icon: Key,
+  },
+  {
     name: "Guests",
     href: "/frontdesk/guests",
     icon: Users,
@@ -66,29 +75,14 @@ const navigation = [
     icon: CreditCard,
   },
   {
-    name: "Room Status",
-    href: "/frontdesk/rooms",
-    icon: Key,
-  },
-  {
-    name: "Tasks",
-    href: "/frontdesk/tasks",
-    icon: ClipboardList,
-  },
-  {
     name: "Messages",
     href: "/frontdesk/messages",
     icon: MessageSquare,
   },
   {
-    name: "Incidents",
-    href: "/frontdesk/incidents",
-    icon: AlertTriangle,
-  },
-  {
-    name: "Phone Directory",
-    href: "/frontdesk/directory",
-    icon: Phone,
+    name: "Reports",
+    href: "/frontdesk/reports",
+    icon: ClipboardList,
   },
 ]
 
@@ -101,12 +95,12 @@ export function FrontDeskSidebar({ user }: FrontDeskSidebarProps) {
   const [open, setOpen] = useState(false)
 
   const SidebarContent = () => (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col bg-sidebar">
       {/* Header */}
-      <div className="flex h-16 items-center border-b px-6">
-        <div className="flex items-center gap-2 font-semibold">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <UserCheck className="h-4 w-4" />
+      <div className="flex h-16 items-center border-b border-sidebar-border px-6">
+        <div className="flex items-center gap-2 font-semibold text-sidebar-foreground">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+            <Hotel className="h-4 w-4" />
           </div>
           <span className="text-lg">Front Desk</span>
         </div>
@@ -125,8 +119,8 @@ export function FrontDeskSidebar({ user }: FrontDeskSidebarProps) {
                 className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                   isActive
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                 )}
               >
                 <item.icon className="h-4 w-4" />
@@ -138,13 +132,16 @@ export function FrontDeskSidebar({ user }: FrontDeskSidebarProps) {
       </ScrollArea>
 
       {/* User Menu */}
-      <div className="border-t p-4">
+      <div className="border-t border-sidebar-border p-4">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="w-full justify-start gap-3 px-3">
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-3 px-3 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            >
               <Avatar className="h-8 w-8">
                 <AvatarImage src={user?.avatar || "/placeholder.svg"} />
-                <AvatarFallback>
+                <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground">
                   {user?.full_name
                     ?.split(" ")
                     .map((n: string) => n[0])
@@ -153,8 +150,8 @@ export function FrontDeskSidebar({ user }: FrontDeskSidebarProps) {
                 </AvatarFallback>
               </Avatar>
               <div className="flex flex-col items-start text-sm">
-                <span className="font-medium">{user?.full_name || "Front Desk"}</span>
-                <span className="text-xs text-muted-foreground">Front Desk Agent</span>
+                <span className="font-medium">{user?.full_name || "Front Desk Agent"}</span>
+                <span className="text-xs text-sidebar-foreground/70">Front Desk Team</span>
               </div>
             </Button>
           </DropdownMenuTrigger>
@@ -165,12 +162,6 @@ export function FrontDeskSidebar({ user }: FrontDeskSidebarProps) {
               <Link href="/frontdesk/profile">
                 <Settings className="mr-2 h-4 w-4" />
                 Profile Settings
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/frontdesk/notifications">
-                <Bell className="mr-2 h-4 w-4" />
-                Notifications
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -200,7 +191,7 @@ export function FrontDeskSidebar({ user }: FrontDeskSidebarProps) {
 
       {/* Desktop Sidebar */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
-        <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r bg-white">
+        <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r border-sidebar-border bg-sidebar">
           <SidebarContent />
         </div>
       </div>

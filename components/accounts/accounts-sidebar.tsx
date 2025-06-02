@@ -18,21 +18,18 @@ import {
 } from "@/components/ui/dropdown-menu"
 import {
   Calculator,
-  CreditCard,
+  DollarSign,
   FileText,
   TrendingUp,
-  PieChart,
-  Receipt,
-  Banknote,
-  Building,
-  Users,
   Settings,
   LogOut,
   Menu,
   Home,
-  DollarSign,
-  FileBarChart,
-  Wallet,
+  CreditCard,
+  Receipt,
+  PieChart,
+  Users,
+  Building,
 } from "lucide-react"
 
 const navigation = [
@@ -40,6 +37,11 @@ const navigation = [
     name: "Dashboard",
     href: "/accounts",
     icon: Home,
+  },
+  {
+    name: "Transactions",
+    href: "/accounts/transactions",
+    icon: DollarSign,
   },
   {
     name: "Invoices",
@@ -57,49 +59,29 @@ const navigation = [
     icon: Receipt,
   },
   {
-    name: "Expenses",
-    href: "/accounts/expenses",
-    icon: Banknote,
-  },
-  {
-    name: "Revenue",
-    href: "/accounts/revenue",
-    icon: DollarSign,
-  },
-  {
     name: "Financial Reports",
     href: "/accounts/reports",
-    icon: FileBarChart,
-  },
-  {
-    name: "Budget & Forecasting",
-    href: "/accounts/budget",
     icon: TrendingUp,
   },
   {
-    name: "Analytics",
-    href: "/accounts/analytics",
+    name: "Budget Planning",
+    href: "/accounts/budget",
     icon: PieChart,
   },
   {
-    name: "Accounts Payable",
-    href: "/accounts/payable",
-    icon: Wallet,
-  },
-  {
-    name: "Accounts Receivable",
-    href: "/accounts/receivable",
+    name: "Tax Management",
+    href: "/accounts/tax",
     icon: Calculator,
   },
   {
-    name: "Vendors",
-    href: "/accounts/vendors",
-    icon: Building,
+    name: "Payroll",
+    href: "/accounts/payroll",
+    icon: Users,
   },
   {
-    name: "Customers",
-    href: "/accounts/customers",
-    icon: Users,
+    name: "Assets",
+    href: "/accounts/assets",
+    icon: Building,
   },
 ]
 
@@ -112,11 +94,11 @@ export function AccountsSidebar({ user }: AccountsSidebarProps) {
   const [open, setOpen] = useState(false)
 
   const SidebarContent = () => (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col bg-sidebar">
       {/* Header */}
-      <div className="flex h-16 items-center border-b px-6">
-        <div className="flex items-center gap-2 font-semibold">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-600 text-white">
+      <div className="flex h-16 items-center border-b border-sidebar-border px-6">
+        <div className="flex items-center gap-2 font-semibold text-sidebar-foreground">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
             <Calculator className="h-4 w-4" />
           </div>
           <span className="text-lg">Accounts</span>
@@ -136,8 +118,8 @@ export function AccountsSidebar({ user }: AccountsSidebarProps) {
                 className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                   isActive
-                    ? "bg-green-600 text-white"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                 )}
               >
                 <item.icon className="h-4 w-4" />
@@ -149,13 +131,16 @@ export function AccountsSidebar({ user }: AccountsSidebarProps) {
       </ScrollArea>
 
       {/* User Menu */}
-      <div className="border-t p-4">
+      <div className="border-t border-sidebar-border p-4">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="w-full justify-start gap-3 px-3">
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-3 px-3 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            >
               <Avatar className="h-8 w-8">
                 <AvatarImage src={user?.avatar || "/placeholder.svg"} />
-                <AvatarFallback>
+                <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground">
                   {user?.full_name
                     ?.split(" ")
                     .map((n: string) => n[0])
@@ -165,7 +150,7 @@ export function AccountsSidebar({ user }: AccountsSidebarProps) {
               </Avatar>
               <div className="flex flex-col items-start text-sm">
                 <span className="font-medium">{user?.full_name || "Accountant"}</span>
-                <span className="text-xs text-muted-foreground">Finance Team</span>
+                <span className="text-xs text-sidebar-foreground/70">Accounts Team</span>
               </div>
             </Button>
           </DropdownMenuTrigger>
@@ -205,7 +190,7 @@ export function AccountsSidebar({ user }: AccountsSidebarProps) {
 
       {/* Desktop Sidebar */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
-        <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r bg-white">
+        <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r border-sidebar-border bg-sidebar">
           <SidebarContent />
         </div>
       </div>
