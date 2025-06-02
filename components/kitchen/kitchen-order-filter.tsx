@@ -25,7 +25,7 @@ export function KitchenOrderFilter({ onFilterChange }: KitchenOrderFilterProps) 
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
-    onFilterChange({ search: orderNumber })
+    onFilterChange({ orderNumber })
   }
 
   const handlePriorityChange = (value: string) => {
@@ -38,7 +38,16 @@ export function KitchenOrderFilter({ onFilterChange }: KitchenOrderFilterProps) 
     onFilterChange({ orderType: value === "all" ? undefined : value })
   }
 
-  const handleDateRangeChange = (range: { from?: Date; to?: Date }) => {
+  const handleDateRangeChange = (range: { from?: Date; to?: Date } | undefined) => {
+    if (!range) {
+      setDateRange({})
+      onFilterChange({
+        startDate: undefined,
+        endDate: undefined,
+      })
+      return
+    }
+
     setDateRange(range)
     onFilterChange({
       startDate: range.from ? format(range.from, "yyyy-MM-dd") : undefined,
@@ -51,7 +60,13 @@ export function KitchenOrderFilter({ onFilterChange }: KitchenOrderFilterProps) 
     setPriority(undefined)
     setOrderType(undefined)
     setDateRange({})
-    onFilterChange({})
+    onFilterChange({
+      orderNumber: undefined,
+      priority: undefined,
+      orderType: undefined,
+      startDate: undefined,
+      endDate: undefined,
+    })
   }
 
   return (
@@ -111,7 +126,16 @@ export function KitchenOrderFilter({ onFilterChange }: KitchenOrderFilterProps) 
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Date Range</label>
-              <DateRangePicker value={dateRange} onChange={handleDateRangeChange} />
+              <DateRangePicker
+                value={
+                  dateRange.from && dateRange.to
+                    ? { from: dateRange.from, to: dateRange.to }
+                    : dateRange.from
+                      ? { from: dateRange.from, to: dateRange.from }
+                      : undefined
+                }
+                onChange={handleDateRangeChange}
+              />
             </div>
           </div>
 
