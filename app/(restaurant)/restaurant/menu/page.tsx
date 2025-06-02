@@ -1,18 +1,23 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Plus, Search, Edit, Trash2, Star, Eye, EyeOff, Utensils, DollarSign } from "lucide-react"
+import { Plus, Edit, Trash2, Star, Utensils, DollarSign, Eye } from "lucide-react"
 import Link from "next/link"
 import { useMenuItems } from "@/hooks/use-menu-items"
 import { toast } from "sonner"
+
+// Import consistent components
+import { PageHeader } from "@/components/ui/page-header"
+import { StatsGrid, StatCard } from "@/components/ui/stats-grid"
+import { FilterBar } from "@/components/ui/filter-bar"
+import { StatusBadge } from "@/components/ui/status-badge"
+import { EmptyState } from "@/components/ui/empty-state"
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton"
+import { Card, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 
 export default function MenuPage() {
   const { getMenuItems, deleteMenuItem, toggleAvailability, toggleFeatured, loading } = useMenuItems()
@@ -46,7 +51,6 @@ export default function MenuPage() {
   const filterItems = () => {
     let filtered = menuItems
 
-    // Search filter
     if (searchTerm) {
       filtered = filtered.filter(
         (item) =>
@@ -56,12 +60,10 @@ export default function MenuPage() {
       )
     }
 
-    // Category filter
     if (categoryFilter !== "all") {
       filtered = filtered.filter((item) => item.category === categoryFilter)
     }
 
-    // Availability filter
     if (availabilityFilter !== "all") {
       const isAvailable = availabilityFilter === "available"
       filtered = filtered.filter((item) => item.available === isAvailable)
@@ -95,181 +97,106 @@ export default function MenuPage() {
 
   const categories = [...new Set(menuItems.map((item) => item.category))].filter(Boolean)
 
+  const calculateStats = () => {
+    const available = menuItems.filter((item) => item.available).length
+    const featured = menuItems.filter((item) => item.featured).length
+    const avgPrice = menuItems.length > 0 ? menuItems.reduce((sum, item) => sum + item.price, 0) / menuItems.length : 0
+
+    return {
+      total: menuItems.length,
+      available,
+      featured,
+      avgPrice,
+    }
+  }
+
+  const stats = calculateStats()
+
   if (loading) {
-    return (
-      <div className="p-6 space-y-6">
-        <div className="space-y-2">
-          <Skeleton className="h-8 w-[200px]" />
-          <Skeleton className="h-4 w-[400px]" />
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {[...Array(6)].map((_, i) => (
-            <Card key={i}>
-              <CardContent className="p-4">
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-[150px]" />
-                  <Skeleton className="h-4 w-[100px]" />
-                  <Skeleton className="h-4 w-[80px]" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-    )
+    return <LoadingSkeleton variant="page" />
   }
 
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Menu Management</h1>
-          <p className="text-muted-foreground">Manage your restaurant menu items and categories</p>
-        </div>
-        <Button asChild>
-          <Link href="/restaurant/menu/new">
-            <Plus className="mr-2 h-4 w-4" />
-            Add Menu Item
-          </Link>
-        </Button>
-      </div>
+      <PageHeader
+        title="Menu Management"
+        description="Manage your restaurant menu items and categories"
+        action={
+          <Button asChild>
+            <Link href="/restaurant/menu/new">
+              <Plus className="mr-2 h-4 w-4" />
+              Add Menu Item
+            </Link>
+          </Button>
+        }
+      />
 
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Utensils className="h-4 w-4 text-muted-foreground" />
-              <div>
-                <p className="text-sm text-muted-foreground">Total Items</p>
-                <p className="text-2xl font-bold">{menuItems.length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Eye className="h-4 w-4 text-green-600" />
-              <div>
-                <p className="text-sm text-muted-foreground">Available</p>
-                <p className="text-2xl font-bold">{menuItems.filter((item) => item.available).length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Star className="h-4 w-4 text-yellow-600" />
-              <div>
-                <p className="text-sm text-muted-foreground">Featured</p>
-                <p className="text-2xl font-bold">{menuItems.filter((item) => item.featured).length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-              <div>
-                <p className="text-sm text-muted-foreground">Avg Price</p>
-                <p className="text-2xl font-bold">
-                  $
-                  {menuItems.length > 0
-                    ? (menuItems.reduce((sum, item) => sum + item.price, 0) / menuItems.length).toFixed(2)
-                    : "0.00"}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <StatsGrid>
+        <StatCard title="Total Items" value={stats.total} icon={Utensils} />
+        <StatCard title="Available" value={stats.available} icon={Eye} />
+        <StatCard title="Featured" value={stats.featured} icon={Star} />
+        <StatCard title="Avg Price" value={`$${stats.avgPrice.toFixed(2)}`} icon={DollarSign} />
+      </StatsGrid>
 
       {/* Filters */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                placeholder="Search menu items..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {categories.map((category) => (
-                  <SelectItem key={category} value={category}>
-                    {category}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={availabilityFilter} onValueChange={setAvailabilityFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by availability" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Items</SelectItem>
-                <SelectItem value="available">Available</SelectItem>
-                <SelectItem value="unavailable">Unavailable</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+      <FilterBar
+        searchPlaceholder="Search menu items..."
+        searchValue={searchTerm}
+        onSearchChange={setSearchTerm}
+        filters={[
+          {
+            placeholder: "Filter by category",
+            value: categoryFilter,
+            onChange: setCategoryFilter,
+            options: [
+              { value: "all", label: "All Categories" },
+              ...categories.map((category) => ({ value: category, label: category })),
+            ],
+          },
+          {
+            placeholder: "Filter by availability",
+            value: availabilityFilter,
+            onChange: setAvailabilityFilter,
+            options: [
+              { value: "all", label: "All Items" },
+              { value: "available", label: "Available" },
+              { value: "unavailable", label: "Unavailable" },
+            ],
+          },
+        ]}
+      />
 
       {/* Menu Items Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {filteredItems.length > 0 ? (
-          filteredItems.map((item) => (
+      {filteredItems.length > 0 ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {filteredItems.map((item) => (
             <Card key={item._id}>
-              <CardContent className="p-4">
-                <div className="space-y-3">
+              <CardContent className="p-6">
+                <div className="space-y-4">
                   <div className="flex items-start justify-between">
-                    <div className="space-y-1">
+                    <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <h3 className="font-semibold">{item.name}</h3>
-                        {item.featured && (
-                          <Badge variant="secondary">
-                            <Star className="w-3 h-3 mr-1" />
-                            Featured
-                          </Badge>
-                        )}
+                        {item.featured && <StatusBadge status="featured" showIcon />}
                       </div>
                       {item.category && <Badge variant="outline">{item.category}</Badge>}
                     </div>
-                    <div className="flex items-center gap-1">
-                      {item.available ? (
-                        <Eye className="h-4 w-4 text-green-600" />
-                      ) : (
-                        <EyeOff className="h-4 w-4 text-red-600" />
-                      )}
-                    </div>
+                    <StatusBadge status={item.available ? "active" : "inactive"} />
                   </div>
 
                   {item.description && <p className="text-sm text-muted-foreground line-clamp-2">{item.description}</p>}
 
                   <div className="flex items-center justify-between">
                     <span className="text-lg font-bold">${item.price.toFixed(2)}</span>
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          checked={item.available}
-                          onCheckedChange={() => handleToggleAvailability(item._id)}
-                          size="sm"
-                        />
-                        <Label className="text-xs">Available</Label>
-                      </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        checked={item.available}
+                        onCheckedChange={() => handleToggleAvailability(item._id)}
+                        size="sm"
+                      />
+                      <Label className="text-xs">Available</Label>
                     </div>
                   </div>
 
@@ -295,24 +222,23 @@ export default function MenuPage() {
                 </div>
               </CardContent>
             </Card>
-          ))
-        ) : (
-          <Card className="col-span-full">
-            <CardContent className="p-12 text-center">
-              <Utensils className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No menu items found</h3>
-              <p className="text-muted-foreground mb-4">
-                {searchTerm || categoryFilter !== "all" || availabilityFilter !== "all"
-                  ? "No items match your current filters."
-                  : "Start by adding your first menu item."}
-              </p>
-              <Button asChild>
-                <Link href="/restaurant/menu/new">Add Menu Item</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <EmptyState
+          icon={Utensils}
+          title="No menu items found"
+          description={
+            searchTerm || categoryFilter !== "all" || availabilityFilter !== "all"
+              ? "No items match your current filters."
+              : "Start by adding your first menu item."
+          }
+          action={{
+            label: "Add Menu Item",
+            href: "/restaurant/menu/new",
+          }}
+        />
+      )}
     </div>
   )
 }

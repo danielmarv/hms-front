@@ -42,7 +42,7 @@ export default function RestaurantLayout({
 
   if (isLoading || isCheckingAuth) {
     return (
-      <div className="flex h-screen w-full items-center justify-center">
+      <div className="flex h-screen w-full items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     )
@@ -53,10 +53,10 @@ export default function RestaurantLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-background">
       <RestaurantSidebar user={user} />
       <main className="flex-1 pl-0 lg:pl-72">
-        <div className="h-full">{children}</div>
+        <div className="h-full bg-background">{children}</div>
       </main>
       <Toaster position="top-right" />
     </div>

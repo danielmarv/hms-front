@@ -1,16 +1,21 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Plus, Search, Edit, Trash2, Users, Clock, CheckCircle, AlertCircle, XCircle } from "lucide-react"
+import { Plus, Edit, Trash2, Users, Clock, CheckCircle, AlertCircle } from "lucide-react"
 import Link from "next/link"
 import { useTables } from "@/hooks/use-tables"
 import { toast } from "sonner"
+
+// Import consistent components
+import { PageHeader } from "@/components/ui/page-header"
+import { StatsGrid, StatCard } from "@/components/ui/stats-grid"
+import { FilterBar } from "@/components/ui/filter-bar"
+import { StatusBadge } from "@/components/ui/status-badge"
+import { EmptyState } from "@/components/ui/empty-state"
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton"
+import { Card, CardContent } from "@/components/ui/card"
 
 export default function TablesPage() {
   const { getTables, deleteTable, updateTableStatus, loading } = useTables()
@@ -42,7 +47,6 @@ export default function TablesPage() {
   const filterTables = () => {
     let filtered = tables
 
-    // Search filter
     if (searchTerm) {
       filtered = filtered.filter(
         (table) =>
@@ -52,7 +56,6 @@ export default function TablesPage() {
       )
     }
 
-    // Status filter
     if (statusFilter !== "all") {
       filtered = filtered.filter((table) => table.status === statusFilter)
     }
@@ -78,169 +81,83 @@ export default function TablesPage() {
     }
   }
 
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      available: { color: "bg-green-100 text-green-800", icon: CheckCircle },
-      occupied: { color: "bg-red-100 text-red-800", icon: Users },
-      reserved: { color: "bg-blue-100 text-blue-800", icon: Clock },
-      cleaning: { color: "bg-yellow-100 text-yellow-800", icon: AlertCircle },
-      maintenance: { color: "bg-gray-100 text-gray-800", icon: XCircle },
-    }
-
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.available
-    const Icon = config.icon
-
-    return (
-      <Badge className={config.color}>
-        <Icon className="w-3 h-3 mr-1" />
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </Badge>
-    )
-  }
-
   const getTablesByStatus = (status: string) => {
     return tables.filter((table) => table.status === status)
   }
 
+  const calculateStats = () => {
+    return {
+      total: tables.length,
+      available: getTablesByStatus("available").length,
+      occupied: getTablesByStatus("occupied").length,
+      reserved: getTablesByStatus("reserved").length,
+      cleaning: getTablesByStatus("cleaning").length,
+    }
+  }
+
+  const stats = calculateStats()
+
   if (loading) {
-    return (
-      <div className="p-6 space-y-6">
-        <div className="space-y-2">
-          <Skeleton className="h-8 w-[200px]" />
-          <Skeleton className="h-4 w-[400px]" />
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {[...Array(8)].map((_, i) => (
-            <Card key={i}>
-              <CardContent className="p-4">
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-[100px]" />
-                  <Skeleton className="h-4 w-[80px]" />
-                  <Skeleton className="h-4 w-[120px]" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-    )
+    return <LoadingSkeleton variant="page" />
   }
 
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Table Management</h1>
-          <p className="text-muted-foreground">Manage restaurant tables and their current status</p>
-        </div>
-        <Button asChild>
-          <Link href="/restaurant/tables/new">
-            <Plus className="mr-2 h-4 w-4" />
-            Add Table
-          </Link>
-        </Button>
-      </div>
+      <PageHeader
+        title="Table Management"
+        description="Manage restaurant tables and their current status"
+        action={
+          <Button asChild>
+            <Link href="/restaurant/tables/new">
+              <Plus className="mr-2 h-4 w-4" />
+              Add Table
+            </Link>
+          </Button>
+        }
+      />
 
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-5">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-muted-foreground" />
-              <div>
-                <p className="text-sm text-muted-foreground">Total Tables</p>
-                <p className="text-2xl font-bold">{tables.length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-green-600" />
-              <div>
-                <p className="text-sm text-muted-foreground">Available</p>
-                <p className="text-2xl font-bold">{getTablesByStatus("available").length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-red-600" />
-              <div>
-                <p className="text-sm text-muted-foreground">Occupied</p>
-                <p className="text-2xl font-bold">{getTablesByStatus("occupied").length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-blue-600" />
-              <div>
-                <p className="text-sm text-muted-foreground">Reserved</p>
-                <p className="text-2xl font-bold">{getTablesByStatus("reserved").length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 text-yellow-600" />
-              <div>
-                <p className="text-sm text-muted-foreground">Cleaning</p>
-                <p className="text-2xl font-bold">{getTablesByStatus("cleaning").length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <StatsGrid className="md:grid-cols-5">
+        <StatCard title="Total Tables" value={stats.total} icon={Users} />
+        <StatCard title="Available" value={stats.available} icon={CheckCircle} />
+        <StatCard title="Occupied" value={stats.occupied} icon={Users} />
+        <StatCard title="Reserved" value={stats.reserved} icon={Clock} />
+        <StatCard title="Cleaning" value={stats.cleaning} icon={AlertCircle} />
+      </StatsGrid>
 
       {/* Filters */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                placeholder="Search tables by number, location, or server..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="available">Available</SelectItem>
-                <SelectItem value="occupied">Occupied</SelectItem>
-                <SelectItem value="reserved">Reserved</SelectItem>
-                <SelectItem value="cleaning">Cleaning</SelectItem>
-                <SelectItem value="maintenance">Maintenance</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+      <FilterBar
+        searchPlaceholder="Search tables by number, location, or server..."
+        searchValue={searchTerm}
+        onSearchChange={setSearchTerm}
+        filters={[
+          {
+            placeholder: "Filter by status",
+            value: statusFilter,
+            onChange: setStatusFilter,
+            options: [
+              { value: "all", label: "All Statuses" },
+              { value: "available", label: "Available" },
+              { value: "occupied", label: "Occupied" },
+              { value: "reserved", label: "Reserved" },
+              { value: "cleaning", label: "Cleaning" },
+              { value: "maintenance", label: "Maintenance" },
+            ],
+          },
+        ]}
+      />
 
       {/* Tables Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {filteredTables.length > 0 ? (
-          filteredTables.map((table) => (
-            <Card key={table._id} className="relative">
-              <CardContent className="p-4">
-                <div className="space-y-3">
+      {filteredTables.length > 0 ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {filteredTables.map((table) => (
+            <Card key={table._id}>
+              <CardContent className="p-6">
+                <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-semibold">Table {table.number}</h3>
-                    {getStatusBadge(table.status)}
+                    <StatusBadge status={table.status} variant={table.status} />
                   </div>
 
                   <div className="space-y-2 text-sm">
@@ -307,24 +224,23 @@ export default function TablesPage() {
                 </div>
               </CardContent>
             </Card>
-          ))
-        ) : (
-          <Card className="col-span-full">
-            <CardContent className="p-12 text-center">
-              <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No tables found</h3>
-              <p className="text-muted-foreground mb-4">
-                {searchTerm || statusFilter !== "all"
-                  ? "No tables match your current filters."
-                  : "Start by adding your first table."}
-              </p>
-              <Button asChild>
-                <Link href="/restaurant/tables/new">Add Table</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <EmptyState
+          icon={Users}
+          title="No tables found"
+          description={
+            searchTerm || statusFilter !== "all"
+              ? "No tables match your current filters."
+              : "Start by adding your first table."
+          }
+          action={{
+            label: "Add Table",
+            href: "/restaurant/tables/new",
+          }}
+        />
+      )}
     </div>
   )
 }
