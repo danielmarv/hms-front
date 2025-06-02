@@ -215,7 +215,7 @@ export default function HomePage() {
       description: "Check-ins, check-outs, and guest services",
       icon: UserCheck,
       href: "/frontdesk",
-      color: "bg-blue-50 border-blue-200 hover:bg-blue-100",
+      color: "bg-background border-blue-200 hover:bg-blue-100 hover:text-black",
       stats: {
         primary: `${occupancyRate}% occupied`,
         secondary: `${roomStats?.available || 0} available rooms`,
@@ -228,7 +228,7 @@ export default function HomePage() {
       description: "Room cleaning and maintenance schedules",
       icon: Wrench,
       href: "/dashboard/housekeeping",
-      color: "bg-green-50 border-green-200 hover:bg-green-100",
+      color: "bg-background border-green-200 hover:bg-green-100 hover:text-black",
       stats: {
         primary: `${roomStats?.cleaning || 0} rooms cleaning`,
         secondary: "12 tasks completed today",
@@ -241,7 +241,7 @@ export default function HomePage() {
       description: "Booking management and availability",
       icon: Calendar,
       href: "/dashboard/bookings",
-      color: "bg-purple-50 border-purple-200 hover:bg-purple-100",
+      color: "bg-background  border-purple-200 hover:bg-purple-100 hover:text-black",
       stats: {
         primary: `${dashboardData?.summary?.totalBookings || 0} bookings`,
         secondary: "15 arriving today",
@@ -254,7 +254,7 @@ export default function HomePage() {
       description: "Kitchen orders and dining services",
       icon: UtensilsCrossed,
       href: "/restaurant",
-      color: "bg-orange-50 border-orange-200 hover:bg-orange-100",
+      color: "bg-background border-orange-200 hover:bg-orange-100 hover:text-black",
       stats: {
         primary: "24 active orders",
         secondary: "Average 15min prep time",
@@ -267,7 +267,7 @@ export default function HomePage() {
       description: "Payments, invoicing, and financial reports",
       icon: CreditCard,
       href: "/dashboard/payments",
-      color: "bg-emerald-50 border-emerald-200 hover:bg-emerald-100",
+      color: "bg-background  border-emerald-200 hover:bg-emerald-100 hover:text-black ",
       stats: {
         primary: `$${totalRevenue.toLocaleString()}`,
         secondary: "Monthly revenue",
@@ -280,7 +280,7 @@ export default function HomePage() {
       description: "Performance metrics and insights",
       icon: BarChart3,
       href: "/dashboard/analytics",
-      color: "bg-indigo-50 border-indigo-200 hover:bg-indigo-100",
+      color: "bg-background  border-indigo-200 hover:bg-indigo-100 hover:text-black",
       stats: {
         primary: "95% satisfaction",
         secondary: "Guest satisfaction rate",
