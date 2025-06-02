@@ -349,7 +349,7 @@ export default function CheckInPage() {
                     />
                   </div>
 
-                  <div className="p-3 bg-gray-50 rounded-lg">
+                  <div className="p-3 bg-background rounded-lg">
                     <h4 className="text-sm font-medium mb-2">Payment Summary</h4>
                     <div className="space-y-1 text-sm">
                       <div className="flex justify-between">
