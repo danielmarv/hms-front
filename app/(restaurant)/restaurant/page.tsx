@@ -114,7 +114,6 @@ export default function RestaurantDashboard() {
         }))
       }
 
-      // Load tables
       const tablesResponse = await getTables()
       if (tablesResponse?.data && Array.isArray(tablesResponse.data)) {
         const tables = tablesResponse.data
