@@ -334,7 +334,6 @@ export default function AdminHotelsPage() {
         </CardContent>
       </Card>
 
-      {/* Hotels Table */}
       <Card>
         <CardHeader>
           <CardTitle>All Hotels</CardTitle>
