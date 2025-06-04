@@ -91,7 +91,6 @@ export default function AdminHotelsPage() {
         setHotels(hotelsResponse.data)
       }
 
-      // Fetch chains for filter dropdown
       const chainsResponse = await getAllChains()
       if (chainsResponse.data) {
         setChains(chainsResponse.data)
