@@ -211,7 +211,6 @@ export default function RestaurantDashboard() {
       total: 25.0,
     })
 
-    // Refresh data after creating order
     setTimeout(() => {
       loadRestaurantData()
     }, 1000)
