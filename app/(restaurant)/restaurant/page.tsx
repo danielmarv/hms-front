@@ -134,7 +134,6 @@ export default function RestaurantDashboard() {
         }))
       }
 
-      // Load popular menu items
       const menuResponse = await getMenuItems({
         featured: true,
         limit: 4,
@@ -144,7 +143,7 @@ export default function RestaurantDashboard() {
         setPopularItems(
           menuResponse.data.map((item: any) => ({
             name: item.name,
-            orders: item.orderCount || Math.floor(Math.random() * 20), // Simulated for now
+            orders: item.orderCount || Math.floor(Math.random() * 20),
             revenue: (item.orderCount || 5) * item.price,
           })),
         )
