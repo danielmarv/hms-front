@@ -369,7 +369,6 @@ export default function RestaurantDashboard() {
           </CardContent>
         </Card>
 
-        {/* Popular Items */}
         <Card>
           <CardHeader>
             <CardTitle>Popular Items Today</CardTitle>
