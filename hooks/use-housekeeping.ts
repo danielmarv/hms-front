@@ -83,15 +83,24 @@ export function useHousekeeping() {
     }>(`/housekeeping?${queryParams.toString()}`)
 
     if (data && !error) {
-      setSchedules(data.data)
+      setSchedules(data.data || [])
       setPagination({
-        page: data.pagination.page,
-        limit: data.pagination.limit,
-        totalPages: data.pagination.totalPages,
-        total: data.total,
+        page: data.pagination?.page || 1,
+        limit: data.pagination?.limit || 10,
+        totalPages: data.pagination?.totalPages || 1,
+        total: data.total || 0,
       })
-      return data.data
+      return data.data || []
     }
+
+    // Set empty defaults on error
+    setSchedules([])
+    setPagination({
+      page: 1,
+      limit: 10,
+      totalPages: 1,
+      total: 0,
+    })
 
     return []
   }

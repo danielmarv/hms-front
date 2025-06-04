@@ -14,7 +14,8 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { CalendarIcon, Search, CheckCircle, Clock, AlertCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useHousekeeping, type HousekeepingStatus } from "@/hooks/use-housekeeping"
+import { useHousekeeping } from "@/hooks/use-housekeeping"
+import type { HousekeepingStatus } from "@/types"
 
 export default function HousekeepingDashboard() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -84,7 +85,7 @@ export default function HousekeepingDashboard() {
     }
   }
 
-  const filteredSchedules = schedules.filter((schedule) => {
+  const filteredSchedules = (schedules || []).filter((schedule) => {
     const matchesSearch =
       schedule.room.number.includes(searchQuery) ||
       (schedule.assigned_to?.name && schedule.assigned_to.name.toLowerCase().includes(searchQuery.toLowerCase()))
