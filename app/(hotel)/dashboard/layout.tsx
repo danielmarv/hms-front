@@ -23,7 +23,6 @@ export default function HotelDashboardLayout({
     const verifyAuth = async () => {
       console.log("Hotel dashboard layout mounted, checking auth")
 
-      // First check if we have a token
       if (!isAuthenticated()) {
         console.log("No token found, redirecting to login")
         router.push("/auth/login")
