@@ -260,7 +260,6 @@ export default function DetailedAnalyticsPage() {
         </div>
       )}
 
-      {/* Detailed Analytics Tabs */}
       {dashboardData && (
         <Tabs value={selectedModule} onValueChange={setSelectedModule} className="space-y-4">
           <TabsList className="grid w-full grid-cols-5 lg:grid-cols-10">
