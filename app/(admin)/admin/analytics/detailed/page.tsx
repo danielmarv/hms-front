@@ -277,7 +277,7 @@ export default function DetailedAnalyticsPage() {
 
           <TabsContent value="overview" className="space-y-6">
             <div className="grid gap-6 md:grid-cols-2">
-              {/* Revenue Trend */}
+
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
