@@ -430,7 +430,6 @@ export default function RestaurantDashboard() {
         </Card>
       </div>
 
-      {/* Quick Actions */}
       <Card>
         <CardHeader>
           <CardTitle>Quick Actions</CardTitle>
