@@ -41,7 +41,6 @@ export default function HotelDashboardLayout({
     verifyAuth()
   }, [router, checkAuth])
 
-  // Show loading state while checking auth
   if (isLoading || isCheckingAuth) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
@@ -50,8 +49,6 @@ export default function HotelDashboardLayout({
     )
   }
 
-  // If not authenticated after checking, don't render anything
-  // (the useEffect will redirect)
   if (!authState) {
     return null
   }
