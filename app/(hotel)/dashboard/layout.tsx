@@ -29,7 +29,6 @@ export default function HotelDashboardLayout({
         return
       }
 
-      // Then verify with the API
       const authValid = await checkAuth()
       if (!authValid) {
         console.log("Auth check failed, redirecting to login")
