@@ -162,7 +162,6 @@ export default function HotelDetailedAnalyticsPage() {
         </Card>
       )}
 
-      {/* Key Metrics */}
       {dashboardData && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
