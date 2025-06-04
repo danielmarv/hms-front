@@ -73,7 +73,6 @@ export default function DetailedAnalyticsPage() {
       return () => clearInterval(interval)
     }
   }, [autoRefresh, getRealTimeAnalytics, getDashboardAnalytics, selectedPeriod, selectedModule])
-
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
