@@ -237,7 +237,6 @@ export default function AdminHotelsPage() {
         </div>
       </div>
 
-      {/* Filters */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
