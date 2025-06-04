@@ -86,7 +86,6 @@ export default function AdminHotelsPage() {
     try {
       setIsLoadingHotels(true)
 
-      // Fetch hotels
       const hotelsResponse = await getAllHotels()
       if (hotelsResponse.data) {
         setHotels(hotelsResponse.data)
