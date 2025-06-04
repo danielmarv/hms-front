@@ -86,13 +86,11 @@ export default function AdminHotelsPage() {
     try {
       setIsLoadingHotels(true)
 
-      // Fetch hotels
       const hotelsResponse = await getAllHotels()
       if (hotelsResponse.data) {
         setHotels(hotelsResponse.data)
       }
 
-      // Fetch chains for filter dropdown
       const chainsResponse = await getAllChains()
       if (chainsResponse.data) {
         setChains(chainsResponse.data)
@@ -239,7 +237,6 @@ export default function AdminHotelsPage() {
         </div>
       </div>
 
-      {/* Filters */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -337,7 +334,6 @@ export default function AdminHotelsPage() {
         </CardContent>
       </Card>
 
-      {/* Hotels Table */}
       <Card>
         <CardHeader>
           <CardTitle>All Hotels</CardTitle>

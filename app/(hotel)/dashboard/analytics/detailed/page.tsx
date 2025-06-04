@@ -107,7 +107,7 @@ export default function HotelDetailedAnalyticsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Hotel Analytics</h1>
@@ -132,7 +132,6 @@ export default function HotelDetailedAnalyticsPage() {
         </div>
       </div>
 
-      {/* Real-time Status */}
       {realTimeData && (
         <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
           <CardContent className="p-4">
@@ -163,7 +162,6 @@ export default function HotelDetailedAnalyticsPage() {
         </Card>
       )}
 
-      {/* Key Metrics */}
       {dashboardData && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
@@ -232,7 +230,6 @@ export default function HotelDetailedAnalyticsPage() {
         </div>
       )}
 
-      {/* Detailed Analytics */}
       {dashboardData && (
         <Tabs defaultValue="performance" className="space-y-4">
           <TabsList className="grid w-full grid-cols-4">

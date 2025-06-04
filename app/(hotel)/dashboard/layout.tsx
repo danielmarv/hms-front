@@ -23,14 +23,12 @@ export default function HotelDashboardLayout({
     const verifyAuth = async () => {
       console.log("Hotel dashboard layout mounted, checking auth")
 
-      // First check if we have a token
       if (!isAuthenticated()) {
         console.log("No token found, redirecting to login")
         router.push("/auth/login")
         return
       }
 
-      // Then verify with the API
       const authValid = await checkAuth()
       if (!authValid) {
         console.log("Auth check failed, redirecting to login")
@@ -43,7 +41,6 @@ export default function HotelDashboardLayout({
     verifyAuth()
   }, [router, checkAuth])
 
-  // Show loading state while checking auth
   if (isLoading || isCheckingAuth) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
@@ -52,8 +49,6 @@ export default function HotelDashboardLayout({
     )
   }
 
-  // If not authenticated after checking, don't render anything
-  // (the useEffect will redirect)
   if (!authState) {
     return null
   }

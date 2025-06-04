@@ -23,12 +23,10 @@ export default function HousekeepingDashboard() {
   const [date, setDate] = useState<Date | undefined>(new Date())
   const { schedules, stats, isLoading, fetchSchedules, fetchStats } = useHousekeeping()
 
-  // Load initial data
   useEffect(() => {
     fetchStats()
   }, [fetchStats])
 
-  // Load schedules when filters change
   useEffect(() => {
     fetchSchedules({
       status: statusFilter === "all" ? undefined : (statusFilter as HousekeepingStatus),

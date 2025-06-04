@@ -73,7 +73,6 @@ export default function DetailedAnalyticsPage() {
       return () => clearInterval(interval)
     }
   }, [autoRefresh, getRealTimeAnalytics, getDashboardAnalytics, selectedPeriod, selectedModule])
-
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
@@ -118,7 +117,6 @@ export default function DetailedAnalyticsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Detailed Analytics</h1>
@@ -143,7 +141,6 @@ export default function DetailedAnalyticsPage() {
         </div>
       </div>
 
-      {/* Real-time Status Bar */}
       {realTimeData && (
         <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
           <CardContent className="p-4">
@@ -178,7 +175,6 @@ export default function DetailedAnalyticsPage() {
         </Card>
       )}
 
-      {/* Executive Summary */}
       {dashboardData && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
           <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
@@ -263,7 +259,6 @@ export default function DetailedAnalyticsPage() {
         </div>
       )}
 
-      {/* Detailed Analytics Tabs */}
       {dashboardData && (
         <Tabs value={selectedModule} onValueChange={setSelectedModule} className="space-y-4">
           <TabsList className="grid w-full grid-cols-5 lg:grid-cols-10">
@@ -279,10 +274,9 @@ export default function DetailedAnalyticsPage() {
             <TabsTrigger value="system">System</TabsTrigger>
           </TabsList>
 
-          {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
             <div className="grid gap-6 md:grid-cols-2">
-              {/* Revenue Trend */}
+
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -323,7 +317,6 @@ export default function DetailedAnalyticsPage() {
                 </CardContent>
               </Card>
 
-              {/* Booking Trends */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -367,7 +360,6 @@ export default function DetailedAnalyticsPage() {
                 </CardContent>
               </Card>
 
-              {/* Room Status Distribution */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -426,7 +418,6 @@ export default function DetailedAnalyticsPage() {
                 </CardContent>
               </Card>
 
-              {/* Guest Demographics */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -459,7 +450,6 @@ export default function DetailedAnalyticsPage() {
               </Card>
             </div>
 
-            {/* Key Performance Indicators */}
             <Card>
               <CardHeader>
                 <CardTitle>Key Performance Indicators</CardTitle>
@@ -515,7 +505,6 @@ export default function DetailedAnalyticsPage() {
             </Card>
           </TabsContent>
 
-          {/* Bookings Tab */}
           <TabsContent value="bookings" className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <Card>
@@ -650,7 +639,6 @@ export default function DetailedAnalyticsPage() {
             </div>
           </TabsContent>
 
-          {/* Revenue Tab */}
           <TabsContent value="revenue" className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <Card>
@@ -842,7 +830,6 @@ export default function DetailedAnalyticsPage() {
             </Card>
           </TabsContent>
 
-          {/* Guests Tab */}
           <TabsContent value="guests" className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <Card>
@@ -964,7 +951,6 @@ export default function DetailedAnalyticsPage() {
             </div>
           </TabsContent>
 
-          {/* Rooms Tab */}
           <TabsContent value="rooms" className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <Card>
@@ -1102,7 +1088,6 @@ export default function DetailedAnalyticsPage() {
             </div>
           </TabsContent>
 
-          {/* Restaurant Tab */}
           <TabsContent value="restaurant" className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <Card>
@@ -1215,7 +1200,6 @@ export default function DetailedAnalyticsPage() {
             </div>
           </TabsContent>
 
-          {/* Inventory Tab */}
           <TabsContent value="inventory" className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <Card>
@@ -1328,7 +1312,6 @@ export default function DetailedAnalyticsPage() {
             </div>
           </TabsContent>
 
-          {/* Maintenance Tab */}
           <TabsContent value="maintenance" className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <Card>
@@ -1445,7 +1428,6 @@ export default function DetailedAnalyticsPage() {
             </div>
           </TabsContent>
 
-          {/* Staff Tab */}
           <TabsContent value="staff" className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <Card>
@@ -1563,7 +1545,6 @@ export default function DetailedAnalyticsPage() {
             </div>
           </TabsContent>
 
-          {/* System Tab */}
           <TabsContent value="system" className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <Card>

@@ -68,7 +68,6 @@ export default function RestaurantDashboard() {
 
   const loadRestaurantData = async () => {
     try {
-      // Load order statistics
       const orderStatsResponse = await getOrderStats()
       if (orderStatsResponse?.data) {
         setStats((prev) => ({
@@ -79,7 +78,6 @@ export default function RestaurantDashboard() {
         }))
       }
 
-      // Load active orders
       const ordersResponse = await getOrders({
         limit: 10,
         sort: "-createdAt",
@@ -108,7 +106,6 @@ export default function RestaurantDashboard() {
         }))
       }
 
-      // Load kitchen statistics
       const kitchenStatsResponse = await getKitchenStats()
       if (kitchenStatsResponse?.data) {
         setStats((prev) => ({
@@ -117,7 +114,6 @@ export default function RestaurantDashboard() {
         }))
       }
 
-      // Load tables
       const tablesResponse = await getTables()
       if (tablesResponse?.data && Array.isArray(tablesResponse.data)) {
         const tables = tablesResponse.data
@@ -138,7 +134,6 @@ export default function RestaurantDashboard() {
         }))
       }
 
-      // Load popular menu items
       const menuResponse = await getMenuItems({
         featured: true,
         limit: 4,
@@ -148,7 +143,7 @@ export default function RestaurantDashboard() {
         setPopularItems(
           menuResponse.data.map((item: any) => ({
             name: item.name,
-            orders: item.orderCount || Math.floor(Math.random() * 20), // Simulated for now
+            orders: item.orderCount || Math.floor(Math.random() * 20),
             revenue: (item.orderCount || 5) * item.price,
           })),
         )
@@ -160,10 +155,8 @@ export default function RestaurantDashboard() {
   }
 
   useEffect(() => {
-    // Listen for workflow events
     const handleWorkflowEvent = (event: any) => {
       console.log("Restaurant received workflow event:", event)
-      // Refresh data when workflows complete
       if (event.type === "order.created" || event.type === "order.updated") {
         loadRestaurantData()
       }
@@ -211,7 +204,6 @@ export default function RestaurantDashboard() {
   }
 
   const handleNewOrder = () => {
-    // Trigger workflow for new order
     triggerRestaurantOrder({
       orderId: `ORD-${Date.now()}`,
       table: "Table 10",
@@ -219,7 +211,6 @@ export default function RestaurantDashboard() {
       total: 25.0,
     })
 
-    // Refresh data after creating order
     setTimeout(() => {
       loadRestaurantData()
     }, 1000)
@@ -253,7 +244,6 @@ export default function RestaurantDashboard() {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Restaurant Dashboard</h1>
@@ -273,7 +263,6 @@ export default function RestaurantDashboard() {
         </div>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -380,7 +369,6 @@ export default function RestaurantDashboard() {
           </CardContent>
         </Card>
 
-        {/* Popular Items */}
         <Card>
           <CardHeader>
             <CardTitle>Popular Items Today</CardTitle>
@@ -410,7 +398,6 @@ export default function RestaurantDashboard() {
           </CardContent>
         </Card>
 
-        {/* Table Status */}
         <Card className="lg:col-span-3">
           <CardHeader>
             <CardTitle>Table Status</CardTitle>
@@ -443,7 +430,6 @@ export default function RestaurantDashboard() {
         </Card>
       </div>
 
-      {/* Quick Actions */}
       <Card>
         <CardHeader>
           <CardTitle>Quick Actions</CardTitle>
