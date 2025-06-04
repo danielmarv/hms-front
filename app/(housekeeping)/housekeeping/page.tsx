@@ -14,7 +14,8 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { CalendarIcon, Search, CheckCircle, Clock, AlertCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useHousekeeping, type HousekeepingStatus } from "@/hooks/use-housekeeping"
+import { useHousekeeping } from "@/hooks/use-housekeeping"
+import type { HousekeepingStatus } from "@/types"
 
 export default function HousekeepingDashboard() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -22,14 +23,19 @@ export default function HousekeepingDashboard() {
   const [date, setDate] = useState<Date | undefined>(new Date())
   const { schedules, stats, isLoading, fetchSchedules, fetchStats } = useHousekeeping()
 
+  // Load initial data
   useEffect(() => {
     fetchStats()
+  }, [fetchStats])
+
+  // Load schedules when filters change
+  useEffect(() => {
     fetchSchedules({
       status: statusFilter === "all" ? undefined : (statusFilter as HousekeepingStatus),
       date: date ? format(date, "yyyy-MM-dd") : undefined,
       limit: 10,
     })
-  }, [statusFilter, date, fetchSchedules, fetchStats])
+  }, [statusFilter, date, fetchSchedules])
 
   const getStatusBadge = (status: string) => {
     switch (status) {
