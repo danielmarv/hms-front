@@ -398,7 +398,6 @@ export default function RestaurantDashboard() {
           </CardContent>
         </Card>
 
-        {/* Table Status */}
         <Card className="lg:col-span-3">
           <CardHeader>
             <CardTitle>Table Status</CardTitle>
