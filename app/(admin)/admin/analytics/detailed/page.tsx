@@ -451,7 +451,6 @@ export default function DetailedAnalyticsPage() {
               </Card>
             </div>
 
-            {/* Key Performance Indicators */}
             <Card>
               <CardHeader>
                 <CardTitle>Key Performance Indicators</CardTitle>
