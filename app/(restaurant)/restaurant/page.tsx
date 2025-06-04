@@ -204,7 +204,6 @@ export default function RestaurantDashboard() {
   }
 
   const handleNewOrder = () => {
-    // Trigger workflow for new order
     triggerRestaurantOrder({
       orderId: `ORD-${Date.now()}`,
       table: "Table 10",
