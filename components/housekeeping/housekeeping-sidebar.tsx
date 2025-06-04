@@ -29,16 +29,16 @@ const navigation = [
     href: "/housekeeping/schedules",
     icon: Calendar,
   },
-  {
-    name: "Tasks",
-    href: "/housekeeping/tasks",
-    icon: CheckSquare,
-  },
-  {
-    name: "Reports",
-    href: "/housekeeping/reports",
-    icon: ClipboardList,
-  },
+  // {
+  //   name: "Tasks",
+  //   href: "/housekeeping/tasks",
+  //   icon: CheckSquare,
+  // },
+  // {
+  //   name: "Reports",
+  //   href: "/housekeeping/reports",
+  //   icon: ClipboardList,
+  // },
 ]
 
 interface HousekeepingSidebarProps {
