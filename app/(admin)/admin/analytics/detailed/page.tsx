@@ -31,8 +31,6 @@ import {
   BedDouble,
   Utensils,
   RefreshCw,
-  ArrowUpRight,
-  ArrowDownRight,
   Activity,
   AlertTriangle,
   CheckCircle,
@@ -45,23 +43,15 @@ import {
   Database,
   Cpu,
   HardDrive,
+  Package,
+  Wrench,
+  UserCheck,
 } from "lucide-react"
 
 const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884D8", "#82CA9D", "#FFC658", "#FF7C7C"]
 
 export default function DetailedAnalyticsPage() {
-  const {
-    dashboardData,
-    realTimeData,
-    isLoading,
-    error,
-    getDashboardAnalytics,
-    getRealTimeAnalytics,
-    getBookingAnalytics,
-    getRevenueAnalytics,
-    getInventoryAnalytics,
-    getSystemPerformance,
-  } = useAnalytics()
+  const { dashboardData, realTimeData, isLoading, error, getDashboardAnalytics, getRealTimeAnalytics } = useAnalytics()
 
   const [selectedPeriod, setSelectedPeriod] = useState<AnalyticsPeriod>("30")
   const [autoRefresh, setAutoRefresh] = useState(true)
@@ -97,33 +87,6 @@ export default function DetailedAnalyticsPage() {
 
   const formatNumber = (value: number) => {
     return new Intl.NumberFormat("en-US").format(value || 0)
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "completed":
-      case "confirmed":
-      case "active":
-        return "text-green-600"
-      case "pending":
-      case "in-progress":
-        return "text-yellow-600"
-      case "cancelled":
-      case "failed":
-      case "inactive":
-        return "text-red-600"
-      default:
-        return "text-gray-600"
-    }
-  }
-
-  const getTrendIcon = (current: number, previous: number) => {
-    if (current > previous) {
-      return <ArrowUpRight className="h-4 w-4 text-green-600" />
-    } else if (current < previous) {
-      return <ArrowDownRight className="h-4 w-4 text-red-600" />
-    }
-    return <Activity className="h-4 w-4 text-gray-600" />
   }
 
   if (isLoading && !dashboardData) {
@@ -404,7 +367,7 @@ export default function DetailedAnalyticsPage() {
                 </CardContent>
               </Card>
 
-              {/* Occupancy Overview */}
+              {/* Room Status Distribution */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -463,7 +426,7 @@ export default function DetailedAnalyticsPage() {
                 </CardContent>
               </Card>
 
-              {/* Top Countries */}
+              {/* Guest Demographics */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -879,6 +842,727 @@ export default function DetailedAnalyticsPage() {
             </Card>
           </TabsContent>
 
+          {/* Guests Tab */}
+          <TabsContent value="guests" className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Total Guests</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{formatNumber(dashboardData.modules.guests.totalGuests)}</div>
+                  <p className="text-xs text-muted-foreground">In selected period</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Countries</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{dashboardData.modules.guests.uniqueCountries}</div>
+                  <p className="text-xs text-muted-foreground">Unique countries</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Average Age</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{Math.round(dashboardData.modules.guests.averageAge)}</div>
+                  <p className="text-xs text-muted-foreground">Years old</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Loyalty Rate</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{dashboardData.modules.guests.loyaltyRate}%</div>
+                  <p className="text-xs text-muted-foreground">Returning guests</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Globe className="h-5 w-5" />
+                    Guest Demographics
+                  </CardTitle>
+                  <CardDescription>Top guest countries by volume</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ChartContainer
+                    config={{
+                      count: {
+                        label: "Guests",
+                        color: "hsl(var(--chart-1))",
+                      },
+                    }}
+                    className="h-[300px]"
+                  >
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={dashboardData.modules.guests.countryDistribution.slice(0, 8)}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="_id" />
+                        <YAxis />
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                        <Bar dataKey="count" fill="hsl(var(--chart-1))" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    Guest Loyalty
+                  </CardTitle>
+                  <CardDescription>New vs returning guests</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ChartContainer
+                    config={{
+                      new: {
+                        label: "New Guests",
+                        color: "hsl(var(--chart-2))",
+                      },
+                      repeat: {
+                        label: "Returning Guests",
+                        color: "hsl(var(--chart-1))",
+                      },
+                    }}
+                    className="h-[300px]"
+                  >
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={[
+                            { name: "New Guests", value: dashboardData.modules.guests.repeatGuestData.new },
+                            { name: "Returning Guests", value: dashboardData.modules.guests.repeatGuestData.repeat },
+                          ]}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(0)}%)`}
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          <Cell fill="hsl(var(--chart-2))" />
+                          <Cell fill="hsl(var(--chart-1))" />
+                        </Pie>
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Rooms Tab */}
+          <TabsContent value="rooms" className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Total Rooms</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{dashboardData.modules.rooms.totalRooms}</div>
+                  <p className="text-xs text-muted-foreground">Available inventory</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Occupied Rooms</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-green-600">{dashboardData.modules.rooms.occupiedRooms}</div>
+                  <p className="text-xs text-muted-foreground">Currently occupied</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Available Rooms</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-blue-600">{dashboardData.modules.rooms.availableRooms}</div>
+                  <p className="text-xs text-muted-foreground">Ready for booking</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Occupancy Rate</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {formatPercentage(dashboardData.modules.rooms.occupancyRate)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Current occupancy</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <BedDouble className="h-5 w-5" />
+                    Room Status Distribution
+                  </CardTitle>
+                  <CardDescription>Current room availability status</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ChartContainer
+                    config={{
+                      occupied: {
+                        label: "Occupied",
+                        color: "hsl(var(--chart-1))",
+                      },
+                      available: {
+                        label: "Available",
+                        color: "hsl(var(--chart-2))",
+                      },
+                      maintenance: {
+                        label: "Maintenance",
+                        color: "hsl(var(--chart-3))",
+                      },
+                      cleaning: {
+                        label: "Cleaning",
+                        color: "hsl(var(--chart-4))",
+                      },
+                    }}
+                    className="h-[300px]"
+                  >
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={Object.entries(dashboardData.modules.rooms.roomStatusDistribution).map(
+                            ([status, count]) => ({
+                              name: status,
+                              value: count,
+                            }),
+                          )}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(0)}%)`}
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          {Object.entries(dashboardData.modules.rooms.roomStatusDistribution).map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5" />
+                    Room Type Performance
+                  </CardTitle>
+                  <CardDescription>Revenue by room type</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ChartContainer
+                    config={{
+                      revenue: {
+                        label: "Revenue",
+                        color: "hsl(var(--chart-1))",
+                      },
+                    }}
+                    className="h-[300px]"
+                  >
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={dashboardData.modules.rooms.roomTypePerformance}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="_id" />
+                        <YAxis />
+                        <ChartTooltip
+                          content={<ChartTooltipContent />}
+                          formatter={(value) => [formatCurrency(Number(value)), "Revenue"]}
+                        />
+                        <Bar dataKey="revenue" fill="hsl(var(--chart-1))" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Restaurant Tab */}
+          <TabsContent value="restaurant" className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{dashboardData.modules.restaurant.totalOrders}</div>
+                  <p className="text-xs text-muted-foreground">All orders</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Restaurant Revenue</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {formatCurrency(dashboardData.modules.restaurant.totalRevenue)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Total F&B revenue</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Average Order Value</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {formatCurrency(dashboardData.modules.restaurant.averageOrderValue)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Per order</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Pending Orders</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-orange-600">
+                    {dashboardData.modules.restaurant.pendingOrders}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Awaiting preparation</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Utensils className="h-5 w-5" />
+                    Popular Menu Items
+                  </CardTitle>
+                  <CardDescription>Top selling items by quantity</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ChartContainer
+                    config={{
+                      quantity: {
+                        label: "Quantity",
+                        color: "hsl(var(--chart-1))",
+                      },
+                    }}
+                    className="h-[300px]"
+                  >
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={dashboardData.modules.restaurant.popularItems.slice(0, 8)}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="_id" />
+                        <YAxis />
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                        <Bar dataKey="quantity" fill="hsl(var(--chart-1))" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Activity className="h-5 w-5" />
+                    Kitchen Performance
+                  </CardTitle>
+                  <CardDescription>Kitchen efficiency metrics</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Average Preparation Time</span>
+                      </div>
+                      <div className="text-2xl font-bold">
+                        {dashboardData.modules.restaurant.kitchenPerformance.averagePreparationTime} min
+                      </div>
+                      <div className="text-xs text-muted-foreground">Per order</div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Total Kitchen Orders</span>
+                      </div>
+                      <div className="text-2xl font-bold">
+                        {dashboardData.modules.restaurant.kitchenPerformance.totalKitchenOrders}
+                      </div>
+                      <div className="text-xs text-muted-foreground">Processed orders</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Inventory Tab */}
+          <TabsContent value="inventory" className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Total Items</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{dashboardData.modules.inventory.totalItems}</div>
+                  <p className="text-xs text-muted-foreground">In inventory</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Total Value</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{formatCurrency(dashboardData.modules.inventory.totalValue)}</div>
+                  <p className="text-xs text-muted-foreground">Inventory worth</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Low Stock Items</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-orange-600">
+                    {dashboardData.modules.inventory.lowStockItems}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Need restocking</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Out of Stock</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-red-600">
+                    {dashboardData.modules.inventory.outOfStockItems}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Urgent restocking</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Package className="h-5 w-5" />
+                    Category Distribution
+                  </CardTitle>
+                  <CardDescription>Items by category</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ChartContainer
+                    config={{
+                      itemCount: {
+                        label: "Items",
+                        color: "hsl(var(--chart-1))",
+                      },
+                    }}
+                    className="h-[300px]"
+                  >
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={dashboardData.modules.inventory.categoryDistribution}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="_id" />
+                        <YAxis />
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                        <Bar dataKey="itemCount" fill="hsl(var(--chart-1))" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5" />
+                    Supplier Performance
+                  </CardTitle>
+                  <CardDescription>Items by supplier</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ChartContainer
+                    config={{
+                      totalValue: {
+                        label: "Value",
+                        color: "hsl(var(--chart-2))",
+                      },
+                    }}
+                    className="h-[300px]"
+                  >
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={dashboardData.modules.inventory.supplierPerformance}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="_id" />
+                        <YAxis />
+                        <ChartTooltip
+                          content={<ChartTooltipContent />}
+                          formatter={(value) => [formatCurrency(Number(value)), "Value"]}
+                        />
+                        <Bar dataKey="totalValue" fill="hsl(var(--chart-2))" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Maintenance Tab */}
+          <TabsContent value="maintenance" className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Total Issues</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{dashboardData.modules.maintenance.totalIssues}</div>
+                  <p className="text-xs text-muted-foreground">All maintenance requests</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Pending Issues</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-orange-600">
+                    {dashboardData.modules.maintenance.pendingIssues}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Awaiting attention</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">In Progress</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-blue-600">
+                    {dashboardData.modules.maintenance.inProgressIssues}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Being worked on</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Resolution Rate</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-green-600">
+                    {formatPercentage(dashboardData.modules.maintenance.resolutionRate)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Completion rate</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Wrench className="h-5 w-5" />
+                    Issues by Type
+                  </CardTitle>
+                  <CardDescription>Maintenance requests by category</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ChartContainer
+                    config={{
+                      count: {
+                        label: "Issues",
+                        color: "hsl(var(--chart-1))",
+                      },
+                    }}
+                    className="h-[300px]"
+                  >
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={dashboardData.modules.maintenance.issuesByType}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="_id" />
+                        <YAxis />
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                        <Bar dataKey="count" fill="hsl(var(--chart-1))" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Activity className="h-5 w-5" />
+                    Maintenance Trends
+                  </CardTitle>
+                  <CardDescription>New vs completed issues over time</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ChartContainer
+                    config={{
+                      newIssues: {
+                        label: "New Issues",
+                        color: "hsl(var(--chart-1))",
+                      },
+                      completedIssues: {
+                        label: "Completed Issues",
+                        color: "hsl(var(--chart-2))",
+                      },
+                    }}
+                    className="h-[300px]"
+                  >
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart data={dashboardData.modules.maintenance.maintenanceTrends}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="_id" />
+                        <YAxis />
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                        <Bar dataKey="newIssues" fill="hsl(var(--chart-1))" />
+                        <Line type="monotone" dataKey="completedIssues" stroke="hsl(var(--chart-2))" strokeWidth={2} />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Staff Tab */}
+          <TabsContent value="staff" className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Total Staff</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{dashboardData.modules.staff.totalStaff}</div>
+                  <p className="text-xs text-muted-foreground">All employees</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Active Staff</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-green-600">{dashboardData.modules.staff.activeStaff}</div>
+                  <p className="text-xs text-muted-foreground">Currently working</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Inactive Staff</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-gray-600">{dashboardData.modules.staff.inactiveStaff}</div>
+                  <p className="text-xs text-muted-foreground">Off duty</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Housekeeping Tasks</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{dashboardData.modules.staff.housekeeping.totalTasks}</div>
+                  <p className="text-xs text-muted-foreground">
+                    {dashboardData.modules.staff.housekeeping.completedTasks} completed
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <UserCheck className="h-5 w-5" />
+                    Role Distribution
+                  </CardTitle>
+                  <CardDescription>Staff by role</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ChartContainer
+                    config={{
+                      count: {
+                        label: "Staff Count",
+                        color: "hsl(var(--chart-1))",
+                      },
+                    }}
+                    className="h-[300px]"
+                  >
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={dashboardData.modules.staff.roleDistribution}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ _id, count, percent }) => `${_id}: ${count} (${(percent * 100).toFixed(0)}%)`}
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="count"
+                        >
+                          {dashboardData.modules.staff.roleDistribution.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Activity className="h-5 w-5" />
+                    Activity Logs
+                  </CardTitle>
+                  <CardDescription>Staff activity by type</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ChartContainer
+                    config={{
+                      activityCount: {
+                        label: "Activities",
+                        color: "hsl(var(--chart-2))",
+                      },
+                    }}
+                    className="h-[300px]"
+                  >
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={dashboardData.modules.staff.activityLogs}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="_id" />
+                        <YAxis />
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                        <Bar dataKey="activityCount" fill="hsl(var(--chart-2))" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
           {/* System Tab */}
           <TabsContent value="system" className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -1045,8 +1729,6 @@ export default function DetailedAnalyticsPage() {
               </CardContent>
             </Card>
           </TabsContent>
-
-          {/* Add other tabs (guests, rooms, restaurant, inventory, maintenance, staff) with similar detailed implementations */}
         </Tabs>
       )}
     </div>

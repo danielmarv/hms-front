@@ -187,22 +187,36 @@ export const useAnalytics = () => {
   const getDashboardAnalytics = useCallback(
     async (period: AnalyticsPeriod = "30") => {
       try {
-        const response = await request<{ data: DashboardAnalytics }>(`/analytics/dashboard?period=${period}`)
-        if (response.data?.data) {
+        const response = await request(`/analytics/dashboard?period=${period}`)
+
+        if (response.data) {
           // Helper function to merge defaults with API data
-          const mergeWithDefaults = <T extends Record<string, any>>(defaults: T, apiData: Partial<T>): T => {
+          const mergeWithDefaults = <T extends Record<string, any>>(
+            defaults: T,
+            apiData: Partial<T> | undefined,
+          ): T => {
             const result = { ...defaults }
-            Object.keys(apiData).forEach((key) => {
-              if (apiData[key] !== undefined && apiData[key] !== null) {
-                (result as Record<string, any>)[key] = apiData[key]
-              }
-            })
+            if (apiData) {
+              Object.keys(apiData).forEach((key) => {
+                if (apiData[key] !== undefined && apiData[key] !== null) {
+                  ;(result as Record<string, any>)[key] = apiData[key]
+                }
+              })
+            }
             return result
           }
 
-          const data = response.data.data
+          const data = response.data
+
+          // Create default period if not provided
+          const defaultPeriod = {
+            startDate: new Date(Date.now() - Number.parseInt(period) * 24 * 60 * 60 * 1000).toISOString(),
+            endDate: new Date().toISOString(),
+            days: Number.parseInt(period),
+          }
+
           const processedData: DashboardAnalytics = {
-            ...data,
+            period: data.period || defaultPeriod,
             summary: mergeWithDefaults(
               {
                 totalRevenue: 0,
@@ -211,10 +225,9 @@ export const useAnalytics = () => {
                 guestSatisfaction: 0,
                 systemUptime: 0,
               },
-              data.summary || {},
+              data.summary,
             ),
             modules: {
-              ...data.modules,
               bookings: mergeWithDefaults(
                 {
                   totalBookings: 0,
@@ -228,7 +241,7 @@ export const useAnalytics = () => {
                   bookingTrends: [] as Array<{ _id: string; count: number; revenue: number }>,
                   channelDistribution: [] as Array<{ _id: string; count: number; revenue: number }>,
                 },
-                data.modules.bookings || {},
+                data.modules?.bookings,
               ),
               revenue: mergeWithDefaults(
                 {
@@ -242,7 +255,7 @@ export const useAnalytics = () => {
                   dailyRevenue: [] as Array<{ _id: string; revenue: number; count: number }>,
                   paymentMethods: [] as Array<{ _id: string; count: number; amount: number }>,
                 },
-                data.modules.revenue || {},
+                data.modules?.revenue,
               ),
               guests: mergeWithDefaults(
                 {
@@ -254,7 +267,7 @@ export const useAnalytics = () => {
                   satisfactionRate: 85,
                   loyaltyRate: "0",
                 },
-                data.modules.guests || {},
+                data.modules?.guests,
               ),
               rooms: mergeWithDefaults(
                 {
@@ -270,7 +283,7 @@ export const useAnalytics = () => {
                     averageRate: number
                   }>,
                 },
-                data.modules.rooms || {},
+                data.modules?.rooms,
               ),
               maintenance: mergeWithDefaults(
                 {
@@ -283,7 +296,7 @@ export const useAnalytics = () => {
                   issuesByType: [] as Array<{ _id: string; count: number; avgResolutionTime: number }>,
                   maintenanceTrends: [] as Array<{ _id: string; newIssues: number; completedIssues: number }>,
                 },
-                data.modules.maintenance || {},
+                data.modules?.maintenance,
               ),
               restaurant: mergeWithDefaults(
                 {
@@ -299,7 +312,7 @@ export const useAnalytics = () => {
                     totalKitchenOrders: 0,
                   },
                 },
-                data.modules.restaurant || {},
+                data.modules?.restaurant,
               ),
               inventory: mergeWithDefaults(
                 {
@@ -310,7 +323,7 @@ export const useAnalytics = () => {
                   categoryDistribution: [] as Array<{ _id: string; itemCount: number; totalValue: number }>,
                   supplierPerformance: [] as Array<{ _id: string; itemCount: number; totalValue: number }>,
                 },
-                data.modules.inventory || {},
+                data.modules?.inventory,
               ),
               staff: mergeWithDefaults(
                 {
@@ -325,7 +338,7 @@ export const useAnalytics = () => {
                   },
                   activityLogs: [] as Array<{ _id: string; activityCount: number }>,
                 },
-                data.modules.staff || {},
+                data.modules?.staff,
               ),
               events: mergeWithDefaults(
                 {
@@ -339,7 +352,7 @@ export const useAnalytics = () => {
                   },
                   eventTypeDistribution: [] as Array<{ _id: string; count: number }>,
                 },
-                data.modules.events || {},
+                data.modules?.events,
               ),
               system: mergeWithDefaults(
                 {
@@ -359,16 +372,18 @@ export const useAnalytics = () => {
                     platform: "",
                   },
                 },
-                data.modules.system || {},
+                data.modules?.system,
               ),
             },
           }
 
+          console.log("Processed Analytics Data:", processedData)
           setDashboardData(processedData)
           setError(null)
         }
         return response
       } catch (err: any) {
+        console.error("Analytics Error:", err)
         setError(err.message)
         throw err
       }
@@ -379,12 +394,15 @@ export const useAnalytics = () => {
   const getRealTimeAnalytics = useCallback(async () => {
     try {
       const response = await request<{ data: RealTimeAnalytics }>("/analytics/realtime")
+      console.log("Real-time Analytics Response:", response)
+
       if (response.data?.data) {
         setRealTimeData(response.data.data)
         setError(null)
       }
       return response
     } catch (err: any) {
+      console.error("Real-time Analytics Error:", err)
       setError(err.message)
       throw err
     }
