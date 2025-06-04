@@ -27,7 +27,6 @@ export default function HousekeepingDashboard() {
     fetchStats()
   }, [fetchStats])
 
-  // Load schedules when filters change
   useEffect(() => {
     fetchSchedules({
       status: statusFilter === "all" ? undefined : (statusFilter as HousekeepingStatus),
