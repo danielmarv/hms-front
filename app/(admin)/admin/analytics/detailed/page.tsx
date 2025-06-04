@@ -952,7 +952,6 @@ export default function DetailedAnalyticsPage() {
             </div>
           </TabsContent>
 
-          {/* Rooms Tab */}
           <TabsContent value="rooms" className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <Card>
