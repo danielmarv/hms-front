@@ -68,7 +68,6 @@ export default function RestaurantDashboard() {
 
   const loadRestaurantData = async () => {
     try {
-      // Load order statistics
       const orderStatsResponse = await getOrderStats()
       if (orderStatsResponse?.data) {
         setStats((prev) => ({
