@@ -106,7 +106,6 @@ export default function RestaurantDashboard() {
         }))
       }
 
-      // Load kitchen statistics
       const kitchenStatsResponse = await getKitchenStats()
       if (kitchenStatsResponse?.data) {
         setStats((prev) => ({
