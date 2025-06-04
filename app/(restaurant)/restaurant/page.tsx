@@ -157,7 +157,6 @@ export default function RestaurantDashboard() {
   useEffect(() => {
     const handleWorkflowEvent = (event: any) => {
       console.log("Restaurant received workflow event:", event)
-      // Refresh data when workflows complete
       if (event.type === "order.created" || event.type === "order.updated") {
         loadRestaurantData()
       }
