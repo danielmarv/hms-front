@@ -23,14 +23,19 @@ export default function HousekeepingDashboard() {
   const [date, setDate] = useState<Date | undefined>(new Date())
   const { schedules, stats, isLoading, fetchSchedules, fetchStats } = useHousekeeping()
 
+  // Load initial data
   useEffect(() => {
     fetchStats()
+  }, [fetchStats])
+
+  // Load schedules when filters change
+  useEffect(() => {
     fetchSchedules({
       status: statusFilter === "all" ? undefined : (statusFilter as HousekeepingStatus),
       date: date ? format(date, "yyyy-MM-dd") : undefined,
       limit: 10,
     })
-  }, [statusFilter, date, fetchSchedules, fetchStats])
+  }, [statusFilter, date, fetchSchedules])
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -85,7 +90,7 @@ export default function HousekeepingDashboard() {
     }
   }
 
-  const filteredSchedules = (schedules || []).filter((schedule) => {
+  const filteredSchedules = schedules.filter((schedule) => {
     const matchesSearch =
       schedule.room.number.includes(searchQuery) ||
       (schedule.assigned_to?.name && schedule.assigned_to.name.toLowerCase().includes(searchQuery.toLowerCase()))
