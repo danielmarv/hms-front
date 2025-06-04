@@ -78,7 +78,6 @@ export default function RestaurantDashboard() {
         }))
       }
 
-      // Load active orders
       const ordersResponse = await getOrders({
         limit: 10,
         sort: "-createdAt",
