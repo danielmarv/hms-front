@@ -275,7 +275,6 @@ export default function DetailedAnalyticsPage() {
             <TabsTrigger value="system">System</TabsTrigger>
           </TabsList>
 
-          {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
             <div className="grid gap-6 md:grid-cols-2">
               {/* Revenue Trend */}
