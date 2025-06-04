@@ -24,6 +24,7 @@ import { CalendarIcon, Search, CheckCircle, Clock, AlertCircle, Play } from "luc
 import { cn } from "@/lib/utils"
 import { useHousekeeping } from "@/hooks/use-housekeeping"
 import { toast } from "sonner"
+import type { HousekeepingStatus } from "@/types"
 
 export default function HousekeepingSchedulesPage() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -34,14 +35,14 @@ export default function HousekeepingSchedulesPage() {
 
   useEffect(() => {
     fetchSchedules({
-      status: statusFilter === "all" ? undefined : statusFilter,
+      status: statusFilter === "all" ? undefined : (statusFilter as HousekeepingStatus),
       date: date ? format(date, "yyyy-MM-dd") : undefined,
       page: currentPage,
       limit: 10,
     })
   }, [statusFilter, date, currentPage, fetchSchedules])
 
-  const handleStatusUpdate = async (scheduleId: string, newStatus: string) => {
+  const handleStatusUpdate = async (scheduleId: string, newStatus: HousekeepingStatus) => {
     try {
       const { data, error } = await updateSchedule(scheduleId, { status: newStatus })
       if (error) {
@@ -50,7 +51,7 @@ export default function HousekeepingSchedulesPage() {
         toast.success("Schedule status updated successfully")
         // Refresh the list
         fetchSchedules({
-          status: statusFilter === "all" ? undefined : statusFilter,
+          status: statusFilter === "all" ? undefined : (statusFilter as HousekeepingStatus),
           date: date ? format(date, "yyyy-MM-dd") : undefined,
           page: currentPage,
           limit: 10,

@@ -14,6 +14,8 @@ import { ArrowLeft, CheckCircle, Clock, AlertCircle, Save } from "lucide-react"
 import { useHousekeeping } from "@/hooks/use-housekeeping"
 import { toast } from "sonner"
 
+type HousekeepingStatus = "pending" | "in_progress" | "completed"
+
 export default function HousekeepingScheduleDetailPage() {
   const params = useParams()
   const router = useRouter()
@@ -21,7 +23,7 @@ export default function HousekeepingScheduleDetailPage() {
   const [schedule, setSchedule] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [notes, setNotes] = useState("")
-  const [status, setStatus] = useState("")
+  const [status, setStatus] = useState<HousekeepingStatus>("pending")
   const [isSaving, setIsSaving] = useState(false)
   const { fetchScheduleById, updateSchedule } = useHousekeeping()
 
@@ -33,7 +35,7 @@ export default function HousekeepingScheduleDetailPage() {
         if (data) {
           setSchedule(data)
           setNotes(data.notes || "")
-          setStatus(data.status)
+          setStatus(data.status as HousekeepingStatus)
         } else {
           toast.error("Schedule not found")
           router.push("/housekeeping/schedules")

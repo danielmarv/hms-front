@@ -101,7 +101,15 @@ export function useHousekeeping() {
     return error ? null : data?.data
   }
 
-  const createSchedule = async (scheduleData: Partial<HousekeepingSchedule> & { updateRoomStatus?: boolean }) => {
+  const createSchedule = async (scheduleData: {
+    room: string
+    assigned_to?: string
+    priority: "low" | "medium" | "high"
+    notes?: string
+    schedule_date: string
+    status: HousekeepingStatus
+    updateRoomStatus?: boolean
+  }) => {
     const { data, error } = await request<{ data: HousekeepingSchedule }>("/housekeeping", "POST", scheduleData)
     return { data: error ? null : data?.data, error }
   }

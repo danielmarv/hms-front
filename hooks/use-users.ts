@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback } from "react"
+import { useCallback, useState } from "react"
 import { useApi } from "./use-api"
 
 export interface User {
@@ -23,10 +23,30 @@ export interface UserRole {
 
 export function useUsers() {
   const { request, isLoading } = useApi()
+  const [users, setUsers] = useState<User[]>([])
 
   const getAllUsers = useCallback(
     async (page = 1, limit = 10) => {
       return await request<{ data: User[]; pagination: any; total: number }>(`/users?page=${page}&limit=${limit}`)
+    },
+    [request],
+  )
+
+  const fetchUsers = useCallback(
+    async (filters: { role?: string; status?: string } = {}) => {
+      const queryParams = new URLSearchParams()
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value) queryParams.append(key, value)
+      })
+
+      const { data, error } = await request<{ data: User[]; pagination: any; total: number }>(
+        `/users?${queryParams.toString()}`,
+      )
+      if (data && !error) {
+        setUsers(data.data)
+        return data.data
+      }
+      return []
     },
     [request],
   )
@@ -99,8 +119,10 @@ export function useUsers() {
   )
 
   return {
+    users,
     isLoading,
     getAllUsers,
+    fetchUsers,
     getUserById,
     createUser,
     updateUser,
