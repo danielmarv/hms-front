@@ -22,7 +22,7 @@ export default function LoginPage() {
   const { login, isAuthenticated: authState } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const callbackUrl = searchParams.get("callbackUrl") || "/dashboard"
+  const callbackUrl = searchParams.get("callbackUrl") || "/"
 
   // Check if already authenticated on mount and when auth state changes
   useEffect(() => {
@@ -31,7 +31,7 @@ export default function LoginPage() {
 
     if (token || authState) {
       console.log("Already authenticated, redirecting to dashboard")
-      router.push("/dashboard")
+      router.push("/")
     }
   }, [router, authState])
 

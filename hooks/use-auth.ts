@@ -38,7 +38,6 @@ export function useAuth() {
 
   // Set tokens in both localStorage and cookies
   const setTokens = (accessToken: string, refreshToken: string, userData: User) => {
-    console.log("Setting tokens...")
 
     // Store the raw token without any modifications
     localStorage.setItem("accessToken", accessToken)
@@ -51,15 +50,19 @@ export function useAuth() {
       path: "/",
       sameSite: "lax",
     })
+    Cookies.set("refreshToken", refreshToken, {
+      expires: 7, // 7 days
+    })
+    Cookies.set("user", JSON.stringify(userData), {
+      expires: 7, // 7 days
+    })
 
     debugTokens()
   }
 
   // Clear tokens from both localStorage and cookies
   const clearTokens = () => {
-    console.log("Clearing tokens...")
 
-    // Clear localStorage
     localStorage.removeItem("accessToken")
     localStorage.removeItem("refreshToken")
     localStorage.removeItem("user")
@@ -71,15 +74,12 @@ export function useAuth() {
   }
 
   const checkAuth = useCallback(async () => {
-    console.log("Checking authentication...")
     debugTokens()
 
     try {
-      // Check both localStorage and cookies
       const accessToken = localStorage.getItem("accessToken") || Cookies.get("token")
 
       if (!accessToken) {
-        console.log("No token found")
         setIsLoading(false)
         setIsAuthenticated(false)
         setUser(null)
@@ -304,7 +304,6 @@ export function useAuth() {
       setIsAuthenticated(true)
       return true
     } catch (error) {
-      console.error("Token refresh failed:", error)
       return false
     }
   }

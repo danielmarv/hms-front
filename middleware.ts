@@ -5,14 +5,13 @@ export function middleware(request: NextRequest) {
 
   // Define public paths that don't require authentication
   const isPublicPath =
-    path === "/" ||
     path === "/auth/login" ||
     path === "/auth/register" ||
     path === "/auth/forgot-password" ||
     path.startsWith("/auth/reset/")
 
   // Define admin paths that require admin role
-  const isAdminPath = path.startsWith("/dashboard/admin")
+  const isAdminPath = path.startsWith("/admin")
 
   // Get token from cookies
   const token = request.cookies.get("token")?.value || ""
@@ -29,7 +28,7 @@ export function middleware(request: NextRequest) {
   // Allow access to public paths even with token (except login/register)
   if (isPublicPath && token && (path === "/auth/login" || path === "/auth/register")) {
     console.log(`[Middleware] Redirecting to dashboard from ${path}`)
-    return NextResponse.redirect(new URL("/dashboard", request.url))
+    return NextResponse.redirect(new URL("/", request.url))
   }
 
   // Important: Clone the response to avoid modifying the original

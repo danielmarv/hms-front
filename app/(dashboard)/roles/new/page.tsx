@@ -1,4 +1,3 @@
-
 "use client"
 
 import type React from "react"
@@ -29,8 +28,8 @@ export default function NewRolePage() {
     const fetchPermissions = async () => {
       try {
         const data = await getAllPermissions()
-        if (data) { // Ensure data exists in the ApiResponse
-          setPermissions(data) // Assuming the API directly returns Permission[]
+        if (data) {
+          setPermissions(data)
         } else {
           throw new Error("Failed to fetch permissions")
         }
