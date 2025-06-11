@@ -48,6 +48,12 @@ export function AdminSidebar({ user }: AdminSidebarProps) {
       active: pathname.startsWith("/admin/chains"),
     },
     {
+      label: "Backups",
+      icon: Building,
+      href: "/admin/backups",
+      active: pathname.startsWith("/admin/backups"),
+    },
+    {
       label: "Hotels",
       icon: Hotel,
       href: "/admin/hotels",
