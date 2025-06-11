@@ -1,457 +1,494 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect } from "react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Package, Plus, Search, ArrowUpDown, RefreshCcw, Trash2, Edit, Eye } from "lucide-react"
-
+import { Plus, Search, Package, DollarSign, AlertTriangle, RotateCcw, Eye, Edit, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination"
 import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
-import { useInventory } from "@/hooks/use-inventory"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { useInventory, type InventoryItem } from "@/hooks/use-inventory"
+import { useToast } from "@/hooks/use-toast"
+
+const CATEGORIES = [
+  "Food & Beverage",
+  "Housekeeping",
+  "Maintenance",
+  "Office Supplies",
+  "Amenities",
+  "Linens",
+  "Cleaning Supplies",
+  "Other",
+]
+
+const STOCK_STATUS_OPTIONS = [
+  { value: "all", label: "All Items" },
+  { value: "in-stock", label: "In Stock" },
+  { value: "low-stock", label: "Low Stock" },
+  { value: "out-of-stock", label: "Out of Stock" },
+  { value: "reorder", label: "Needs Reorder" },
+]
+
+const SORT_OPTIONS = [
+  { value: "name", label: "Name" },
+  { value: "category", label: "Category" },
+  { value: "currentStock", label: "Stock Level" },
+  { value: "unitPrice", label: "Unit Price" },
+  { value: "createdAt", label: "Date Added" },
+]
 
 export default function InventoryPage() {
   const router = useRouter()
-  const { items, loading, error, pagination, totalItems, fetchInventoryItems, deleteInventoryItem } = useInventory()
+  const { toast } = useToast()
+  const { fetchInventoryItems, fetchInventoryStats, deleteInventoryItem, loading: isLoading } = useInventory()
 
-  const [search, setSearch] = useState("")
-  const [category, setCategory] = useState("")
-  const [stockStatus, setStockStatus] = useState("")
-  const [isActive, setIsActive] = useState("")
-  const [currentPage, setCurrentPage] = useState(1)
+  const [items, setItems] = useState<InventoryItem[]>([])
+  const [stats, setStats] = useState({
+    totalItems: 0,
+    totalValue: 0,
+    lowStockItems: 0,
+    reorderItems: 0,
+  })
+  const [pagination, setPagination] = useState({
+    page: 1,
+    totalPages: 1,
+    total: 0,
+    limit: 10,
+  })
 
-  // Filter states
-  // const [search, setSearch] = useState(searchParams.get("search") || "")
-  // const [category, setCategory] = useState(searchParams.get("category") || "")
-  // const [stockStatus, setStockStatus] = useState(searchParams.get("stockStatus") || "")
-  // const [sort, setSort] = useState(searchParams.get("sort") || "name")
+  const [filters, setFilters] = useState({
+    search: "",
+    category: "",
+    stockStatus: "",
+    sortBy: "name",
+    sortOrder: "asc",
+    page: 1,
+    limit: 10,
+  })
 
-  // const loadItems = async () => {
-  //   const params: Record<string, any> = {
-  //     page: pagination.page,
-  //     limit: pagination.limit,
-  //     sort
-  //   }
+  // Fetch items function
+  const fetchItems = async () => {
+    try {
+      const response = await fetchInventoryItems(
+        filters.page,
+        filters.limit,
+        filters.search,
+        filters.category,
+        "", // supplier
+        filters.stockStatus,
+        "", // isActive
+      )
 
-  //   if (search) params.search = search
-  //   if (category) params.category = category
-  //   if (stockStatus) params.stockStatus = stockStatus
+      if (response && response.data) {
+        // Handle different possible response structures
+        const responseData = response.data
 
-  //   const result = await getInventoryItems(params)
-
-  //   if (result && result.data) {
-  //     setItems(result.data)
-  //     setTotalItems(result.total || 0)
-  //     setPagination({
-  //       page: result.pagination?.page || 1,
-  //       limit: result.pagination?.limit || 10,
-  //       totalPages: result.pagination?.totalPages || 1
-  //     })
-  //   }
-  // }
-
-  // const loadLowStockItems = async () => {
-  //   const result = await getLowStockItems()
-  //   if (result) {
-  //     setLowStockItems(result)
-  //   }
-  // }
-
-  useEffect(() => {
-    fetchInventoryItems(currentPage, 10, search, category, "", stockStatus, isActive)
-  }, [fetchInventoryItems, currentPage, search, category, stockStatus, isActive])
-
-  // const handleSearch = () => {
-  //   setPagination({ ...pagination, page: 1 })
-  //   loadItems()
-  // }
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    setCurrentPage(1)
-    fetchInventoryItems(1, 10, search, category, "", stockStatus, isActive)
+        if (Array.isArray(responseData)) {
+          // If response.data is directly an array
+          setItems(responseData)
+          setPagination((prev) => ({ ...prev, total: responseData.length }))
+        } else if (responseData.data && Array.isArray(responseData.data)) {
+          // If response.data has a nested data property
+          setItems(responseData.data)
+          setPagination(responseData.pagination || pagination)
+        } else {
+          setItems([])
+        }
+      } else if (response && response.error) {
+        toast({
+          title: "Error",
+          description: `Failed to fetch inventory items: ${response.error}`,
+          variant: "destructive",
+        })
+        setItems([])
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while fetching items",
+        variant: "destructive",
+      })
+      setItems([])
+    }
   }
 
-  // const handleCategoryChange = (value: string) => {
-  //   setCategory(value)
-  //   setPagination({ ...pagination, page: 1 })
-  //   setTimeout(loadItems, 0)
-  // }
+  // Fetch stats function
+  const fetchStats = async () => {
+    try {
+      const response = await fetchInventoryStats()
+
+      if (response && response.data) {
+        const statsData = response.data
+        setStats({
+          totalItems: statsData.totalItems || 0,
+          totalValue: statsData.totalValue || 0,
+          lowStockItems: statsData.stockStatus?.find((s: any) => s._id === "Low")?.count || 0,
+          reorderItems: statsData.stockStatus?.find((s: any) => s._id === "Reorder")?.count || 0,
+        })
+      }
+    } catch (error) {
+      // Silent fail for stats
+    }
+  }
+
+  // Fetch data on component mount and filter changes
+  useEffect(() => {
+    fetchItems()
+    fetchStats()
+  }, [filters])
 
   const handleDelete = async (id: string) => {
-    const success = await deleteInventoryItem(id)
-    if (success) {
-      fetchInventoryItems(currentPage, 10, search, category, "", stockStatus, isActive)
+    if (confirm("Are you sure you want to delete this item?")) {
+      try {
+        const response = await deleteInventoryItem(id)
+        if (response && response.error) {
+          toast({
+            title: "Error",
+            description: "Failed to delete item",
+            variant: "destructive",
+          })
+        } else {
+          toast({
+            title: "Success",
+            description: "Item deleted successfully",
+          })
+          // Refresh data after deletion
+          fetchItems()
+          fetchStats()
+        }
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "An unexpected error occurred while deleting the item",
+          variant: "destructive",
+        })
+      }
     }
   }
 
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page)
+  const getStockStatus = (item: InventoryItem) => {
+    if (item.currentStock === 0) return { label: "Out of Stock", variant: "destructive" as const }
+    if (item.currentStock <= item.reorderPoint) return { label: "Reorder", variant: "destructive" as const }
+    if (item.currentStock <= item.minStockLevel) return { label: "Low Stock", variant: "secondary" as const }
+    return { label: "In Stock", variant: "default" as const }
   }
 
-  const handleCategoryChange = (value: string) => {
-    setCategory(value)
-    setCurrentPage(1)
-    fetchInventoryItems(1, 10, search, value, "", stockStatus, isActive)
-  }
-
-  const handleStockStatusChange = (value: string) => {
-    setStockStatus(value)
-  }
-
-  // const handleStockStatusChange = (value: string) => {
-  //   setStockStatus(value)
-  //   setPagination({ ...pagination, page: 1 })
-  //   setTimeout(loadItems, 0)
-  // }
-
-  // const handleSortChange = (value: string) => {
-  //   setSort(value)
-  //   setPagination({ ...pagination, page: 1 })
-  // }
-
-  // const handlePageChange = (page: number) => {
-  //   setPagination({ ...pagination, page })
-  // }
-
-  const getStockStatusBadge = (item: any) => {
-    if (!item.quantity_in_stock || !item.reorder_level) return null
-
-    if (item.quantity_in_stock <= item.reorder_level) {
-      return (
-        <Badge variant="destructive" className="ml-2">
-          Low Stock
-        </Badge>
-      )
-    }
-
-    return null
+  const handleFilterChange = (key: string, value: any) => {
+    setFilters((prev) => ({
+      ...prev,
+      [key]: value === "all" ? "" : value,
+      page: key === "page" ? value : 1,
+    }))
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Inventory Management</h1>
-        <Button asChild>
-          <Link href="/dashboard/inventory/new">
-            <Plus className="mr-2 h-4 w-4" /> Add Item
-          </Link>
-        </Button>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6">
+      <div className="max-w-7xl mx-auto space-y-8">
+        {/* Header */}
+        <div className="flex justify-between items-center bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20">
+          <div>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">
+              Inventory Management
+            </h1>
+            <p className="text-slate-600 mt-2 text-lg">Manage your hotel inventory items and stock levels</p>
+          </div>
+          <Button
+            onClick={() => router.push("/dashboard/inventory/new")}
+            className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+            size="lg"
+          >
+            <Plus className="mr-2 h-5 w-5" />
+            Add Item
+          </Button>
+        </div>
 
-      {/* {lowStockItems.length > 0 && (
-        <Card className="border-amber-500">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center">
-              <AlertTriangle className="mr-2 h-5 w-5 text-amber-500" />
-              Low Stock Alert
-            </CardTitle>
-            <CardDescription>
-              {lowStockItems.length} items are below their reorder level
+        {/* Stats Cards */}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-blue-100">Total Items</CardTitle>
+              <Package className="h-6 w-6 text-blue-200" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{stats.totalItems}</div>
+              <p className="text-blue-100 text-sm mt-1">Active inventory items</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white border-0 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-emerald-100">Total Value</CardTitle>
+              <DollarSign className="h-6 w-6 text-emerald-200" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">Shs{stats.totalValue.toLocaleString()}</div>
+              <p className="text-emerald-100 text-sm mt-1">Current inventory value</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white border-0 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-orange-100">Low Stock Items</CardTitle>
+              <AlertTriangle className="h-6 w-6 text-orange-200" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{stats.lowStockItems}</div>
+              <p className="text-orange-100 text-sm mt-1">Items needing attention</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-red-500 to-red-600 text-white border-0 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-red-100">Reorder Items</CardTitle>
+              <RotateCcw className="h-6 w-6 text-red-200" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{stats.reorderItems}</div>
+              <p className="text-red-100 text-sm mt-1">Items to reorder</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Filters */}
+        <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
+          <CardHeader className="bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-t-lg">
+            <CardTitle className="text-xl">Filters & Search</CardTitle>
+            <CardDescription className="text-purple-100">Filter and search inventory items</CardDescription>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                <Input
+                  placeholder="Search items..."
+                  value={filters.search || ""}
+                  onChange={(e) => handleFilterChange("search", e.target.value)}
+                  className="pl-10 border-2 border-slate-200 focus:border-blue-500 rounded-lg"
+                />
+              </div>
+              <Select
+                value={filters.category || "all"}
+                onValueChange={(value) => handleFilterChange("category", value)}
+              >
+                <SelectTrigger className="border-2 border-slate-200 focus:border-blue-500 rounded-lg">
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {CATEGORIES.map((category) => (
+                    <SelectItem key={category} value={category}>
+                      {category}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={filters.stockStatus || "all"}
+                onValueChange={(value) => handleFilterChange("stockStatus", value)}
+              >
+                <SelectTrigger className="border-2 border-slate-200 focus:border-blue-500 rounded-lg">
+                  <SelectValue placeholder="Stock Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {STOCK_STATUS_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={filters.sortBy || "name"} onValueChange={(value) => handleFilterChange("sortBy", value)}>
+                <SelectTrigger className="border-2 border-slate-200 focus:border-blue-500 rounded-lg">
+                  <SelectValue placeholder="Sort By" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SORT_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={filters.sortOrder || "asc"}
+                onValueChange={(value) => handleFilterChange("sortOrder", value)}
+              >
+                <SelectTrigger className="border-2 border-slate-200 focus:border-blue-500 rounded-lg">
+                  <SelectValue placeholder="Order" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="asc">Ascending</SelectItem>
+                  <SelectItem value="desc">Descending</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Items Table */}
+        <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
+          <CardHeader className="bg-gradient-to-r from-slate-700 to-slate-800 text-white rounded-t-lg">
+            <CardTitle className="text-xl">Inventory Items</CardTitle>
+            <CardDescription className="text-slate-200">
+              {pagination.total} total items • Page {pagination.page} of {pagination.totalPages}
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {lowStockItems.slice(0, 6).map((item) => (
-                <div key={item._id} className="p-3 border rounded-md flex justify-between items-center">
-                  <div>
-                    <p className="font-medium">{item.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Stock: {item.quantity_in_stock} {item.unit} (Reorder: {item.reorder_level})
-                    </p>
-                  </div>
-                  <Button variant="outline" size="sm" asChild>
-                    <Link href={`/dashboard/inventory/${item._id}`}>
-                      <Eye className="h-4 w-4 mr-1" /> View
-                    </Link>
+          <CardContent className="p-0">
+            {isLoading ? (
+              <div className="flex justify-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-slate-50 hover:bg-slate-100">
+                      <TableHead className="font-semibold text-slate-700">Name</TableHead>
+                      <TableHead className="font-semibold text-slate-700">SKU</TableHead>
+                      <TableHead className="font-semibold text-slate-700">Category</TableHead>
+                      <TableHead className="font-semibold text-slate-700">Current Stock</TableHead>
+                      <TableHead className="font-semibold text-slate-700">Unit Price</TableHead>
+                      <TableHead className="font-semibold text-slate-700">Status</TableHead>
+                      <TableHead className="font-semibold text-slate-700">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {items.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-12">
+                          <div className="flex flex-col items-center gap-4">
+                            <div className="bg-gradient-to-br from-slate-100 to-slate-200 rounded-full p-6">
+                              <Package className="h-12 w-12 text-slate-400" />
+                            </div>
+                            <div>
+                              <p className="text-slate-600 text-lg font-medium">No inventory items found</p>
+                              <p className="text-slate-400 text-sm mt-1">Get started by adding your first item</p>
+                            </div>
+                            <Button
+                              onClick={() => router.push("/dashboard/inventory/new")}
+                              className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"
+                            >
+                              <Plus className="mr-2 h-4 w-4" />
+                              Add your first item
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      items.map((item, index) => {
+                        const status = getStockStatus(item)
+                        return (
+                          <TableRow
+                            key={item._id}
+                            className={`hover:bg-slate-50 transition-colors ${
+                              index % 2 === 0 ? "bg-white" : "bg-slate-25"
+                            }`}
+                          >
+                            <TableCell className="font-medium text-slate-900">{item.name}</TableCell>
+                            <TableCell className="text-slate-600">{item.sku || "-"}</TableCell>
+                            <TableCell>
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                {item.category}
+                              </span>
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              <span
+                                className={`${
+                                  item.currentStock <= item.minStockLevel
+                                    ? "text-red-600"
+                                    : item.currentStock <= item.reorderPoint
+                                      ? "text-orange-600"
+                                      : "text-green-600"
+                                }`}
+                              >
+                                {item.currentStock} {item.unit}
+                              </span>
+                            </TableCell>
+                            <TableCell className="font-medium text-green-600">Shs{item.unitPrice.toFixed(2)}</TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={status.variant}
+                                className={`${
+                                  status.variant === "destructive"
+                                    ? "bg-red-100 text-red-800 hover:bg-red-200"
+                                    : status.variant === "secondary"
+                                      ? "bg-orange-100 text-orange-800 hover:bg-orange-200"
+                                      : "bg-green-100 text-green-800 hover:bg-green-200"
+                                }`}
+                              >
+                                {status.label}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex space-x-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => router.push(`/dashboard/inventory/${item._id}`)}
+                                  className="border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-300"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => router.push(`/dashboard/inventory/${item._id}/edit`)}
+                                  className="border-emerald-200 text-emerald-600 hover:bg-emerald-50 hover:border-emerald-300"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleDelete(item._id)}
+                                  className="border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+
+            {/* Pagination */}
+            {pagination && pagination.totalPages > 1 && (
+              <div className="flex items-center justify-between p-6 bg-slate-50 border-t">
+                <div className="text-sm text-slate-600">
+                  Showing page {pagination.page} of {pagination.totalPages}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={pagination.page <= 1}
+                    onClick={() => handleFilterChange("page", pagination.page - 1)}
+                    className="border-slate-300 hover:bg-slate-100"
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={pagination.page >= pagination.totalPages}
+                    onClick={() => handleFilterChange("page", pagination.page + 1)}
+                    className="border-slate-300 hover:bg-slate-100"
+                  >
+                    Next
                   </Button>
                 </div>
-              ))}
-            </div>
-            {lowStockItems.length > 6 && (
-              <div className="mt-3 text-center">
-                <Button variant="link" asChild>
-                  <Link href="/dashboard/inventory/low-stock">
-                    View all {lowStockItems.length} low stock items
-                  </Link>
-                </Button>
               </div>
             )}
           </CardContent>
         </Card>
-      )} */}
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Inventory Items</CardTitle>
-          <CardDescription>
-            Manage your inventory items, track stock levels, and reorder when necessary.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form className="flex flex-col md:flex-row gap-4 mb-6" onSubmit={handleSearch}>
-            <div className="flex w-full md:w-1/3">
-              <Input
-                placeholder="Search items..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                // onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                className="mr-2"
-              />
-              <Button type="submit" variant="secondary">
-                <Search className="h-4 w-4" />
-              </Button>
-            </div>
-
-            <div className="flex flex-1 gap-4">
-              <Select value={category} onValueChange={handleCategoryChange}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder={category || "All Categories"} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  <SelectItem value="food">Food</SelectItem>
-                  <SelectItem value="beverage">Beverage</SelectItem>
-                  <SelectItem value="cleaning">Cleaning</SelectItem>
-                  <SelectItem value="linen">Linen</SelectItem>
-                  <SelectItem value="electronics">Electronics</SelectItem>
-                  <SelectItem value="furniture">Furniture</SelectItem>
-                  <SelectItem value="stationery">Stationery</SelectItem>
-                  <SelectItem value="others">Others</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={stockStatus} onValueChange={handleStockStatusChange}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder={stockStatus || "Stock Status"} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="Low">Low Stock</SelectItem>
-                  <SelectItem value="Reorder">Reorder</SelectItem>
-                  <SelectItem value="Normal">Normal</SelectItem>
-                  <SelectItem value="Overstocked">Overstocked</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {/* <Select value={sort} onValueChange={handleSortChange}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder={sort || "Sort By"} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="name">Name (A-Z)</SelectItem>
-                  <SelectItem value="-name">Name (Z-A)</SelectItem>
-                  <SelectItem value="-quantity_in_stock">Stock (High-Low)</SelectItem>
-                  <SelectItem value="quantity_in_stock">Stock (Low-High)</SelectItem>
-                  <SelectItem value="-price_per_unit">Price (High-Low)</SelectItem>
-                  <SelectItem value="price_per_unit">Price (Low-High)</SelectItem>
-                </SelectContent>
-              </Select> */}
-            </div>
-          </form>
-
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>SKU</TableHead>
-                  <TableHead>Stock</TableHead>
-                  <TableHead>Unit</TableHead>
-                  <TableHead>Price</TableHead>
-                  <TableHead>Value</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  Array(5)
-                    .fill(0)
-                    .map((_, i) => (
-                      <TableRow key={i}>
-                        {Array(8)
-                          .fill(0)
-                          .map((_, j) => (
-                            <TableCell key={j}>
-                              <Skeleton className="h-6 w-full" />
-                            </TableCell>
-                          ))}
-                      </TableRow>
-                    ))
-                ) : items && items.length > 0 ? (
-                  items.map((item) => (
-                    <TableRow key={item._id}>
-                      <TableCell className="font-medium">
-                        {item.name}
-                        {getStockStatusBadge(item)}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{item.category}</Badge>
-                      </TableCell>
-                      <TableCell>{item.sku}</TableCell>
-                      <TableCell>{item.quantity_in_stock}</TableCell>
-                      <TableCell>{item.unit}</TableCell>
-                      <TableCell>${item.price_per_unit?.toFixed(2)}</TableCell>
-                      <TableCell>${item.total_value?.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <span className="sr-only">Open menu</span>
-                              <ArrowUpDown className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem asChild>
-                              <Link href={`/dashboard/inventory/${item._id}`}>
-                                <Eye className="mr-2 h-4 w-4" /> View Details
-                              </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                              <Link href={`/dashboard/inventory/${item._id}/edit`}>
-                                <Edit className="mr-2 h-4 w-4" /> Edit
-                              </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem asChild>
-                              <Link href={`/dashboard/inventory/${item._id}/stock`}>
-                                <RefreshCcw className="mr-2 h-4 w-4" /> Update Stock
-                              </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                              <Link href={`/dashboard/inventory/${item._id}/transfer`}>
-                                <Package className="mr-2 h-4 w-4" /> Transfer
-                              </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-destructive">
-                              <AlertDialog>
-                                <AlertDialogTrigger>
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  Delete
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      This action cannot be undone. This will permanently delete this item from our
-                                      servers.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => handleDelete(item._id)}>Delete</AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={8} className="h-24 text-center">
-                      {loading ? "Loading..." : "No inventory items found."}
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-
-          {pagination?.totalPages > 1 && (
-            <div className="mt-4 flex justify-center">
-              <Pagination>
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationPrevious
-                      onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
-                      className={currentPage <= 1 ? "pointer-events-none opacity-50" : ""}
-                    />
-                  </PaginationItem>
-
-                  {Array.from({ length: pagination?.totalPages }, (_, i) => i + 1)
-                    .filter((page) => {
-                      // Show first page, last page, and pages around current page
-                      return (
-                        page === 1 ||
-                        page === pagination?.totalPages ||
-                        (page >= currentPage - 1 && page <= currentPage + 1)
-                      )
-                    })
-                    .map((page, i, array) => {
-                      // Add ellipsis where needed
-                      if (i > 0 && array[i - 1] !== page - 1) {
-                        return (
-                          <PaginationItem key={`ellipsis-${page}`}>
-                            <PaginationEllipsis />
-                          </PaginationItem>
-                        )
-                      }
-
-                      return (
-                        <PaginationItem key={page}>
-                          <PaginationLink isActive={page === currentPage} onClick={() => handlePageChange(page)}>
-                            {page}
-                          </PaginationLink>
-                        </PaginationItem>
-                      )
-                    })}
-
-                  <PaginationItem>
-                    <PaginationNext
-                      onClick={() => handlePageChange(Math.min(pagination?.totalPages, currentPage + 1))}
-                      className={currentPage >= pagination?.totalPages ? "pointer-events-none opacity-50" : ""}
-                    />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
-            </div>
-          )}
-
-          <div className="mt-4 text-sm text-muted-foreground text-center">
-            Showing {items?.length} of {totalItems} items
-          </div>
-        </CardContent>
-      </Card>
+      </div>
     </div>
   )
 }
