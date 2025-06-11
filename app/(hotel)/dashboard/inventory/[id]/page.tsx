@@ -1,452 +1,442 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { format } from "date-fns"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Skeleton } from "@/components/ui/skeleton"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import {
   ArrowLeft,
   Edit,
-  RefreshCcw,
-  Calendar,
-  User,
-  Building,
+  Trash2,
   Package,
   TrendingUp,
   TrendingDown,
-  History,
-  ArrowRightLeft,
+  Calendar,
+  MapPin,
+  Tag,
+  FileText,
 } from "lucide-react"
-
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
-import { Skeleton } from "@/components/ui/skeleton"
+import { useInventory, type InventoryItem, type StockTransaction } from "@/hooks/use-inventory"
 import { toast } from "sonner"
-import { useInventory } from "@/hooks/use-inventory"
-import { useSuppliers } from "@/hooks/use-suppliers"
+import { StockUpdateDialog } from "@/components/inventory/stock-update-dialog"
 
-export default function InventoryItemPage() {
-  const params = useParams()
+interface InventoryItemPageProps {
+  params: {
+    id: string
+  }
+}
+
+export default function InventoryItemPage({ params }: InventoryItemPageProps) {
   const router = useRouter()
-  const { getInventoryItemById, getItemTransactions } = useInventory()
-  const { getSupplierById } = useSuppliers()
+  const { getInventoryItemById, getItemTransactions, deleteInventoryItem, isLoading } = useInventory()
+  const [item, setItem] = useState<InventoryItem | null>(null)
+  const [transactions, setTransactions] = useState<StockTransaction[]>([])
+  const [showStockDialog, setShowStockDialog] = useState(false)
 
-  const [item, setItem] = useState<any>(null)
-  const [supplier, setSupplier] = useState<any>(null)
-  const [transactions, setTransactions] = useState<any[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [transactionsLoading, setTransactionsLoading] = useState(false)
-
-  useEffect(() => {
-    const loadItem = async () => {
-      setIsLoading(true)
-      try {
-        const response = await getInventoryItemById(params.id as string)
-        if (response.data) {
-          setItem(response.data)
-
-          // Load supplier details if available
-          if (response.data.supplier) {
-            let supplierId = response.data.supplier
-            if (typeof supplierId === "object" && supplierId._id) {
-              supplierId = supplierId._id
-            }
-
-            const supplierResponse = await getSupplierById(supplierId)
-            if (supplierResponse.data) {
-              setSupplier(supplierResponse.data)
-            }
-          }
-        } else {
-          toast.error("Failed to load inventory item")
-        }
-      } catch (error) {
-        console.error("Error loading item:", error)
-        toast.error("An error occurred while loading the inventory item")
-      } finally {
-        setIsLoading(false)
-      }
+  const fetchItem = async () => {
+    const { data } = await getInventoryItemById(params.id)
+    if (data) {
+      setItem(data)
     }
+  }
 
-    loadItem()
-  }, [params.id, getInventoryItemById, getSupplierById])
-
-  const loadTransactions = async () => {
-    setTransactionsLoading(true)
-    try {
-      const response = await getItemTransactions(params.id as string, { limit: 5 })
-      if (response.data) {
-        setTransactions(response.data.data)
-      } else {
-        toast.error("Failed to load transactions")
-      }
-    } catch (error) {
-      console.error("Error loading transactions:", error)
-      toast.error("An error occurred while loading transactions")
-    } finally {
-      setTransactionsLoading(false)
+  const fetchTransactions = async () => {
+    const { data } = await getItemTransactions(params.id, { limit: 10, sort: "-transaction_date" })
+    if (data) {
+      setTransactions(data.data)
     }
   }
 
   useEffect(() => {
-    if (item) {
-      loadTransactions()
-    }
-  }, [item])
+    fetchItem()
+    fetchTransactions()
+  }, [params.id])
 
-  if (isLoading) {
-    return (
-      <div className="p-6 space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <Skeleton className="h-8 w-64" />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <Skeleton className="h-6 w-32" />
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {Array(6)
-                .fill(0)
-                .map((_, i) => (
-                  <Skeleton key={i} className="h-6 w-full" />
-                ))}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <Skeleton className="h-6 w-32" />
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {Array(6)
-                .fill(0)
-                .map((_, i) => (
-                  <Skeleton key={i} className="h-6 w-full" />
-                ))}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    )
-  }
-
-  if (!item) {
-    return (
-      <div className="p-6">
-        <Card className="border-destructive">
-          <CardHeader>
-            <CardTitle className="text-destructive">Error</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>Failed to load inventory item</p>
-          </CardContent>
-          <CardFooter>
-            <Button variant="outline" onClick={() => router.back()}>
-              Go Back
-            </Button>
-          </CardFooter>
-        </Card>
-      </div>
-    )
-  }
-
-  const getStockStatusBadge = () => {
-    if (!item.stockStatus) {
-      if (item.currentStock <= item.minStockLevel) {
-        return <Badge variant="destructive">Low Stock</Badge>
-      } else if (item.currentStock >= item.maxStockLevel) {
-        return <Badge variant="warning">Overstocked</Badge>
-      } else if (item.currentStock <= item.reorderPoint) {
-        return (
-          <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-300">
-            Reorder Soon
-          </Badge>
-        )
-      } else {
-        return (
-          <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
-            In Stock
-          </Badge>
-        )
-      }
+  const handleDelete = async () => {
+    const { error } = await deleteInventoryItem(params.id)
+    if (error) {
+      toast.error(error)
     } else {
-      switch (item.stockStatus) {
-        case "Low":
-          return <Badge variant="destructive">Low Stock</Badge>
-        case "Overstocked":
-          return <Badge variant="warning">Overstocked</Badge>
-        case "Reorder":
-          return (
-            <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-300">
-              Reorder Soon
-            </Badge>
-          )
-        case "Normal":
-          return (
-            <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
-              In Stock
-            </Badge>
-          )
-        default:
-          return <Badge variant="outline">Unknown</Badge>
-      }
+      toast.success("Item deleted successfully")
+      router.push("/dashboard/inventory")
     }
   }
 
-  const formatDate = (dateString: string) => {
-    if (!dateString) return "N/A"
-    return format(new Date(dateString), "PPP")
+  const getStockStatusBadge = (item: InventoryItem) => {
+    if (item.currentStock <= item.minStockLevel) {
+      return <Badge variant="destructive">Low Stock</Badge>
+    }
+    if (item.currentStock <= item.reorderPoint) {
+      return <Badge variant="secondary">Reorder</Badge>
+    }
+    if (item.currentStock >= item.maxStockLevel) {
+      return <Badge variant="outline">Overstocked</Badge>
+    }
+    return <Badge variant="default">Normal</Badge>
   }
 
   const getTransactionIcon = (type: string) => {
     switch (type) {
       case "restock":
-        return <TrendingUp className="h-4 w-4 text-green-500" />
-      case "use":
-        return <TrendingDown className="h-4 w-4 text-red-500" />
-      case "transfer":
-        return <ArrowRightLeft className="h-4 w-4 text-blue-500" />
-      case "adjustment":
-        return <History className="h-4 w-4 text-amber-500" />
+        return <TrendingUp className="h-4 w-4 text-green-600" />
+      case "usage":
       case "waste":
-        return <TrendingDown className="h-4 w-4 text-red-700" />
+        return <TrendingDown className="h-4 w-4 text-red-600" />
       default:
-        return <History className="h-4 w-4" />
+        return <Package className="h-4 w-4 text-blue-600" />
     }
   }
 
+  if (isLoading || !item) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-10 w-20" />
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-64" />
+            <Skeleton className="h-4 w-48" />
+          </div>
+        </div>
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="lg:col-span-2 space-y-6">
+            <Skeleton className="h-64 w-full" />
+            <Skeleton className="h-64 w-full" />
+          </div>
+          <Skeleton className="h-96 w-full" />
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="outline" size="icon" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <h1 className="text-2xl font-bold">{item.name}</h1>
-        {getStockStatusBadge()}
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle>Item Details</CardTitle>
-            <CardDescription>Detailed information about this inventory item</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <h3 className="text-sm font-medium text-muted-foreground">Category</h3>
-                <p className="text-sm">{item.category}</p>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-muted-foreground">SKU</h3>
-                <p className="text-sm">{item.sku || "N/A"}</p>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-muted-foreground">Barcode</h3>
-                <p className="text-sm">{item.barcode || "N/A"}</p>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-muted-foreground">Location</h3>
-                <p className="text-sm">{item.location || "N/A"}</p>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-muted-foreground">Status</h3>
-                <p className="text-sm">{item.isActive ? "Active" : "Inactive"}</p>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-muted-foreground">Perishable</h3>
-                <p className="text-sm">{item.isPerishable ? "Yes" : "No"}</p>
-              </div>
-            </div>
-
-            <Separator />
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <h3 className="text-sm font-medium text-muted-foreground">Current Stock</h3>
-                <p className="text-lg font-semibold">
-                  {item.currentStock} {item.unit}
-                </p>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-muted-foreground">Reorder Point</h3>
-                <p className="text-lg font-semibold">
-                  {item.reorderPoint} {item.unit}
-                </p>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-muted-foreground">Price per Unit</h3>
-                <p className="text-lg font-semibold">${item.unitPrice?.toFixed(2)}</p>
-              </div>
-            </div>
-
-            <Separator />
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <h3 className="text-sm font-medium text-muted-foreground">Min Stock Level</h3>
-                <p className="text-lg font-semibold">
-                  {item.minStockLevel} {item.unit}
-                </p>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-muted-foreground">Max Stock Level</h3>
-                <p className="text-lg font-semibold">
-                  {item.maxStockLevel} {item.unit}
-                </p>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-muted-foreground">Reorder Quantity</h3>
-                <p className="text-lg font-semibold">
-                  {item.reorderQuantity} {item.unit}
-                </p>
-              </div>
-            </div>
-
-            {item.description && (
-              <>
-                <Separator />
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground">Description</h3>
-                  <p className="text-sm mt-1">{item.description}</p>
-                </div>
-              </>
-            )}
-
-            {item.expiryDate && (
-              <>
-                <Separator />
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground">Expiry Date</h3>
-                  <p className="text-sm mt-1">{formatDate(item.expiryDate)}</p>
-                </div>
-              </>
-            )}
-
-            {supplier && (
-              <>
-                <Separator />
-
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Supplier</h3>
-                  <div className="bg-muted p-3 rounded-md">
-                    <p className="font-medium">{supplier.name}</p>
-                    {supplier.contact_person && (
-                      <p className="text-sm flex items-center gap-1">
-                        <User className="h-3 w-3" /> {supplier.contact_person}
-                      </p>
-                    )}
-                    {supplier.phone && <p className="text-sm">{supplier.phone}</p>}
-                    {supplier.email && <p className="text-sm">{supplier.email}</p>}
-                  </div>
-                </div>
-              </>
-            )}
-          </CardContent>
-          <CardFooter className="flex justify-between">
-            <Button variant="outline" asChild>
-              <Link href={`/dashboard/inventory/${item._id}/edit`}>
-                <Edit className="mr-2 h-4 w-4" /> Edit Item
-              </Link>
-            </Button>
-            <Button asChild>
-              <Link href={`/dashboard/inventory/${item._id}/stock`}>
-                <RefreshCcw className="mr-2 h-4 w-4" /> Update Stock
-              </Link>
-            </Button>
-          </CardFooter>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Transactions</CardTitle>
-            <CardDescription>Last 5 stock transactions</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {transactionsLoading ? (
-              <div className="space-y-2">
-                {Array(3)
-                  .fill(0)
-                  .map((_, i) => (
-                    <Skeleton key={i} className="h-16 w-full" />
-                  ))}
-              </div>
-            ) : transactions.length > 0 ? (
-              <div className="space-y-3">
-                {transactions.map((transaction) => (
-                  <div key={transaction._id} className="border rounded-md p-3">
-                    <div className="flex justify-between items-start">
-                      <div className="flex items-center">
-                        {getTransactionIcon(transaction.type)}
-                        <Badge
-                          variant={
-                            transaction.type === "restock"
-                              ? "default"
-                              : transaction.type === "use"
-                                ? "destructive"
-                                : transaction.type === "waste"
-                                  ? "destructive"
-                                  : transaction.type === "transfer"
-                                    ? "outline"
-                                    : "secondary"
-                          }
-                          className="ml-2"
-                        >
-                          {transaction.type}
-                        </Badge>
-                      </div>
-                      <p className="text-sm font-medium">
-                        {transaction.type === "restock" ? "+" : "-"}
-                        {transaction.quantity} {item.unit}
-                      </p>
-                    </div>
-                    <div className="mt-2 text-xs text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        {formatDate(transaction.transaction_date)}
-                      </div>
-                      {transaction.department && (
-                        <div className="flex items-center gap-1 mt-1">
-                          <Building className="h-3 w-3" />
-                          {transaction.department}
-                        </div>
-                      )}
-                      {transaction.reason && <div className="mt-1">{transaction.reason}</div>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-6">No transactions found</p>
-            )}
-          </CardContent>
-          <CardFooter>
-            <Button variant="outline" className="w-full" asChild>
-              <Link href={`/dashboard/inventory/${item._id}/transactions`}>View All Transactions</Link>
-            </Button>
-          </CardFooter>
-        </Card>
-      </div>
-
-      <div className="flex gap-2 mt-4">
-        <Button variant="outline" asChild>
-          <Link href={`/dashboard/inventory/${item._id}/transfer`}>
-            <ArrowRightLeft className="mr-2 h-4 w-4" /> Transfer Stock
-          </Link>
-        </Button>
-        {item.currentStock <= item.reorderPoint && (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" onClick={() => router.push("/dashboard/inventory")}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Inventory
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">{item.name}</h1>
+            <p className="text-muted-foreground">{item.description}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setShowStockDialog(true)}>
+            Update Stock
+          </Button>
           <Button asChild>
-            <Link href={`/dashboard/inventory/${item._id}/stock`}>
-              <Package className="mr-2 h-4 w-4" /> Restock Now
+            <Link href={`/dashboard/inventory/${item._id}/edit`}>
+              <Edit className="h-4 w-4 mr-2" />
+              Edit
             </Link>
           </Button>
-        )}
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive">
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This action cannot be undone. This will permanently delete the inventory item.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
       </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2 space-y-6">
+          <Tabs defaultValue="details" className="w-full">
+            <TabsList>
+              <TabsTrigger value="details">Details</TabsTrigger>
+              <TabsTrigger value="transactions">Transactions</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="details" className="space-y-6">
+              {/* Basic Information */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Basic Information</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">Category</label>
+                      <p className="text-sm">{item.category}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">Unit</label>
+                      <p className="text-sm">{item.unit}</p>
+                    </div>
+                    {item.sku && (
+                      <div>
+                        <label className="text-sm font-medium text-muted-foreground">SKU</label>
+                        <p className="text-sm">{item.sku}</p>
+                      </div>
+                    )}
+                    {item.barcode && (
+                      <div>
+                        <label className="text-sm font-medium text-muted-foreground">Barcode</label>
+                        <p className="text-sm">{item.barcode}</p>
+                      </div>
+                    )}
+                    {item.location && (
+                      <div>
+                        <label className="text-sm font-medium text-muted-foreground">Location</label>
+                        <p className="text-sm flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
+                          {item.location}
+                        </p>
+                      </div>
+                    )}
+                    {item.expiryDate && (
+                      <div>
+                        <label className="text-sm font-medium text-muted-foreground">Expiry Date</label>
+                        <p className="text-sm flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {new Date(item.expiryDate).toLocaleDateString()}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {item.tags && item.tags.length > 0 && (
+                    <div className="mt-4">
+                      <label className="text-sm font-medium text-muted-foreground">Tags</label>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {item.tags.map((tag, index) => (
+                          <Badge key={index} variant="secondary" className="text-xs">
+                            <Tag className="h-3 w-3 mr-1" />
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {item.notes && (
+                    <div className="mt-4">
+                      <label className="text-sm font-medium text-muted-foreground">Notes</label>
+                      <p className="text-sm flex items-start gap-1 mt-1">
+                        <FileText className="h-3 w-3 mt-0.5" />
+                        {item.notes}
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Stock Levels */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Stock Levels</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">Minimum Stock</label>
+                      <p className="text-sm">
+                        {item.minStockLevel} {item.unit}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">Maximum Stock</label>
+                      <p className="text-sm">
+                        {item.maxStockLevel} {item.unit}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">Reorder Point</label>
+                      <p className="text-sm">
+                        {item.reorderPoint} {item.unit}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">Reorder Quantity</label>
+                      <p className="text-sm">
+                        {item.reorderQuantity} {item.unit}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="transactions">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Recent Transactions</CardTitle>
+                  <CardDescription>Latest stock movements for this item</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {transactions.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Package className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                      <p className="text-muted-foreground">No transactions found</p>
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Quantity</TableHead>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Performed By</TableHead>
+                          <TableHead>Reason</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {transactions.map((transaction) => (
+                          <TableRow key={transaction._id}>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                {getTransactionIcon(transaction.type)}
+                                <span className="capitalize">{transaction.type}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <span className={transaction.type === "restock" ? "text-green-600" : "text-red-600"}>
+                                {transaction.type === "restock" ? "+" : "-"}
+                                {transaction.quantity}
+                              </span>
+                            </TableCell>
+                            <TableCell>{new Date(transaction.transaction_date).toLocaleDateString()}</TableCell>
+                            <TableCell>{transaction.performedBy.full_name}</TableCell>
+                            <TableCell>{transaction.reason || "-"}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        {/* Sidebar */}
+        <div className="space-y-6">
+          {/* Current Stock */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Current Stock</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center">
+                <div className="text-3xl font-bold mb-2">
+                  {item.currentStock} {item.unit}
+                </div>
+                {getStockStatusBadge(item)}
+                <div className="text-sm text-muted-foreground mt-2">
+                  Value: ${(item.currentStock * item.unitPrice).toFixed(2)}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Pricing */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Pricing</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Unit Price</span>
+                  <span className="text-sm font-medium">${item.unitPrice.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Total Value</span>
+                  <span className="text-sm font-medium">${(item.currentStock * item.unitPrice).toFixed(2)}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Status */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Status</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Active</span>
+                  <Badge variant={item.isActive ? "default" : "secondary"}>{item.isActive ? "Yes" : "No"}</Badge>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Perishable</span>
+                  <Badge variant={item.isPerishable ? "destructive" : "secondary"}>
+                    {item.isPerishable ? "Yes" : "No"}
+                  </Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Supplier */}
+          {item.supplier && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Supplier</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div>
+                    <span className="text-sm font-medium">{item.supplier.name}</span>
+                  </div>
+                  {item.supplier.contact_person && (
+                    <div>
+                      <span className="text-sm text-muted-foreground">Contact: {item.supplier.contact_person}</span>
+                    </div>
+                  )}
+                  {item.supplier.phone && (
+                    <div>
+                      <span className="text-sm text-muted-foreground">Phone: {item.supplier.phone}</span>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+
+      <StockUpdateDialog
+        open={showStockDialog}
+        onOpenChange={setShowStockDialog}
+        item={item}
+        onSuccess={() => {
+          fetchItem()
+          fetchTransactions()
+        }}
+      />
     </div>
   )
 }
