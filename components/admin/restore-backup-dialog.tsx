@@ -87,192 +87,199 @@ export function RestoreBackupDialog({ backup, open, onOpenChange }: RestoreBacku
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>Restore Backup</DialogTitle>
           <DialogDescription>
             Restore data from the selected backup. This operation will replace existing data.
           </DialogDescription>
         </DialogHeader>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            {/* Backup Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  {backup.type === "database" ? <Database className="h-5 w-5" /> : <HardDrive className="h-5 w-5" />}
-                  Backup Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="font-medium">Name:</span> {backup.name}
+        <div className="flex-1 overflow-y-auto pr-2">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              {/* Backup Information */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    {backup.type === "database" ? <Database className="h-5 w-5" /> : <HardDrive className="h-5 w-5" />}
+                    Backup Information
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="font-medium">Name:</span> {backup.name}
+                    </div>
+                    <div>
+                      <span className="font-medium">Type:</span> {backup.type}
+                    </div>
+                    <div>
+                      <span className="font-medium">Size:</span> {formatFileSize(backup.size || 0)}
+                    </div>
+                    <div>
+                      <span className="font-medium">Created:</span> {new Date(backup.createdAt).toLocaleString()}
+                    </div>
+                    <div className="col-span-2">
+                      <span className="font-medium">Description:</span> {backup.description || "No description"}
+                    </div>
                   </div>
-                  <div>
-                    <span className="font-medium">Type:</span> {backup.type}
-                  </div>
-                  <div>
-                    <span className="font-medium">Size:</span> {formatFileSize(backup.size || 0)}
-                  </div>
-                  <div>
-                    <span className="font-medium">Created:</span> {new Date(backup.createdAt).toLocaleString()}
-                  </div>
-                  <div className="col-span-2">
-                    <span className="font-medium">Description:</span> {backup.description || "No description"}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
 
-            {/* Warning Alert */}
-            <Alert className="border-orange-200 bg-orange-50">
-              <AlertTriangle className="h-4 w-4 text-orange-600" />
-              <AlertDescription className="text-orange-800">
-                <strong>Warning:</strong> This operation will replace existing data with the backup data. Make sure you
-                understand the implications before proceeding.
-              </AlertDescription>
-            </Alert>
+              {/* Warning Alert */}
+              <Alert className="border-orange-200 bg-orange-50">
+                <AlertTriangle className="h-4 w-4 text-orange-600" />
+                <AlertDescription className="text-orange-800">
+                  <strong>Warning:</strong> This operation will replace existing data with the backup data. Make sure
+                  you understand the implications before proceeding.
+                </AlertDescription>
+              </Alert>
 
-            {/* Target Location */}
-            <FormField
-              control={form.control}
-              name="targetLocation"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Target Location (Optional)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Leave empty to restore to original location" {...field} />
-                  </FormControl>
-                  <FormDescription>
-                    Specify a custom location to restore the backup. Leave empty to restore to the original location.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              {/* Target Location */}
+              <FormField
+                control={form.control}
+                name="targetLocation"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Target Location (Optional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Leave empty to restore to original location" {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      Specify a custom location to restore the backup. Leave empty to restore to the original location.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            {/* Restore Options */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Restore Options</CardTitle>
-                <CardDescription>Configure how the restore operation should be performed</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="options.validateBeforeRestore"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                      <FormControl>
-                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel>Validate Backup Before Restore</FormLabel>
-                        <FormDescription>Verify backup integrity before starting the restore process</FormDescription>
-                      </div>
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="options.createBackupBeforeRestore"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                      <FormControl>
-                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel>Create Backup Before Restore</FormLabel>
-                        <FormDescription>Create a backup of current data before restoring</FormDescription>
-                      </div>
-                    </FormItem>
-                  )}
-                />
-
-                {backup.type === "database" && (
+              {/* Restore Options */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Restore Options</CardTitle>
+                  <CardDescription>Configure how the restore operation should be performed</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
                   <FormField
                     control={form.control}
-                    name="options.dropExisting"
+                    name="options.validateBeforeRestore"
                     render={({ field }) => (
                       <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                         <FormControl>
                           <Checkbox checked={field.value} onCheckedChange={field.onChange} />
                         </FormControl>
                         <div className="space-y-1 leading-none">
-                          <FormLabel>Drop Existing Collections</FormLabel>
+                          <FormLabel>Validate Backup Before Restore</FormLabel>
+                          <FormDescription>Verify backup integrity before starting the restore process</FormDescription>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="options.createBackupBeforeRestore"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormControl>
+                          <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>Create Backup Before Restore</FormLabel>
+                          <FormDescription>Create a backup of current data before restoring</FormDescription>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+
+                  {backup.type === "database" && (
+                    <FormField
+                      control={form.control}
+                      name="options.dropExisting"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                          <FormControl>
+                            <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel>Drop Existing Collections</FormLabel>
+                            <FormDescription>
+                              Remove existing database collections before restoring (recommended for clean restore)
+                            </FormDescription>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
+                  {(backup.type === "files" || backup.type === "full") && (
+                    <FormField
+                      control={form.control}
+                      name="options.overwriteFiles"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                          <FormControl>
+                            <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel>Overwrite Existing Files</FormLabel>
+                            <FormDescription>Replace existing files with backup files</FormDescription>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Confirmation */}
+              <Card className="border-red-200">
+                <CardHeader>
+                  <CardTitle className="text-red-700">Confirmation Required</CardTitle>
+                  <CardDescription>Please confirm that you understand the risks of this operation</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <FormField
+                    control={form.control}
+                    name="confirmRestore"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormControl>
+                          <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel className="text-red-700">
+                            I understand that this operation will replace existing data and cannot be undone
+                          </FormLabel>
                           <FormDescription>
-                            Remove existing database collections before restoring (recommended for clean restore)
+                            By checking this box, you confirm that you have read and understood the implications of this
+                            restore operation.
                           </FormDescription>
                         </div>
                       </FormItem>
                     )}
                   />
-                )}
+                  <FormMessage />
+                </CardContent>
+              </Card>
+            </form>
+          </Form>
+        </div>
 
-                {(backup.type === "files" || backup.type === "full") && (
-                  <FormField
-                    control={form.control}
-                    name="options.overwriteFiles"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                        <FormControl>
-                          <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                        </FormControl>
-                        <div className="space-y-1 leading-none">
-                          <FormLabel>Overwrite Existing Files</FormLabel>
-                          <FormDescription>Replace existing files with backup files</FormDescription>
-                        </div>
-                      </FormItem>
-                    )}
-                  />
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Confirmation */}
-            <Card className="border-red-200">
-              <CardHeader>
-                <CardTitle className="text-red-700">Confirmation Required</CardTitle>
-                <CardDescription>Please confirm that you understand the risks of this operation</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <FormField
-                  control={form.control}
-                  name="confirmRestore"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                      <FormControl>
-                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel className="text-red-700">
-                          I understand that this operation will replace existing data and cannot be undone
-                        </FormLabel>
-                        <FormDescription>
-                          By checking this box, you confirm that you have read and understood the implications of this
-                          restore operation.
-                        </FormDescription>
-                      </div>
-                    </FormItem>
-                  )}
-                />
-                <FormMessage />
-              </CardContent>
-            </Card>
-
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={handleClose}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isSubmitting || !form.watch("confirmRestore")} variant="destructive">
-                {isSubmitting ? "Restoring..." : "Start Restore"}
-              </Button>
-            </div>
-          </form>
-        </Form>
+        <div className="flex-shrink-0 flex justify-end gap-2 pt-4 border-t">
+          <Button type="button" variant="outline" onClick={handleClose}>
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            disabled={isSubmitting || !form.watch("confirmRestore")}
+            variant="destructive"
+            onClick={form.handleSubmit(onSubmit)}
+          >
+            {isSubmitting ? "Restoring..." : "Start Restore"}
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   )
