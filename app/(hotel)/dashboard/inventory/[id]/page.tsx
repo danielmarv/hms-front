@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, use } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -37,12 +37,13 @@ import { toast } from "sonner"
 import { StockUpdateDialog } from "@/components/inventory/stock-update-dialog"
 
 interface InventoryItemPageProps {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 export default function InventoryItemPage({ params }: InventoryItemPageProps) {
+  const resolvedParams = use(params)
   const router = useRouter()
   const { getInventoryItemById, getItemTransactions, deleteInventoryItem, isLoading } = useInventory()
   const [item, setItem] = useState<InventoryItem | null>(null)
@@ -50,14 +51,14 @@ export default function InventoryItemPage({ params }: InventoryItemPageProps) {
   const [showStockDialog, setShowStockDialog] = useState(false)
 
   const fetchItem = async () => {
-    const { data } = await getInventoryItemById(params.id)
+    const { data } = await getInventoryItemById(resolvedParams.id)
     if (data) {
       setItem(data)
     }
   }
 
   const fetchTransactions = async () => {
-    const { data } = await getItemTransactions(params.id, { limit: 10, sort: "-transaction_date" })
+    const { data } = await getItemTransactions(resolvedParams.id, { limit: 10, sort: "-transaction_date" })
     if (data) {
       setTransactions(data.data)
     }
@@ -66,10 +67,10 @@ export default function InventoryItemPage({ params }: InventoryItemPageProps) {
   useEffect(() => {
     fetchItem()
     fetchTransactions()
-  }, [params.id])
+  }, [resolvedParams.id])
 
   const handleDelete = async () => {
-    const { error } = await deleteInventoryItem(params.id)
+    const { error } = await deleteInventoryItem(resolvedParams.id)
     if (error) {
       toast.error(error)
     } else {
@@ -142,7 +143,7 @@ export default function InventoryItemPage({ params }: InventoryItemPageProps) {
             Update Stock
           </Button>
           <Button asChild>
-            <Link href={`/dashboard/inventory/${item._id}/edit`}>
+            <Link href={`/dashboard/inventory/${resolvedParams.id}/edit`}>
               <Edit className="h-4 w-4 mr-2" />
               Edit
             </Link>
@@ -295,7 +296,7 @@ export default function InventoryItemPage({ params }: InventoryItemPageProps) {
                   <CardDescription>Latest stock movements for this item</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {transactions.length === 0 ? (
+                  {!transactions || transactions.length === 0 ? (
                     <div className="text-center py-8">
                       <Package className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                       <p className="text-muted-foreground">No transactions found</p>
@@ -327,7 +328,7 @@ export default function InventoryItemPage({ params }: InventoryItemPageProps) {
                               </span>
                             </TableCell>
                             <TableCell>{new Date(transaction.transaction_date).toLocaleDateString()}</TableCell>
-                            <TableCell>{transaction.performedBy.full_name}</TableCell>
+                            <TableCell>{transaction.performedBy?.full_name || "Unknown"}</TableCell>
                             <TableCell>{transaction.reason || "-"}</TableCell>
                           </TableRow>
                         ))}
@@ -354,7 +355,7 @@ export default function InventoryItemPage({ params }: InventoryItemPageProps) {
                 </div>
                 {getStockStatusBadge(item)}
                 <div className="text-sm text-muted-foreground mt-2">
-                  Value: ${(item.currentStock * item.unitPrice).toFixed(2)}
+                  Value: Shs{(item.currentStock * item.unitPrice).toFixed(2)}
                 </div>
               </div>
             </CardContent>
@@ -369,11 +370,11 @@ export default function InventoryItemPage({ params }: InventoryItemPageProps) {
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">Unit Price</span>
-                  <span className="text-sm font-medium">${item.unitPrice.toFixed(2)}</span>
+                  <span className="text-sm font-medium">Shs{item.unitPrice.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">Total Value</span>
-                  <span className="text-sm font-medium">${(item.currentStock * item.unitPrice).toFixed(2)}</span>
+                  <span className="text-sm font-medium">Shs{(item.currentStock * item.unitPrice).toFixed(2)}</span>
                 </div>
               </div>
             </CardContent>
