@@ -88,7 +88,7 @@ export const useBackups = () => {
       const response = await request<{
         backups: Backup[]
         pagination: { current: number; pages: number; total: number }
-      }>("/api/backups", "GET", undefined, false)
+      }>("/backups", "GET", undefined, false)
 
       if (response?.data) {
         setBackups(response.data.backups)
@@ -102,7 +102,7 @@ export const useBackups = () => {
 
   const createBackup = async (backupData: Partial<Backup>) => {
     try {
-      const response = await request<Backup>("/api/backups", "POST", backupData)
+      const response = await request<Backup>("/backups", "POST", backupData)
       if (response?.data) {
         setBackups((prev) => [response.data, ...prev])
         toast.success("Backup started successfully")
@@ -116,7 +116,7 @@ export const useBackups = () => {
 
   const scheduleBackup = async (backupData: Partial<Backup>) => {
     try {
-      const response = await request<Backup>("/api/backups/schedule", "POST", backupData)
+      const response = await request<Backup>("/backups/schedule", "POST", backupData)
       if (response?.data) {
         setBackups((prev) => [response.data, ...prev])
         toast.success("Backup scheduled successfully")
@@ -139,7 +139,7 @@ export const useBackups = () => {
     },
   ) => {
     try {
-      const response = await request<{ jobId: string }>(`/api/backups/${id}/restore`, "POST", restoreData)
+      const response = await request<{ jobId: string }>(`/backups/${id}/restore`, "POST", restoreData)
       if (response?.data) {
         toast.success("Restore process started")
         return response.data
@@ -156,7 +156,7 @@ export const useBackups = () => {
         isValid: boolean
         checksum: string
         details: any
-      }>(`/api/backups/${id}/validate`, "POST")
+      }>(`/backups/${id}/validate`, "POST")
 
       if (response?.data) {
         if (response.data.isValid) {
@@ -174,7 +174,7 @@ export const useBackups = () => {
 
   const deleteBackup = async (id: string) => {
     try {
-      await request(`/api/backups/${id}`, "DELETE")
+      await request(`/backups/${id}`, "DELETE")
       setBackups((prev) => prev.filter((backup) => backup._id !== id))
       toast.success("Backup deleted successfully")
     } catch (error) {
@@ -190,7 +190,7 @@ export const useBackups = () => {
     try {
       const queryParams = new URLSearchParams(params).toString()
       const response = await request<BackupAnalytics>(
-        `/api/backups/analytics${queryParams ? `?${queryParams}` : ""}`,
+        `/backups/analytics${queryParams ? `?${queryParams}` : ""}`,
         "GET",
         undefined,
         false,
