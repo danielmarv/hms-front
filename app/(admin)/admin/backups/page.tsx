@@ -1,64 +1,149 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Plus, Shield, Clock, Database, HardDrive, MoreHorizontal } from "lucide-react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Progress } from "@/components/ui/progress"
-import { useBackups, type Backup } from "@/hooks/use-backups"
-import { RestoreBackupDialog } from "@/components/admin/restore-backup-dialog"
-import Link from "next/link"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useBackups } from "@/hooks/use-backups"
+import {
+  Calendar,
+  Check,
+  ChevronDown,
+  Clock,
+  Database,
+  Download,
+  Files,
+  Filter,
+  HardDrive,
+  MoreVertical,
+  Plus,
+  RefreshCw,
+  Search,
+  Server,
+  Trash2,
+  XCircle,
+} from "lucide-react"
 
 export default function BackupsPage() {
-  const {
-    backups,
-    analytics,
-    isLoading,
-    fetchBackups,
-    fetchBackupAnalytics,
-    deleteBackup,
-    validateBackup,
-    restoreBackup,
-  } = useBackups()
-
-  const [selectedBackup, setSelectedBackup] = useState<Backup | null>(null)
-  const [showRestoreDialog, setShowRestoreDialog] = useState(false)
+  const router = useRouter()
+  const { backups, fetchBackups, deleteBackup, isLoading } = useBackups()
+  const [searchTerm, setSearchTerm] = useState("")
+  const [statusFilter, setStatusFilter] = useState<string | null>(null)
+  const [typeFilter, setTypeFilter] = useState<string | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [backupToDelete, setBackupToDelete] = useState<string | null>(null)
 
   useEffect(() => {
     fetchBackups()
-    fetchBackupAnalytics()
   }, [])
 
-  const getStatusColor = (status: string) => {
+  const handleDeleteBackup = async () => {
+    if (backupToDelete) {
+      try {
+        await deleteBackup(backupToDelete)
+        setDeleteDialogOpen(false)
+        setBackupToDelete(null)
+      } catch (error) {
+        console.error("Error deleting backup:", error)
+      }
+    }
+  }
+
+  const confirmDelete = (id: string) => {
+    setBackupToDelete(id)
+    setDeleteDialogOpen(true)
+  }
+
+  const filteredBackups = backups.filter((backup) => {
+    let matches = true
+
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase()
+      matches =
+        matches &&
+        (backup.name.toLowerCase().includes(searchLower) ||
+          backup.description?.toLowerCase().includes(searchLower) ||
+          false ||
+          backup.tags?.some((tag) => tag.toLowerCase().includes(searchLower)) ||
+          false)
+    }
+
+    if (statusFilter) {
+      matches = matches && backup.status === statusFilter
+    }
+
+    if (typeFilter) {
+      matches = matches && backup.type === typeFilter
+    }
+
+    return matches
+  })
+
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case "completed":
-        return "bg-green-100 text-green-800"
-      case "in_progress":
-        return "bg-blue-100 text-blue-800"
+        return (
+          <Badge className="bg-green-100 text-green-800 hover:bg-green-200">
+            <Check className="h-3 w-3 mr-1" /> Completed
+          </Badge>
+        )
       case "pending":
-        return "bg-yellow-100 text-yellow-800"
+        return (
+          <Badge variant="outline" className="border-amber-200 text-amber-800">
+            <Clock className="h-3 w-3 mr-1" /> Pending
+          </Badge>
+        )
+      case "in-progress":
+        return (
+          <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-200">
+            <RefreshCw className="h-3 w-3 mr-1 animate-spin" /> In Progress
+          </Badge>
+        )
       case "failed":
-        return "bg-red-100 text-red-800"
+        return (
+          <Badge className="bg-red-100 text-red-800 hover:bg-red-200">
+            <XCircle className="h-3 w-3 mr-1" /> Failed
+          </Badge>
+        )
       default:
-        return "bg-gray-100 text-gray-800"
+        return <Badge variant="outline">{status}</Badge>
     }
   }
 
   const getTypeIcon = (type: string) => {
     switch (type) {
+      case "full":
+        return <HardDrive className="h-4 w-4" />
       case "database":
         return <Database className="h-4 w-4" />
       case "files":
-        return <HardDrive className="h-4 w-4" />
+        return <Files className="h-4 w-4" />
+      case "incremental":
+        return <RefreshCw className="h-4 w-4" />
+      case "differential":
+        return <Server className="h-4 w-4" />
       default:
-        return <Shield className="h-4 w-4" />
+        return <HardDrive className="h-4 w-4" />
     }
   }
 
-  const formatFileSize = (bytes: number) => {
+  const formatFileSize = (bytes?: number) => {
     if (!bytes) return "0 B"
     const k = 1024
     const sizes = ["B", "KB", "MB", "GB", "TB"]
@@ -66,192 +151,274 @@ export default function BackupsPage() {
     return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
   }
 
-  const handleDeleteBackup = async (id: string) => {
-    if (confirm("Are you sure you want to delete this backup?")) {
-      await deleteBackup(id)
-    }
-  }
-
-  const handleValidateBackup = async (backup: Backup) => {
-    await validateBackup(backup._id)
-  }
-
-  const handleRestoreBackup = (backup: Backup) => {
-    setSelectedBackup(backup)
-    setShowRestoreDialog(true)
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return "N/A"
+    return new Date(dateString).toLocaleString()
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Backup Management</h1>
-          <p className="text-muted-foreground">Create, schedule, and manage system backups</p>
-        </div>
+    <div className="container mx-auto py-6 space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold">Backups</h1>
         <div className="flex gap-2">
-          <Link href="/admin/backups/schedule">
-            <Button variant="outline">
-              <Clock className="h-4 w-4 mr-2" />
-              Schedule Backup
-            </Button>
-          </Link>
-
-          <Link href="/admin/backups/create">
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Backup
-            </Button>
-          </Link>
+          <Button onClick={() => router.push("/admin/backups/create")}>
+            <Plus className="h-4 w-4 mr-2" />
+            Create Backup
+          </Button>
+          <Button variant="outline" onClick={() => router.push("/admin/backups/schedule")}>
+            <Calendar className="h-4 w-4 mr-2" />
+            Schedule Backup
+          </Button>
         </div>
       </div>
 
-      {/* Analytics Cards */}
-      {analytics && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Backups</CardTitle>
-              <Shield className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{analytics.summary.reduce((sum, item) => sum + item.count, 0)}</div>
-              <p className="text-xs text-muted-foreground">All backup records</p>
-            </CardContent>
-          </Card>
+      <Tabs defaultValue="all">
+        <div className="flex justify-between items-center mb-4">
+          <TabsList>
+            <TabsTrigger value="all">All Backups</TabsTrigger>
+            <TabsTrigger value="scheduled">Scheduled</TabsTrigger>
+            <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          </TabsList>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Storage Used</CardTitle>
-              <HardDrive className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {formatFileSize(analytics.summary.reduce((sum, item) => sum + item.totalSize, 0))}
-              </div>
-              <p className="text-xs text-muted-foreground">Total backup storage</p>
-            </CardContent>
-          </Card>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search backups..."
+                className="pl-8 w-[200px]"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Success Rate</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">
-                {analytics.trends.length > 0
-                  ? Math.round(
-                      (analytics.trends.reduce((sum, item) => sum + item.successRate, 0) / analytics.trends.length) *
-                        100,
-                    )
-                  : 0}
-                %
-              </div>
-              <p className="text-xs text-muted-foreground">Last 30 days</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Avg Duration</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {analytics.summary.length > 0
-                  ? Math.round(
-                      analytics.summary.reduce((sum, item) => sum + item.avgDuration, 0) /
-                        analytics.summary.length /
-                        1000,
-                    )
-                  : 0}
-                s
-              </div>
-              <p className="text-xs text-muted-foreground">Average backup time</p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Backups Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Backup History</CardTitle>
-          <CardDescription>View and manage all system backups</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Size</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Schedule</TableHead>
-                  <TableHead className="w-[70px]"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {backups.map((backup) => (
-                  <TableRow key={backup._id}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {getTypeIcon(backup.type)}
-                        <div>
-                          <div className="font-medium">{backup.name}</div>
-                          <div className="text-sm text-muted-foreground">{backup.description}</div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="capitalize">{backup.type}</TableCell>
-                    <TableCell>
-                      <Badge className={getStatusColor(backup.status)}>{backup.status}</Badge>
-                      {backup.status === "in_progress" && <Progress value={50} className="w-20 mt-1" />}
-                    </TableCell>
-                    <TableCell>{formatFileSize(backup.size || 0)}</TableCell>
-                    <TableCell>
-                      {backup.metadata.duration ? `${Math.round(backup.metadata.duration / 1000)}s` : "-"}
-                    </TableCell>
-                    <TableCell>{new Date(backup.createdAt).toLocaleDateString()}</TableCell>
-                    <TableCell>
-                      {backup.schedule?.isScheduled ? (
-                        <Badge variant="outline">{backup.schedule.frequency}</Badge>
-                      ) : (
-                        <span className="text-muted-foreground">Manual</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {backup.status === "completed" && (
-                            <>
-                              <DropdownMenuItem onClick={() => handleRestoreBackup(backup)}>Restore</DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleValidateBackup(backup)}>Validate</DropdownMenuItem>
-                            </>
-                          )}
-                          <DropdownMenuItem onClick={() => handleDeleteBackup(backup._id)} className="text-red-600">
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Filter className="h-4 w-4 mr-2" />
+                  Filter
+                  <ChevronDown className="h-4 w-4 ml-2" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[200px]">
+                <div className="p-2">
+                  <p className="text-sm font-medium mb-2">Status</p>
+                  <Select value={statusFilter || ""} onValueChange={(value) => setStatusFilter(value || null)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All statuses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All statuses</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="in-progress">In Progress</SelectItem>
+                      <SelectItem value="failed">Failed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="p-2 border-t">
+                  <p className="text-sm font-medium mb-2">Type</p>
+                  <Select value={typeFilter || ""} onValueChange={(value) => setTypeFilter(value || null)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All types" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All types</SelectItem>
+                      <SelectItem value="full">Full</SelectItem>
+                      <SelectItem value="database">Database</SelectItem>
+                      <SelectItem value="files">Files</SelectItem>
+                      <SelectItem value="incremental">Incremental</SelectItem>
+                      <SelectItem value="differential">Differential</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* Restore Dialog */}
-      <RestoreBackupDialog backup={selectedBackup} open={showRestoreDialog} onOpenChange={setShowRestoreDialog} />
+        <TabsContent value="all" className="mt-0">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle>All Backups</CardTitle>
+              <CardDescription>Manage your system backups and restore points</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="flex justify-center py-8">
+                  <RefreshCw className="h-6 w-6 animate-spin" />
+                </div>
+              ) : filteredBackups.length === 0 ? (
+                <div className="text-center py-8">
+                  <Database className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium mb-2">No backups found</h3>
+                  <p className="text-muted-foreground mb-4">
+                    {searchTerm || statusFilter || typeFilter
+                      ? "No backups match your current filters."
+                      : "Get started by creating your first backup."}
+                  </p>
+                  <Button onClick={() => router.push("/admin/backups/create")}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Backup
+                  </Button>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Size</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead>Tags</TableHead>
+                      <TableHead className="w-[50px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredBackups.map((backup) => (
+                      <TableRow key={backup._id}>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">{backup.name}</p>
+                            {backup.description && (
+                              <p className="text-sm text-muted-foreground">{backup.description}</p>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {getTypeIcon(backup.type)}
+                            <span className="capitalize">{backup.type}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>{getStatusBadge(backup.status)}</TableCell>
+                        <TableCell>{formatFileSize(backup.size)}</TableCell>
+                        <TableCell>{formatDate(backup.createdAt)}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {backup.tags?.slice(0, 2).map((tag) => (
+                              <Badge key={tag} variant="outline" className="text-xs">
+                                {tag}
+                              </Badge>
+                            ))}
+                            {backup.tags && backup.tags.length > 2 && (
+                              <Badge variant="outline" className="text-xs">
+                                +{backup.tags.length - 2}
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem>
+                                <Download className="h-4 w-4 mr-2" />
+                                Download
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <RefreshCw className="h-4 w-4 mr-2" />
+                                Restore
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="text-red-600" onClick={() => confirmDelete(backup._id)}>
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="scheduled">
+          <Card>
+            <CardHeader>
+              <CardTitle>Scheduled Backups</CardTitle>
+              <CardDescription>View and manage your automated backup schedules</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8">
+                <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">No scheduled backups</h3>
+                <p className="text-muted-foreground mb-4">Set up automated backups to run on a schedule.</p>
+                <Button onClick={() => router.push("/admin/backups/schedule")}>
+                  <Calendar className="h-4 w-4 mr-2" />
+                  Schedule Backup
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="analytics">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Total Backups</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{backups.length}</div>
+                <p className="text-xs text-muted-foreground">+2 from last month</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Success Rate</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {backups.length > 0
+                    ? Math.round((backups.filter((b) => b.status === "completed").length / backups.length) * 100)
+                    : 0}
+                  %
+                </div>
+                <p className="text-xs text-muted-foreground">Last 30 days</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Storage Used</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {formatFileSize(backups.reduce((total, backup) => total + (backup.size || 0), 0))}
+                </div>
+                <p className="text-xs text-muted-foreground">Across all backups</p>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Backup</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this backup? This action cannot be undone and will permanently remove the
+              backup files.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteBackup} className="bg-red-600 hover:bg-red-700">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
