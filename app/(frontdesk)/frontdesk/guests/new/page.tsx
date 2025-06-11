@@ -39,32 +39,34 @@ export default function NewGuestPage() {
       street: "",
       city: "",
       state: "",
-      postal_code: "",
       country: "",
+      zip: "",
     },
 
     // Preferences
     preferences: {
-      room_type: "",
-      pillow_type: "",
-      special_requests: [],
-      dietary_restrictions: [],
+      bed_type: "",
+      smoking: false,
+      floor_preference: "",
+      room_location: "",
+      dietary_requirements: [],
+      special_requests: "",
+      amenities: [],
     },
 
     // Loyalty program
     loyalty_program: {
       member: false,
       points: 0,
-      tier: "Standard",
+      tier: "standard",
       membership_number: "",
     },
 
     // Marketing preferences
     marketing_preferences: {
-      email: false,
-      sms: false,
-      phone: false,
-      mail: false,
+      email_opt_in: false,
+      sms_opt_in: false,
+      mail_opt_in: false,
     },
 
     // Additional information
@@ -85,6 +87,7 @@ export default function NewGuestPage() {
       name: "",
       relationship: "",
       phone: "",
+      email: "",
     },
   })
 
@@ -137,9 +140,9 @@ export default function NewGuestPage() {
     try {
       const response = await createGuest(formData)
 
-      if (response.data) {
+      if (response.data?.success) {
         toast.success("Guest created successfully")
-        router.push(`/dashboard/guests/${response.data._id}`)
+        router.push(`/frontdesk/guests/${response.data.data._id}`)
       } else {
         toast.error("Failed to create guest")
       }
@@ -156,7 +159,7 @@ export default function NewGuestPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" asChild>
-            <Link href="/dashboard/guests">
+            <Link href="/frontdesk/guests">
               <ChevronLeft className="h-4 w-4" />
               <span className="sr-only">Back</span>
             </Link>
@@ -207,7 +210,6 @@ export default function NewGuestPage() {
                         <SelectItem value="male">Male</SelectItem>
                         <SelectItem value="female">Female</SelectItem>
                         <SelectItem value="other">Other</SelectItem>
-                        <SelectItem value="prefer_not_to_say">Prefer not to say</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -238,15 +240,8 @@ export default function NewGuestPage() {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email Address *</Label>
-                    <Input
-                      id="email"
-                      name="email"
-                      type="email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      required
-                    />
+                    <Label htmlFor="email">Email Address</Label>
+                    <Input id="email" name="email" type="email" value={formData.email} onChange={handleInputChange} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="phone">Phone Number *</Label>
@@ -287,11 +282,11 @@ export default function NewGuestPage() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="address.postal_code">Postal Code</Label>
+                      <Label htmlFor="address.zip">Postal Code</Label>
                       <Input
-                        id="address.postal_code"
-                        name="address.postal_code"
-                        value={formData.address.postal_code}
+                        id="address.zip"
+                        name="address.zip"
+                        value={formData.address.zip}
                         onChange={handleInputChange}
                       />
                     </div>
@@ -325,7 +320,7 @@ export default function NewGuestPage() {
                         <SelectContent>
                           <SelectItem value="passport">Passport</SelectItem>
                           <SelectItem value="national_id">National ID</SelectItem>
-                          <SelectItem value="drivers_license">Driver's License</SelectItem>
+                          <SelectItem value="driver_license">Driver's License</SelectItem>
                           <SelectItem value="other">Other</SelectItem>
                         </SelectContent>
                       </Select>
@@ -359,56 +354,68 @@ export default function NewGuestPage() {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="preferences.room_type">Preferred Room Type</Label>
-                    <Input
-                      id="preferences.room_type"
-                      name="preferences.room_type"
-                      value={formData.preferences.room_type}
-                      onChange={handleInputChange}
-                    />
+                    <Label htmlFor="preferences.bed_type">Preferred Bed Type</Label>
+                    <Select
+                      name="preferences.bed_type"
+                      value={formData.preferences.bed_type}
+                      onValueChange={(value) =>
+                        handleInputChange({ target: { name: "preferences.bed_type", value } } as any)
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select bed type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="single">Single</SelectItem>
+                        <SelectItem value="double">Double</SelectItem>
+                        <SelectItem value="queen">Queen</SelectItem>
+                        <SelectItem value="king">King</SelectItem>
+                        <SelectItem value="twin">Twin</SelectItem>
+                        <SelectItem value="sofa">Sofa Bed</SelectItem>
+                        <SelectItem value="bunk">Bunk Bed</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="preferences.pillow_type">Pillow Preference</Label>
+                    <Label htmlFor="preferences.floor_preference">Floor Preference</Label>
                     <Input
-                      id="preferences.pillow_type"
-                      name="preferences.pillow_type"
-                      value={formData.preferences.pillow_type}
+                      id="preferences.floor_preference"
+                      name="preferences.floor_preference"
+                      value={formData.preferences.floor_preference}
                       onChange={handleInputChange}
+                      placeholder="e.g., High floor, Ground floor"
                     />
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="special_requests">Special Requests</Label>
-                  <Textarea
-                    id="special_requests"
-                    placeholder="Enter any special requests (e.g., extra towels, high floor, etc.)"
-                    value={formData.preferences.special_requests.join(", ")}
-                    onChange={(e) => {
-                      const requests = e.target.value
-                        .split(",")
-                        .map((item) => item.trim())
-                        .filter(Boolean)
-                      setFormData({
-                        ...formData,
-                        preferences: {
-                          ...formData.preferences,
-                          special_requests: requests,
-                        },
-                      })
-                    }}
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="preferences.smoking"
+                    checked={formData.preferences.smoking}
+                    onCheckedChange={(checked) => handleSwitchChange("preferences.smoking", checked)}
                   />
-                  <p className="text-sm text-muted-foreground">Separate multiple requests with commas</p>
+                  <Label htmlFor="preferences.smoking">Smoking Room Preference</Label>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="dietary_restrictions">Dietary Restrictions</Label>
+                  <Label htmlFor="preferences.room_location">Room Location Preference</Label>
+                  <Input
+                    id="preferences.room_location"
+                    name="preferences.room_location"
+                    value={formData.preferences.room_location}
+                    onChange={handleInputChange}
+                    placeholder="e.g., Ocean view, City view, Quiet area"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="dietary_requirements">Dietary Requirements</Label>
                   <Textarea
-                    id="dietary_restrictions"
-                    placeholder="Enter any dietary restrictions (e.g., vegetarian, gluten-free, etc.)"
-                    value={formData.preferences.dietary_restrictions.join(", ")}
+                    id="dietary_requirements"
+                    placeholder="Enter dietary requirements (e.g., vegetarian, gluten-free, etc.)"
+                    value={formData.preferences.dietary_requirements.join(", ")}
                     onChange={(e) => {
-                      const restrictions = e.target.value
+                      const requirements = e.target.value
                         .split(",")
                         .map((item) => item.trim())
                         .filter(Boolean)
@@ -416,12 +423,23 @@ export default function NewGuestPage() {
                         ...formData,
                         preferences: {
                           ...formData.preferences,
-                          dietary_restrictions: restrictions,
+                          dietary_requirements: requirements,
                         },
                       })
                     }}
                   />
-                  <p className="text-sm text-muted-foreground">Separate multiple restrictions with commas</p>
+                  <p className="text-sm text-muted-foreground">Separate multiple requirements with commas</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="preferences.special_requests">Special Requests</Label>
+                  <Textarea
+                    id="preferences.special_requests"
+                    name="preferences.special_requests"
+                    placeholder="Enter any special requests"
+                    value={formData.preferences.special_requests}
+                    onChange={handleInputChange}
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -458,10 +476,10 @@ export default function NewGuestPage() {
                           <SelectValue placeholder="Select tier" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Standard">Standard</SelectItem>
-                          <SelectItem value="Silver">Silver</SelectItem>
-                          <SelectItem value="Gold">Gold</SelectItem>
-                          <SelectItem value="Platinum">Platinum</SelectItem>
+                          <SelectItem value="standard">Standard</SelectItem>
+                          <SelectItem value="silver">Silver</SelectItem>
+                          <SelectItem value="gold">Gold</SelectItem>
+                          <SelectItem value="platinum">Platinum</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -496,38 +514,30 @@ export default function NewGuestPage() {
                     Select how the guest would like to receive marketing communications.
                   </p>
 
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                     <div className="flex items-center space-x-2">
                       <Switch
-                        id="marketing_preferences.email"
-                        checked={formData.marketing_preferences.email}
-                        onCheckedChange={(checked) => handleSwitchChange("marketing_preferences.email", checked)}
+                        id="marketing_preferences.email_opt_in"
+                        checked={formData.marketing_preferences.email_opt_in}
+                        onCheckedChange={(checked) => handleSwitchChange("marketing_preferences.email_opt_in", checked)}
                       />
-                      <Label htmlFor="marketing_preferences.email">Email Marketing</Label>
+                      <Label htmlFor="marketing_preferences.email_opt_in">Email Marketing</Label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <Switch
-                        id="marketing_preferences.sms"
-                        checked={formData.marketing_preferences.sms}
-                        onCheckedChange={(checked) => handleSwitchChange("marketing_preferences.sms", checked)}
+                        id="marketing_preferences.sms_opt_in"
+                        checked={formData.marketing_preferences.sms_opt_in}
+                        onCheckedChange={(checked) => handleSwitchChange("marketing_preferences.sms_opt_in", checked)}
                       />
-                      <Label htmlFor="marketing_preferences.sms">SMS Marketing</Label>
+                      <Label htmlFor="marketing_preferences.sms_opt_in">SMS Marketing</Label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <Switch
-                        id="marketing_preferences.phone"
-                        checked={formData.marketing_preferences.phone}
-                        onCheckedChange={(checked) => handleSwitchChange("marketing_preferences.phone", checked)}
+                        id="marketing_preferences.mail_opt_in"
+                        checked={formData.marketing_preferences.mail_opt_in}
+                        onCheckedChange={(checked) => handleSwitchChange("marketing_preferences.mail_opt_in", checked)}
                       />
-                      <Label htmlFor="marketing_preferences.phone">Phone Marketing</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="marketing_preferences.mail"
-                        checked={formData.marketing_preferences.mail}
-                        onCheckedChange={(checked) => handleSwitchChange("marketing_preferences.mail", checked)}
-                      />
-                      <Label htmlFor="marketing_preferences.mail">Postal Mail Marketing</Label>
+                      <Label htmlFor="marketing_preferences.mail_opt_in">Postal Mail Marketing</Label>
                     </div>
                   </div>
                 </div>
@@ -621,7 +631,7 @@ export default function NewGuestPage() {
 
                 <div className="space-y-2">
                   <h3 className="text-lg font-medium">Emergency Contact</h3>
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="emergency_contact.name">Contact Name</Label>
                       <Input
@@ -649,6 +659,16 @@ export default function NewGuestPage() {
                         onChange={handleInputChange}
                       />
                     </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="emergency_contact.email">Email Address</Label>
+                      <Input
+                        id="emergency_contact.email"
+                        name="emergency_contact.email"
+                        type="email"
+                        value={formData.emergency_contact.email}
+                        onChange={handleInputChange}
+                      />
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -658,7 +678,7 @@ export default function NewGuestPage() {
 
         <div className="mt-6 flex justify-end gap-4">
           <Button variant="outline" type="button" asChild>
-            <Link href="/dashboard/guests">Cancel</Link>
+            <Link href="/frontdesk/guests">Cancel</Link>
           </Button>
           <Button type="submit" disabled={submitting}>
             {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

@@ -6,39 +6,42 @@ import { useApi } from "./use-api"
 export type Guest = {
   _id: string
   full_name: string
-  email: string
+  email?: string
   phone: string
-  gender?: string
+  gender?: "male" | "female" | "other"
   dob?: string
   nationality?: string
-  id_type?: string
+  id_type?: "passport" | "national_id" | "driver_license" | "other"
   id_number?: string
   id_expiry?: string
+  id_scan?: string
   address?: {
     street?: string
     city?: string
     state?: string
-    postal_code?: string
     country?: string
+    zip?: string
   }
   preferences?: {
-    room_type?: string
-    pillow_type?: string
-    special_requests?: string[]
-    dietary_restrictions?: string[]
+    bed_type?: "single" | "double" | "queen" | "king" | "twin" | "sofa" | "bunk"
+    smoking?: boolean
+    floor_preference?: string
+    room_location?: string
+    dietary_requirements?: string[]
+    special_requests?: string
+    amenities?: string[]
   }
   loyalty_program: {
     member: boolean
     points: number
-    tier: string
-    membership_number?: string
+    tier: "standard" | "silver" | "gold" | "platinum"
     member_since?: string
+    membership_number?: string
   }
   marketing_preferences?: {
-    email: boolean
-    sms: boolean
-    phone: boolean
-    mail: boolean
+    email_opt_in: boolean
+    sms_opt_in: boolean
+    mail_opt_in: boolean
   }
   notes?: string
   tags?: string[]
@@ -46,21 +49,22 @@ export type Guest = {
   blacklisted: boolean
   blacklist_reason?: string
   company?: {
-    name: string
+    name?: string
     position?: string
     address?: string
     tax_id?: string
   }
   emergency_contact?: {
-    name: string
-    relationship: string
-    phone: string
+    name?: string
+    relationship?: string
+    phone?: string
+    email?: string
   }
   stay_history?: {
     total_stays: number
-    last_stay_date?: string
-    total_spent?: number
-    average_stay_length?: number
+    last_stay?: string
+    average_stay_length: number
+    total_spent: number
     favorite_room_type?: {
       _id: string
       name: string
@@ -77,6 +81,9 @@ export type Guest = {
     _id: string
     full_name: string
   }
+  // Virtual fields
+  full_address?: string
+  age?: number
 }
 
 export type GuestBooking = {
@@ -123,7 +130,10 @@ export type GuestFilters = {
   sort?: string
 }
 
-export type CreateGuestData = Omit<Guest, "_id" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy">
+export type CreateGuestData = Omit<
+  Guest,
+  "_id" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy" | "stay_history" | "full_address" | "age"
+>
 
 export function useGuests() {
   const { request, isLoading } = useApi()
@@ -139,6 +149,7 @@ export function useGuests() {
     })
 
     return await request<{
+      success: boolean
       count: number
       total: number
       pagination: { page: number; limit: number; totalPages: number }
@@ -151,23 +162,39 @@ export function useGuests() {
     if (id === "new") {
       return { data: null, error: null, isLoading: false }
     }
-    return await request<Guest>(`/guests/${id}`)
+    return await request<{
+      success: boolean
+      data: Guest
+    }>(`/guests/${id}`)
   }
 
   const getGuestBookingHistory = async (id: string) => {
-    return await request<{ count: number; data: GuestBooking[] }>(`/guests/${id}/bookings`)
+    return await request<{
+      success: boolean
+      count: number
+      data: GuestBooking[]
+    }>(`/guests/${id}/bookings`)
   }
 
   const createGuest = async (guestData: Partial<CreateGuestData>) => {
-    return await request<Guest>("/guests", "POST", guestData)
+    return await request<{
+      success: boolean
+      data: Guest
+    }>("/guests", "POST", guestData)
   }
 
   const updateGuest = async (id: string, guestData: Partial<CreateGuestData>) => {
-    return await request<Guest>(`/guests/${id}`, "PUT", guestData)
+    return await request<{
+      success: boolean
+      data: Guest
+    }>(`/guests/${id}`, "PUT", guestData)
   }
 
   const deleteGuest = async (id: string) => {
-    return await request<{ message: string }>(`/guests/${id}`, "DELETE")
+    return await request<{
+      success: boolean
+      message: string
+    }>(`/guests/${id}`, "DELETE")
   }
 
   const updateGuestLoyalty = async (
@@ -179,29 +206,36 @@ export function useGuests() {
       membership_number?: string
     },
   ) => {
-    return await request<{ message: string; data: Guest["loyalty_program"] }>(
-      `/guests/${id}/loyalty`,
-      "PATCH",
-      loyaltyData,
-    )
+    return await request<{
+      success: boolean
+      message: string
+      data: Guest["loyalty_program"]
+    }>(`/guests/${id}/loyalty`, "PATCH", loyaltyData)
   }
 
   const toggleVipStatus = async (id: string) => {
-    return await request<{ message: string; data: { vip: boolean } }>(`/guests/${id}/vip`, "PATCH")
+    return await request<{
+      success: boolean
+      message: string
+      data: { vip: boolean }
+    }>(`/guests/${id}/vip`, "PATCH")
   }
 
   const toggleBlacklistStatus = async (id: string, blacklisted: boolean, reason?: string) => {
-    return await request<{ message: string; data: { blacklisted: boolean; reason?: string } }>(
-      `/guests/${id}/blacklist`,
-      "PATCH",
-      { blacklisted, reason },
-    )
+    return await request<{
+      success: boolean
+      message: string
+      data: { blacklisted: boolean; reason?: string }
+    }>(`/guests/${id}/blacklist`, "PATCH", { blacklisted, reason })
   }
 
   const getGuestStatistics = async () => {
-    const response = await request<GuestStats>("/guests/stats")
-    if (response.data) {
-      setGuestStats(response.data)
+    const response = await request<{
+      success: boolean
+      data: GuestStats
+    }>("/guests/stats")
+    if (response.data?.data) {
+      setGuestStats(response.data.data)
     }
     return response
   }
