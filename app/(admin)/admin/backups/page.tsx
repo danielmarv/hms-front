@@ -7,12 +7,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Progress } from "@/components/ui/progress"
 import { useBackups, type Backup } from "@/hooks/use-backups"
-import { CreateBackupForm } from "@/components/admin/create-backup-form"
-import { ScheduleBackupForm } from "@/components/admin/schedule-backup-form"
 import { RestoreBackupDialog } from "@/components/admin/restore-backup-dialog"
+import Link from "next/link"
 
 export default function BackupsPage() {
   const {
@@ -27,8 +25,6 @@ export default function BackupsPage() {
   } = useBackups()
 
   const [selectedBackup, setSelectedBackup] = useState<Backup | null>(null)
-  const [showCreateDialog, setShowCreateDialog] = useState(false)
-  const [showScheduleDialog, setShowScheduleDialog] = useState(false)
   const [showRestoreDialog, setShowRestoreDialog] = useState(false)
 
   useEffect(() => {
@@ -93,35 +89,19 @@ export default function BackupsPage() {
           <p className="text-muted-foreground">Create, schedule, and manage system backups</p>
         </div>
         <div className="flex gap-2">
-          <Dialog open={showScheduleDialog} onOpenChange={setShowScheduleDialog}>
-            <DialogTrigger asChild>
-              <Button variant="outline">
-                <Clock className="h-4 w-4 mr-2" />
-                Schedule Backup
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Schedule Backup</DialogTitle>
-              </DialogHeader>
-              <ScheduleBackupForm onSuccess={() => setShowScheduleDialog(false)} />
-            </DialogContent>
-          </Dialog>
+          <Link href="/admin/backups/schedule">
+            <Button variant="outline">
+              <Clock className="h-4 w-4 mr-2" />
+              Schedule Backup
+            </Button>
+          </Link>
 
-          <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Backup
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Create New Backup</DialogTitle>
-              </DialogHeader>
-              <CreateBackupForm onSuccess={() => setShowCreateDialog(false)} />
-            </DialogContent>
-          </Dialog>
+          <Link href="/admin/backups/create">
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Backup
+            </Button>
+          </Link>
         </div>
       </div>
 
