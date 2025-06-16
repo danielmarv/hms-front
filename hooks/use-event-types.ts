@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { toast } from "sonner"
 import { useApi } from "@/hooks/use-api"
 import type { EventType } from "./use-events"
 
@@ -14,7 +13,7 @@ export function useEventTypes(hotelId?: string) {
   const fetchEventTypes = useCallback(async () => {
     try {
       setLoading(true)
-      const endpoint = hotelId ? `/events/event-types?hotel_id=${hotelId}` : "/events/event-types"
+      const endpoint = hotelId ? `/event-types?hotel_id=${hotelId}` : "/event-types"
       const response = await request<{ event_types: EventType[] }>(endpoint, "GET")
 
       if (response.error) {
@@ -29,7 +28,7 @@ export function useEventTypes(hotelId?: string) {
     } catch (err) {
       console.error("Failed to fetch event types:", err)
       setError(err instanceof Error ? err.message : "Failed to fetch event types")
-      toast.error("Failed to load event types")
+      // Error logged in useApi hook
     } finally {
       setLoading(false)
     }
@@ -43,7 +42,7 @@ export function useEventTypes(hotelId?: string) {
   const createEventType = async (eventTypeData: Partial<EventType>) => {
     try {
       setLoading(true)
-      const response = await request<{ event_type: EventType }>("/events/event-types", "POST", eventTypeData)
+      const response = await request<{ event_type: EventType }>("/event-types", "POST", eventTypeData)
 
       if (response.error) {
         throw new Error(response.error)
@@ -52,7 +51,7 @@ export function useEventTypes(hotelId?: string) {
       if (response.data && response.data.event_type) {
         // Add the new event type to the state
         setEventTypes((prevEventTypes) => [...prevEventTypes, response.data.event_type])
-        toast.success("Event type created successfully")
+        // toast.success("Event type created successfully")
         return response.data.event_type
       }
 
@@ -60,7 +59,7 @@ export function useEventTypes(hotelId?: string) {
     } catch (err) {
       console.error("Failed to create event type:", err)
       setError(err instanceof Error ? err.message : "Failed to create event type")
-      toast.error("Failed to create event type")
+      // Error logged in useApi hook
       throw err
     } finally {
       setLoading(false)
@@ -71,7 +70,7 @@ export function useEventTypes(hotelId?: string) {
   const updateEventType = async (id: string, eventTypeData: Partial<EventType>) => {
     try {
       setLoading(true)
-      const response = await request<{ event_type: EventType }>(`/events/event-types/${id}`, "PUT", eventTypeData)
+      const response = await request<{ event_type: EventType }>(`/event-types/${id}`, "PUT", eventTypeData)
 
       if (response.error) {
         throw new Error(response.error)
@@ -85,7 +84,7 @@ export function useEventTypes(hotelId?: string) {
           ),
         )
 
-        toast.success("Event type updated successfully")
+        // toast.success("Event type updated successfully")
         return response.data.event_type
       }
 
@@ -93,7 +92,7 @@ export function useEventTypes(hotelId?: string) {
     } catch (err) {
       console.error("Failed to update event type:", err)
       setError(err instanceof Error ? err.message : "Failed to update event type")
-      toast.error("Failed to update event type")
+      // Error logged in useApi hook
       throw err
     } finally {
       setLoading(false)
@@ -104,7 +103,7 @@ export function useEventTypes(hotelId?: string) {
   const deleteEventType = async (id: string) => {
     try {
       setLoading(true)
-      const response = await request<{ success: boolean }>(`/events/event-types/${id}`, "DELETE")
+      const response = await request<{ success: boolean }>(`/event-types/${id}`, "DELETE")
 
       if (response.error) {
         throw new Error(response.error)
@@ -112,11 +111,11 @@ export function useEventTypes(hotelId?: string) {
 
       // Remove the event type from the state
       setEventTypes((prevEventTypes) => prevEventTypes.filter((eventType) => eventType._id !== id))
-      toast.success("Event type deleted successfully")
+      // toast.success("Event type deleted successfully")
     } catch (err) {
       console.error("Failed to delete event type:", err)
       setError(err instanceof Error ? err.message : "Failed to delete event type")
-      toast.error("Failed to delete event type")
+      // Error logged in useApi hook
       throw err
     } finally {
       setLoading(false)
@@ -127,7 +126,7 @@ export function useEventTypes(hotelId?: string) {
   const getEventType = async (id: string) => {
     try {
       setLoading(true)
-      const response = await request<{ event_type: EventType }>(`/events/event-types/${id}`, "GET")
+      const response = await request<{ event_type: EventType }>(`/event-types/${id}`, "GET")
 
       if (response.error) {
         throw new Error(response.error)
@@ -141,7 +140,7 @@ export function useEventTypes(hotelId?: string) {
     } catch (err) {
       console.error(`Failed to fetch event type with ID ${id}:`, err)
       setError(err instanceof Error ? err.message : `Failed to fetch event type with ID ${id}`)
-      toast.error("Failed to load event type details")
+      // Error logged in useApi hook
       throw err
     } finally {
       setLoading(false)

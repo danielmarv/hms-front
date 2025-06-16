@@ -25,65 +25,59 @@ export function useApi() {
   }, [])
 
   const request = useCallback(
-    async <T>(
-      endpoint: string,
-      method: ApiMethods = "GET",
-      data?: any,
-      showToast: boolean = true
-    ): Promise<ApiResponse<T>> => {
+    async (endpoint: string, method: ApiMethods = "GET", data?: any, showToast = true): Promise<ApiResponse<any>> => {
       setIsLoading(true)
-  const url = `${API_URL}${endpoint}`
-  const token = getToken()
+      const url = `${API_URL}${endpoint}`
+      const token = getToken()
 
-  const headers: HeadersInit = {
-    "Content-Type": "application/json",
-  }
-
-  // Ensure we're formatting the Authorization header exactly as expected by the backend
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`
-  }
-
-  const options: RequestInit = {
-    method,
-    headers,
-  }
-
-  if (data && method !== "GET") {
-    options.body = JSON.stringify(data)
-  }
-
-  try {
-    console.log(`API Request: ${method} ${url}`, token ? "With token" : "No token")
-    const response = await fetch(url, options)
-    const responseData = await response.json()
-
-    if (!response.ok) {
-      const errorMessage = responseData.message || "An error occurred"
-      if (showToast) {
-        toast.error(errorMessage)
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
       }
-      console.error(`API Error (${response.status}):`, errorMessage)
-      return { data: null, error: errorMessage, isLoading: false }
-    }
 
-    setIsLoading(false)
-    return { data: responseData.data || responseData, error: null, isLoading: false }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "An error occurred"
-    if (showToast) {
-      toast.error(errorMessage)
-    }
-    console.error("API Request failed:", errorMessage)
-    setIsLoading(false)
-    return { data: null, error: errorMessage, isLoading: false }
-  }
-}
-,
-    [getToken]
+      // Ensure we're formatting the Authorization header exactly as expected by the backend
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`
+      }
+
+      const options: RequestInit = {
+        method,
+        headers,
+      }
+
+      if (data && method !== "GET") {
+        options.body = JSON.stringify(data)
+      }
+
+      try {
+        console.log(`API Request: ${method} ${url}`, token ? "With token" : "No token")
+        const response = await fetch(url, options)
+        const responseData = await response.json()
+
+        if (!response.ok) {
+          const errorMessage = responseData.message || "An error occurred"
+          console.error(`API Error (${response.status}):`, errorMessage)
+          if (showToast) {
+            toast.error(errorMessage)
+          }
+          return { data: null, error: errorMessage, isLoading: false }
+        }
+
+        setIsLoading(false)
+        return { data: responseData.data || responseData, error: null, isLoading: false }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "An error occurred"
+        console.error("API Request failed:", errorMessage)
+        if (showToast) {
+          toast.error(errorMessage)
+        }
+        setIsLoading(false)
+        return { data: null, error: errorMessage, isLoading: false }
+      }
+    },
+    [getToken],
   )
 
-return {
+  return {
     request,
     isLoading,
   }
