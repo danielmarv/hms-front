@@ -78,14 +78,23 @@ export default function EditUserPage() {
           phone: userData.data.phone || "",
           gender: userData.data.gender,
           dob: userData.data.dob ? userData.data.dob.split("T")[0] : "", // Format date for input
-          role: typeof userData.data.role === "object" ? userData.data.role._id : userData.data.role,
+          role: userData.data.role ? (typeof userData.data.role === "object" ? userData.data.role._id : userData.data.role) : "",
           national_id: userData.data.national_id || "",
-          address: userData.data.address || "",
+          address:
+            typeof userData.data.address === "object"
+              ? `${userData.data.address.street || ""}, ${userData.data.address.city || ""}, ${userData.data.address.country || ""}`.replace(
+                  /^,\s*|,\s*$/g,
+                  "",
+                )
+              : userData.data.address || "",
           department: userData.data.department || "",
           job_title: userData.data.job_title || "",
           is_global_admin: userData.data.is_global_admin || false,
-          primary_hotel:
-            typeof userData.data.primary_hotel === "object" ? userData.data.primary_hotel._id : userData.data.primary_hotel || "",
+          primary_hotel: userData.data.primary_hotel
+            ? typeof userData.data.primary_hotel === "object"
+              ? userData.data.primary_hotel._id
+              : userData.data.primary_hotel
+            : "",
           status: userData.data.status === "active",
         })
 
@@ -340,6 +349,9 @@ export default function EditUserPage() {
                     <FormControl>
                       <Input placeholder="Full address" {...field} />
                     </FormControl>
+                    <FormDescription>
+                      Enter full address or it will be formatted from existing address components
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
