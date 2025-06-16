@@ -48,8 +48,10 @@ export default function UsersPage() {
     setIsLoading(true)
     try {
       const response = await getAllUsers(currentPage, 10)
-      setUsers(response.data)
-      setTotalPages(Math.ceil(response.total / 10))
+      if (response && response.data) {
+        setUsers(response.data)
+        setTotalPages(response.pagination?.totalPages || 1)
+      }
     } catch (error) {
       console.error("Error fetching users:", error)
       toast.error("Failed to load users")
@@ -75,12 +77,14 @@ export default function UsersPage() {
     }
   }
 
-  const filteredUsers = users.filter(
-    (user) =>
+  const filteredUsers = users.filter((user) => {
+    const roleName = typeof user.role === "object" ? user.role?.name || "" : user.role || ""
+    return (
       user.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.role.toLowerCase().includes(searchQuery.toLowerCase()),
-  )
+      roleName.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+  })
 
   return (
     <div className="space-y-6">
@@ -134,6 +138,9 @@ export default function UsersPage() {
                     <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Role</TableHead>
+                    <TableHead>Department</TableHead>
+                    <TableHead>Job Title</TableHead>
+                    <TableHead>Global Admin</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Hotel Access</TableHead>
                     <TableHead className="w-[100px]">Actions</TableHead>
@@ -147,14 +154,19 @@ export default function UsersPage() {
                       <TableCell className="capitalize">
                         {typeof user.role === "object" ? user.role.name : user.role}
                       </TableCell>
+                      <TableCell>{user.department || "N/A"}</TableCell>
+                      <TableCell>{user.job_title || "N/A"}</TableCell>
+                      <TableCell>
+                        {user.is_global_admin ? <Badge variant="secondary">Global Admin</Badge> : null}
+                      </TableCell>
                       <TableCell>
                         <Badge variant={user.status === "active" ? "default" : "outline"}>{user.status}</Badge>
                       </TableCell>
                       <TableCell>
-                        {user.hotelAccess && user.hotelAccess > 0 ? (
+                        {user.accessible_hotels && user.accessible_hotels.length > 0 ? (
                           <div className="flex items-center gap-1">
                             <Hotel className="h-4 w-4 text-muted-foreground" />
-                            <span>{user.hotelAccess}</span>
+                            <span>{user.accessible_hotels.length}</span>
                           </div>
                         ) : (
                           <span className="text-muted-foreground">None</span>
