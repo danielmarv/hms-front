@@ -40,23 +40,51 @@ export function useVenues(hotelId?: string) {
   }, [fetchVenues])
 
   // Function to create a new venue
-  const createVenue = async (venueData: Partial<Venue>) => {
+  const createVenue = async (venueData: Partial<Venue>, hotelId?: string) => {
     try {
       setLoading(true)
-      const response = await request<{ venue: Venue }>("/event-venues", "POST", venueData)
+
+      // Add hotel_id to the venue data
+      const dataWithHotelId = {
+        ...venueData,
+        hotel_id: hotelId || venueData.hotel_id,
+      }
+
+      console.log("Creating venue with data:", dataWithHotelId)
+
+      const response = await request<any>("/event-venues", "POST", dataWithHotelId)
+
+      console.log("Create venue response:", response)
 
       if (response.error) {
         throw new Error(response.error)
       }
 
-      if (response.data && response.data.venue) {
-        // Add the new venue to the state
-        setVenues((prevVenues) => [...prevVenues, response.data.venue])
-        toast.success("Venue created successfully")
-        return response.data.venue
+      // Check for different possible response structures
+      let createdVenue = null
+      if (response.data) {
+        // Try different possible response structures
+        if (response.data.venue) {
+          createdVenue = response.data.venue
+        } else if (response.data.data) {
+          createdVenue = response.data.data
+        } else if (response.data._id) {
+          // Response data is the venue itself
+          createdVenue = response.data
+        } else {
+          console.log("Unexpected response structure:", response.data)
+        }
       }
 
-      throw new Error("Failed to create venue")
+      if (createdVenue) {
+        // Add the new venue to the state
+        setVenues((prevVenues) => [...prevVenues, createdVenue])
+        toast.success("Venue created successfully")
+        return createdVenue
+      } else {
+        console.error("No venue data in response:", response)
+        throw new Error("Venue was created but no data returned")
+      }
     } catch (err) {
       console.error("Failed to create venue:", err)
       setError(err instanceof Error ? err.message : "Failed to create venue")
@@ -68,26 +96,45 @@ export function useVenues(hotelId?: string) {
   }
 
   // Function to update a venue
-  const updateVenue = async (id: string, venueData: Partial<Venue>) => {
+  const updateVenue = async (id: string, venueData: Partial<Venue>, hotelId?: string) => {
     try {
       setLoading(true)
-      const response = await request<{ venue: Venue }>(`/event-venues/${id}`, "PUT", venueData)
+
+      // Add hotel_id to the venue data if provided
+      const dataWithHotelId = hotelId
+        ? {
+            ...venueData,
+            hotel_id: hotelId,
+          }
+        : venueData
+
+      const response = await request<any>(`/event-venues/${id}`, "PUT", dataWithHotelId)
 
       if (response.error) {
         throw new Error(response.error)
       }
 
-      if (response.data && response.data.venue) {
-        // Update the venue in the state
-        setVenues((prevVenues) =>
-          prevVenues.map((venue) => (venue._id === id ? { ...venue, ...response.data.venue } : venue)),
-        )
-
-        toast.success("Venue updated successfully")
-        return response.data.venue
+      // Check for different possible response structures
+      let updatedVenue = null
+      if (response.data) {
+        if (response.data.venue) {
+          updatedVenue = response.data.venue
+        } else if (response.data.data) {
+          updatedVenue = response.data.data
+        } else if (response.data._id) {
+          updatedVenue = response.data
+        }
       }
 
-      throw new Error("Failed to update venue")
+      if (updatedVenue) {
+        // Update the venue in the state
+        setVenues((prevVenues) => prevVenues.map((venue) => (venue._id === id ? { ...venue, ...updatedVenue } : venue)))
+
+        toast.success("Venue updated successfully")
+        return updatedVenue
+      } else {
+        throw new Error("Venue was updated but no data returned")
+      }
     } catch (err) {
       console.error("Failed to update venue:", err)
       setError(err instanceof Error ? err.message : "Failed to update venue")
@@ -125,14 +172,21 @@ export function useVenues(hotelId?: string) {
   const getVenue = async (id: string) => {
     try {
       setLoading(true)
-      const response = await request<{ venue: Venue }>(`/event-venues/${id}`, "GET")
+      const response = await request<any>(`/event-venues/${id}`, "GET")
 
       if (response.error) {
         throw new Error(response.error)
       }
 
-      if (response.data && response.data.venue) {
-        return response.data.venue
+      // Check for different possible response structures
+      if (response.data) {
+        if (response.data.venue) {
+          return response.data.venue
+        } else if (response.data.data) {
+          return response.data.data
+        } else if (response.data._id) {
+          return response.data
+        }
       }
 
       throw new Error(`Failed to fetch venue with ID ${id}`)
