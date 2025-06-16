@@ -73,20 +73,20 @@ export default function EditUserPage() {
         // Fetch user data
         const userData = await getUserById(userId)
         form.reset({
-          full_name: userData.full_name || "",
-          email: userData.email || "",
-          phone: userData.phone || "",
-          gender: userData.gender,
-          dob: userData.dob ? userData.dob.split("T")[0] : "", // Format date for input
-          role: typeof userData.role === "object" ? userData.role._id : userData.role,
-          national_id: userData.national_id || "",
-          address: userData.address || "",
-          department: userData.department || "",
-          job_title: userData.job_title || "",
-          is_global_admin: userData.is_global_admin || false,
+          full_name: userData.data.full_name || "",
+          email: userData.data.email || "",
+          phone: userData.data.phone || "",
+          gender: userData.data.gender,
+          dob: userData.data.dob ? userData.data.dob.split("T")[0] : "", // Format date for input
+          role: typeof userData.data.role === "object" ? userData.data.role._id : userData.data.role,
+          national_id: userData.data.national_id || "",
+          address: userData.data.address || "",
+          department: userData.data.department || "",
+          job_title: userData.data.job_title || "",
+          is_global_admin: userData.data.is_global_admin || false,
           primary_hotel:
-            typeof userData.primary_hotel === "object" ? userData.primary_hotel._id : userData.primary_hotel || "",
-          status: userData.status === "active",
+            typeof userData.data.primary_hotel === "object" ? userData.data.primary_hotel._id : userData.data.primary_hotel || "",
+          status: userData.data.status === "active",
         })
 
         // Fetch roles
