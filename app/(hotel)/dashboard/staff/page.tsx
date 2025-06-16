@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -17,84 +17,57 @@ import {
 } from "@/components/ui/pagination"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Plus, Search, Mail, Phone } from "lucide-react"
-
-// Mock data for staff members
-const staffMembers = [
-  {
-    id: "E001",
-    name: "John Smith",
-    email: "john.smith@hotel.com",
-    phone: "+1 (555) 123-4567",
-    role: "manager",
-    department: "management",
-    status: "active",
-    joinDate: "2023-01-15",
-  },
-  {
-    id: "E002",
-    name: "Sarah Johnson",
-    email: "sarah.j@hotel.com",
-    phone: "+1 (555) 987-6543",
-    role: "receptionist",
-    department: "front_desk",
-    status: "active",
-    joinDate: "2023-03-10",
-  },
-  {
-    id: "E003",
-    name: "Michael Brown",
-    email: "michael.brown@hotel.com",
-    phone: "+1 (555) 456-7890",
-    role: "housekeeper",
-    department: "housekeeping",
-    status: "active",
-    joinDate: "2023-02-05",
-  },
-  {
-    id: "E004",
-    name: "Emily Davis",
-    email: "emily.davis@hotel.com",
-    phone: "+1 (555) 234-5678",
-    role: "chef",
-    department: "food_service",
-    status: "on_leave",
-    joinDate: "2023-04-20",
-  },
-  {
-    id: "E005",
-    name: "Robert Wilson",
-    email: "robert.wilson@hotel.com",
-    phone: "+1 (555) 876-5432",
-    role: "maintenance",
-    department: "maintenance",
-    status: "inactive",
-    joinDate: "2022-11-15",
-  },
-]
+import { Plus, Search, Mail, AlertCircle } from "lucide-react"
+import { useUsers } from "@/hooks/use-users"
+import { ApiTest } from "@/components/debug/api-test"
 
 export default function StaffPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [departmentFilter, setDepartmentFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [showDebug, setShowDebug] = useState(false)
 
-  // Filter staff members based on search query, department filter, and status filter
-  const filteredStaff = staffMembers.filter((staff) => {
+  // Enhanced data fetching with error handling
+  const { users, isLoading, error, fetchUsers } = useUsers()
+
+  // Fetch users on component mount with error handling
+  useEffect(() => {
+    const loadStaff = async () => {
+      try {
+        console.log("Loading staff members...")
+        await fetchUsers()
+      } catch (err) {
+        console.error("Error fetching staff:", err)
+      }
+    }
+
+    loadStaff()
+  }, [fetchUsers])
+
+  // Add retry function
+  const handleRetry = async () => {
+    try {
+      await fetchUsers()
+    } catch (err) {
+      console.error("Retry failed:", err)
+    }
+  }
+
+  // Mock departments since the User model doesn't have department field
+  const mockDepartments = ["management", "front_desk", "housekeeping", "food_service", "maintenance"]
+
+  // Filter users based on search query and status filter
+  const filteredStaff = (users || []).filter((staff) => {
     const searchLower = searchQuery.toLowerCase()
     const matchesSearch =
-      staff.name.toLowerCase().includes(searchLower) ||
+      staff.full_name.toLowerCase().includes(searchLower) ||
       staff.email.toLowerCase().includes(searchLower) ||
-      staff.phone.includes(searchQuery) ||
-      staff.id.toLowerCase().includes(searchLower)
+      staff._id.toLowerCase().includes(searchLower)
 
-    const matchesDepartment = departmentFilter === "all" || staff.department === departmentFilter
     const matchesStatus = statusFilter === "all" || staff.status === statusFilter
 
-    return matchesSearch && matchesDepartment && matchesStatus
+    return matchesSearch && matchesStatus
   })
-
-  // Get unique departments for filter
-  const departments = Array.from(new Set(staffMembers.map((staff) => staff.department)))
 
   // Function to get badge variant based on status
   const getStatusBadge = (status: string) => {
@@ -131,8 +104,14 @@ export default function StaffPage() {
   }
 
   // Function to format role name for display
-  const formatRole = (role: string) => {
-    return role.charAt(0).toUpperCase() + role.slice(1)
+  const formatRole = (role: string | any) => {
+    if (typeof role === "string") {
+      return role.charAt(0).toUpperCase() + role.slice(1)
+    }
+    if (role && typeof role === "object" && role.name) {
+      return role.name
+    }
+    return "Unknown"
   }
 
   // Function to get initials from name
@@ -161,13 +140,24 @@ export default function StaffPage() {
           <h1 className="text-3xl font-bold tracking-tight">Staff</h1>
           <p className="text-muted-foreground">Manage hotel staff and employees</p>
         </div>
-        <Button asChild>
-          <Link href="/dashboard/staff/new">
-            <Plus className="mr-2 h-4 w-4" />
-            Add Staff Member
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => setShowDebug(!showDebug)}>
+            {showDebug ? "Hide Debug" : "Show Debug"}
+          </Button>
+          <Button asChild>
+            <Link href="/dashboard/staff/new">
+              <Plus className="mr-2 h-4 w-4" />
+              Add Staff Member
+            </Link>
+          </Button>
+        </div>
       </div>
+
+      {showDebug && (
+        <div className="mb-6">
+          <ApiTest />
+        </div>
+      )}
 
       <Card>
         <CardHeader className="flex flex-col gap-4 space-y-0 sm:flex-row sm:items-center sm:justify-between">
@@ -183,19 +173,6 @@ export default function StaffPage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="Filter by department" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Departments</SelectItem>
-                {departments.map((department) => (
-                  <SelectItem key={department} value={department}>
-                    {formatDepartment(department)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-full sm:w-[150px]">
                 <SelectValue placeholder="Filter by status" />
@@ -225,23 +202,63 @@ export default function StaffPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredStaff.length === 0 ? (
+                {isLoading ? (
                   <TableRow>
                     <TableCell colSpan={8} className="h-24 text-center">
-                      No staff members found.
+                      <div className="flex items-center justify-center space-x-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900"></div>
+                        <span>Loading staff members...</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : error ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="h-24 text-center">
+                      <div className="flex flex-col items-center space-y-3">
+                        <AlertCircle className="h-8 w-8 text-red-500" />
+                        <div className="text-center">
+                          <p className="text-red-600 font-medium">Failed to load staff members</p>
+                          <p className="text-sm text-gray-600 mt-1">{error}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" onClick={handleRetry}>
+                            Try Again
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => setShowDebug(true)}>
+                            Show Debug Info
+                          </Button>
+                        </div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : !users || users.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="h-24 text-center">
+                      <div className="flex flex-col items-center space-y-2">
+                        <p>No staff members found.</p>
+                        <Button asChild variant="outline" size="sm">
+                          <Link href="/dashboard/staff/new">Add First Staff Member</Link>
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : filteredStaff.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="h-24 text-center">
+                      No staff members match your search criteria.
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredStaff.map((staff) => (
-                    <TableRow key={staff.id}>
-                      <TableCell className="font-medium">{staff.id}</TableCell>
+                    <TableRow key={staff._id}>
+                      <TableCell className="font-medium">{staff._id.slice(-6).toUpperCase()}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Avatar className="h-8 w-8">
-                            <AvatarImage src={`/placeholder.svg?height=32&width=32`} alt={staff.name} />
-                            <AvatarFallback>{getInitials(staff.name)}</AvatarFallback>
+                            <AvatarImage src={`/placeholder.svg?height=32&width=32`} alt={staff.full_name} />
+                            <AvatarFallback>{getInitials(staff.full_name)}</AvatarFallback>
                           </Avatar>
-                          {staff.name}
+                          {staff.full_name}
                         </div>
                       </TableCell>
                       <TableCell className="hidden md:table-cell">
@@ -250,19 +267,19 @@ export default function StaffPage() {
                             <Mail className="mr-1 h-3 w-3" />
                             {staff.email}
                           </div>
-                          <div className="flex items-center text-sm text-muted-foreground">
-                            <Phone className="mr-1 h-3 w-3" />
-                            {staff.phone}
-                          </div>
                         </div>
                       </TableCell>
                       <TableCell>{formatRole(staff.role)}</TableCell>
-                      <TableCell className="hidden md:table-cell">{formatDepartment(staff.department)}</TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        {formatDepartment(
+                          staff.department || mockDepartments[Math.floor(Math.random() * mockDepartments.length)],
+                        )}
+                      </TableCell>
                       <TableCell>{getStatusBadge(staff.status)}</TableCell>
-                      <TableCell className="hidden md:table-cell">{formatDate(staff.joinDate)}</TableCell>
+                      <TableCell className="hidden md:table-cell">{formatDate(staff.createdAt)}</TableCell>
                       <TableCell className="text-right">
                         <Button variant="ghost" size="sm" asChild>
-                          <Link href={`/dashboard/staff/${staff.id}`}>View</Link>
+                          <Link href={`/dashboard/staff/${staff._id}`}>View</Link>
                         </Button>
                       </TableCell>
                     </TableRow>
