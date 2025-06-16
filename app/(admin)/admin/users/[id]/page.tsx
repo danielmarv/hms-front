@@ -66,7 +66,7 @@ export default function UserDetailsPage() {
       setIsLoading(true)
       try {
         const userData = await getUserById(userId)
-        setUser(userData as DetailedUser)
+        setUser(userData.data)
         console.log("Fetched user data:", userData)
       } catch (error) {
         console.error("Error fetching user data:", error)
@@ -168,8 +168,8 @@ export default function UserDetailsPage() {
             <div className="flex items-center gap-2 border-b pb-2">
               <span className="font-medium">Role:</span>
               <div className="flex flex-col">
-                <span className="capitalize font-medium">{user.role.name}</span>
-                <span className="text-sm text-muted-foreground">{user.role.description}</span>
+                <span className="capitalize font-medium">{user.role?.name || "N/A"}</span>
+                <span className="text-sm text-muted-foreground">{user.role?.description || "No description"}</span>
               </div>
             </div>
 
@@ -215,7 +215,7 @@ export default function UserDetailsPage() {
                   ? format(new Date(user.updatedAt), "PPP")
                   : "N/A"}
               </span>
-              {user.updatedBy && (
+              {user.updatedBy?.full_name && (
                 <span className="text-sm text-muted-foreground ml-2">by {user.updatedBy.full_name}</span>
               )}
             </div>
@@ -358,8 +358,8 @@ export default function UserDetailsPage() {
                 <div>
                   <h4 className="font-medium mb-2">Role Permissions</h4>
                   <div className="p-4 bg-muted rounded-lg">
-                    <p className="font-medium">{user.role.name}</p>
-                    <p className="text-sm text-muted-foreground">{user.role.description}</p>
+                    <p className="font-medium">{user.role?.name || "N/A"}</p>
+                    <p className="text-sm text-muted-foreground">{user.role?.description || "No description"}</p>
                   </div>
                 </div>
 
