@@ -14,7 +14,7 @@ export function useVenues(hotelId?: string) {
   const fetchVenues = useCallback(async () => {
     try {
       setLoading(true)
-      const endpoint = hotelId ? `/events/event-venues?hotel_id=${hotelId}` : "/events/event-venues"
+      const endpoint = hotelId ? `/event-venues?hotel_id=${hotelId}` : "/event-venues"
       const response = await request<{ venues: Venue[] }>(endpoint, "GET")
 
       if (response.error) {
@@ -29,7 +29,7 @@ export function useVenues(hotelId?: string) {
     } catch (err) {
       console.error("Failed to fetch venues:", err)
       setError(err instanceof Error ? err.message : "Failed to fetch venues")
-      toast.error("Failed to load venues")
+      // Error logged in useApi hook
     } finally {
       setLoading(false)
     }
@@ -43,7 +43,7 @@ export function useVenues(hotelId?: string) {
   const createVenue = async (venueData: Partial<Venue>) => {
     try {
       setLoading(true)
-      const response = await request<{ venue: Venue }>("/events/event-venues", "POST", venueData)
+      const response = await request<{ venue: Venue }>("/event-venues", "POST", venueData)
 
       if (response.error) {
         throw new Error(response.error)
@@ -60,7 +60,7 @@ export function useVenues(hotelId?: string) {
     } catch (err) {
       console.error("Failed to create venue:", err)
       setError(err instanceof Error ? err.message : "Failed to create venue")
-      toast.error("Failed to create venue")
+      // Error logged in useApi hook
       throw err
     } finally {
       setLoading(false)
@@ -71,7 +71,7 @@ export function useVenues(hotelId?: string) {
   const updateVenue = async (id: string, venueData: Partial<Venue>) => {
     try {
       setLoading(true)
-      const response = await request<{ venue: Venue }>(`/events/event-venues/${id}`, "PUT", venueData)
+      const response = await request<{ venue: Venue }>(`/event-venues/${id}`, "PUT", venueData)
 
       if (response.error) {
         throw new Error(response.error)
@@ -91,7 +91,7 @@ export function useVenues(hotelId?: string) {
     } catch (err) {
       console.error("Failed to update venue:", err)
       setError(err instanceof Error ? err.message : "Failed to update venue")
-      toast.error("Failed to update venue")
+      // Error logged in useApi hook
       throw err
     } finally {
       setLoading(false)
@@ -102,7 +102,7 @@ export function useVenues(hotelId?: string) {
   const deleteVenue = async (id: string) => {
     try {
       setLoading(true)
-      const response = await request<{ success: boolean }>(`/events/event-venues/${id}`, "DELETE")
+      const response = await request<{ success: boolean }>(`/event-venues/${id}`, "DELETE")
 
       if (response.error) {
         throw new Error(response.error)
@@ -114,7 +114,7 @@ export function useVenues(hotelId?: string) {
     } catch (err) {
       console.error("Failed to delete venue:", err)
       setError(err instanceof Error ? err.message : "Failed to delete venue")
-      toast.error("Failed to delete venue")
+      // Error logged in useApi hook
       throw err
     } finally {
       setLoading(false)
@@ -125,7 +125,7 @@ export function useVenues(hotelId?: string) {
   const getVenue = async (id: string) => {
     try {
       setLoading(true)
-      const response = await request<{ venue: Venue }>(`/events/event-venues/${id}`, "GET")
+      const response = await request<{ venue: Venue }>(`/event-venues/${id}`, "GET")
 
       if (response.error) {
         throw new Error(response.error)
@@ -139,7 +139,7 @@ export function useVenues(hotelId?: string) {
     } catch (err) {
       console.error(`Failed to fetch venue with ID ${id}:`, err)
       setError(err instanceof Error ? err.message : `Failed to fetch venue with ID ${id}`)
-      toast.error("Failed to load venue details")
+      // Error logged in useApi hook
       throw err
     } finally {
       setLoading(false)
@@ -151,7 +151,7 @@ export function useVenues(hotelId?: string) {
     try {
       setLoading(true)
       const response = await request<{ available: boolean; conflicts?: any[] }>(
-        `/events/event-venues/${venueId}/availability?start_date=${startDate.toISOString()}&end_date=${endDate.toISOString()}`,
+        `/event-venues/${venueId}/availability?start_date=${startDate.toISOString()}&end_date=${endDate.toISOString()}`,
         "GET",
       )
 
@@ -163,7 +163,7 @@ export function useVenues(hotelId?: string) {
     } catch (err) {
       console.error("Failed to check venue availability:", err)
       setError(err instanceof Error ? err.message : "Failed to check venue availability")
-      toast.error("Failed to check venue availability")
+      // Error logged in useApi hook
       throw err
     } finally {
       setLoading(false)

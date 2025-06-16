@@ -12,6 +12,7 @@ export interface User {
   createdAt: string
   updatedAt: string
   hotelAccess?: number
+  department?: string
 }
 
 export interface UserRole {
@@ -24,36 +25,90 @@ export interface UserRole {
 export function useUsers() {
   const { request, isLoading } = useApi()
   const [users, setUsers] = useState<User[]>([])
+  const [error, setError] = useState<string | null>(null)
 
   const getAllUsers = useCallback(
     async (page = 1, limit = 10) => {
-      return await request<{ data: User[]; pagination: any; total: number }>(`/users?page=${page}&limit=${limit}`)
+      setError(null)
+      const result = await request<{ data: User[]; pagination: any; total: number }>(
+        `/users?page=${page}&limit=${limit}`,
+      )
+
+      if (result.error) {
+        setError(result.error)
+        return { data: null, error: result.error }
+      }
+
+      return result
     },
     [request],
   )
 
   const fetchUsers = useCallback(
     async (filters: { role?: string; status?: string } = {}) => {
-      const queryParams = new URLSearchParams()
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value) queryParams.append(key, value)
-      })
+      setError(null)
 
-      const { data, error } = await request<{ data: User[]; pagination: any; total: number }>(
-        `/users?${queryParams.toString()}`,
-      )
-      if (data && !error) {
-        setUsers(data.data)
-        return data.data
+      try {
+        const queryParams = new URLSearchParams()
+        Object.entries(filters).forEach(([key, value]) => {
+          if (value && value !== "all") queryParams.append(key, value)
+        })
+
+        const queryString = queryParams.toString()
+        const endpoint = queryString ? `/users?${queryString}` : "/users"
+
+        console.log("Fetching users from endpoint:", endpoint)
+
+        const result = await request<{ success: boolean; data: User[]; pagination?: any; total?: number }>(endpoint)
+
+        if (result.error) {
+          setError(result.error)
+          setUsers([])
+          throw new Error(result.error)
+        }
+
+        if (result.data) {
+          // Handle different response formats
+          let userData: User[] = []
+
+          if (Array.isArray(result.data)) {
+            // Direct array response
+            userData = result.data
+          } else if (result.data.data && Array.isArray(result.data.data)) {
+            // Nested data response
+            userData = result.data.data
+          } else if (result.data.success && result.data.data) {
+            // Success wrapper response
+            userData = Array.isArray(result.data.data) ? result.data.data : []
+          }
+
+          setUsers(userData)
+          return userData
+        }
+
+        setUsers([])
+        return []
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Failed to fetch users"
+        setError(errorMessage)
+        setUsers([])
+        throw err
       }
-      return []
     },
     [request],
   )
 
   const getUserById = useCallback(
     async (userId: string) => {
-      return await request<User>(`/users/${userId}`)
+      setError(null)
+      const result = await request<{ success: boolean; data: User }>(`/users/${userId}`)
+
+      if (result.error) {
+        setError(result.error)
+        return { data: null, error: result.error }
+      }
+
+      return result
     },
     [request],
   )
@@ -65,10 +120,22 @@ export function useUsers() {
       password: string
       role: string
       status?: "active" | "inactive"
+      department?: string
     }) => {
-      return await request<User>("/users", "POST", userData)
+      setError(null)
+      const result = await request<{ success: boolean; data: User }>("/users", "POST", userData)
+
+      if (result.error) {
+        setError(result.error)
+        return { data: null, error: result.error }
+      }
+
+      // Refresh users list after creating
+      await fetchUsers()
+
+      return result
     },
-    [request],
+    [request, fetchUsers],
   )
 
   const updateUser = useCallback(
@@ -79,33 +146,59 @@ export function useUsers() {
         email?: string
         role?: string
         status?: "active" | "inactive"
+        department?: string
       },
     ) => {
-      return await request<User>(`/users/${userId}`, "PUT", userData)
+      setError(null)
+      const result = await request<{ success: boolean; data: User }>(`/users/${userId}`, "PUT", userData)
+
+      if (result.error) {
+        setError(result.error)
+        return { data: null, error: result.error }
+      }
+
+      // Refresh users list after updating
+      await fetchUsers()
+
+      return result
     },
-    [request],
+    [request, fetchUsers],
   )
 
   const deleteUser = useCallback(
     async (userId: string) => {
-      return await request<{ success: boolean; message: string }>(`/users/${userId}`, "DELETE")
+      setError(null)
+      const result = await request<{ success: boolean; message: string }>(`/users/${userId}`, "DELETE")
+
+      if (result.error) {
+        setError(result.error)
+        return { data: null, error: result.error }
+      }
+
+      // Refresh users list after deleting
+      await fetchUsers()
+
+      return result
     },
-    [request],
+    [request, fetchUsers],
   )
 
   const resetPassword = useCallback(
     async (userId: string, data: { newPassword: string }) => {
+      setError(null)
       return await request<{ success: boolean; message: string }>(`/users/${userId}/reset-password`, "POST", data)
     },
     [request],
   )
 
   const getUserRoles = useCallback(async () => {
+    setError(null)
     return await request<UserRole[]>("/roles")
   }, [request])
 
   const getUserHotelCount = useCallback(
     async (userId: string) => {
+      setError(null)
       return await request<{ count: number }>(`/users/${userId}/hotels/count`)
     },
     [request],
@@ -113,6 +206,7 @@ export function useUsers() {
 
   const getUserChainAccess = useCallback(
     async (userId: string) => {
+      setError(null)
       return await request<{ chainCode: string; name: string; accessLevel: string }[]>(`/users/${userId}/chains`)
     },
     [request],
@@ -121,6 +215,7 @@ export function useUsers() {
   return {
     users,
     isLoading,
+    error,
     getAllUsers,
     fetchUsers,
     getUserById,
