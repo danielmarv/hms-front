@@ -1,294 +1,184 @@
 "use client"
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Eye, Download } from "lucide-react"
+
+import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { format } from "date-fns"
-import { FileText, Clock, User, Database, Settings } from "lucide-react"
-import type { Report } from "@/hooks/use-reports"
+import { ScrollArea } from "@/components/ui/scroll-area"
 
 interface ReportDetailsDialogProps {
-  report: Report | null
   open: boolean
-  onOpenChange: (open: boolean) => void
+  setOpen: (open: boolean) => void
+  report: any // Replace 'any' with the actual type of your report object
+  handleDownload: (reportId: string) => void
 }
 
-export function ReportDetailsDialog({ report, open, onOpenChange }: ReportDetailsDialogProps) {
-  if (!report) return null
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "completed":
-        return "bg-green-100 text-green-800"
-      case "processing":
-        return "bg-blue-100 text-blue-800"
-      case "pending":
-        return "bg-yellow-100 text-yellow-800"
-      case "failed":
-        return "bg-red-100 text-red-800"
-      default:
-        return "bg-gray-100 text-gray-800"
-    }
-  }
-
+export function ReportDetailsDialog({ open, setOpen, report, handleDownload }: ReportDetailsDialogProps) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[70vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="sm">
+          <Eye className="h-4 w-4" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            {report.title}
-          </DialogTitle>
+          <DialogTitle>Report Details</DialogTitle>
         </DialogHeader>
-
-        <Tabs defaultValue="overview" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="parameters">Parameters</TabsTrigger>
-            <TabsTrigger value="data">Data</TabsTrigger>
-            <TabsTrigger value="metadata">Metadata</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="overview" className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
+        <div className="max-h-[80vh] overflow-hidden">
+          <ScrollArea className="h-full pr-4">
+            <div className="space-y-6 pb-4">
+              {/* Report Information */}
               <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    Report Information
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Title</label>
-                    <p>{report.title}</p>
-                  </div>
-                  {report.description && (
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">Description</label>
-                      <p>{report.description}</p>
-                    </div>
-                  )}
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Type</label>
-                    <p className="capitalize">{report.type}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Format</label>
-                    <p className="uppercase">{report.format}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Status</label>
-                    <Badge className={getStatusColor(report.status)}>{report.status}</Badge>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
-                    Timing Information
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Created</label>
-                    <p>{format(new Date(report.createdAt), "PPpp")}</p>
-                  </div>
-                  {report.metadata?.startTime && (
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">Started</label>
-                      <p>{format(new Date(report.metadata.startTime), "PPpp")}</p>
-                    </div>
-                  )}
-                  {report.metadata?.endTime && (
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">Completed</label>
-                      <p>{format(new Date(report.metadata.endTime), "PPpp")}</p>
-                    </div>
-                  )}
-                  {report.metadata?.executionTime && (
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">Execution Time</label>
-                      <p>{Math.round(report.metadata.executionTime / 1000)}s</p>
-                    </div>
-                  )}
-                  {report.isScheduled && (
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">Schedule</label>
-                      <Badge variant="outline">{report.frequency}</Badge>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            {report.recipients && report.recipients.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <User className="h-4 w-4" />
-                    Email Recipients
-                  </CardTitle>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Report Information</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex flex-wrap gap-2">
-                    {report.recipients.map((recipient, index) => (
-                      <Badge key={index} variant="outline">
-                        {recipient.email}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm font-medium">Name</Label>
+                      <p className="text-sm text-muted-foreground">{report.name}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Type</Label>
+                      <Badge variant="outline" className="ml-2 capitalize">
+                        {report.type}
                       </Badge>
-                    ))}
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Status</Label>
+                      <Badge
+                        variant={
+                          report.status === "completed"
+                            ? "default"
+                            : report.status === "failed"
+                              ? "destructive"
+                              : "secondary"
+                        }
+                        className="ml-2"
+                      >
+                        {report.status}
+                      </Badge>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Generated By</Label>
+                      <p className="text-sm text-muted-foreground">
+                        {report.generatedBy?.firstName} {report.generatedBy?.lastName}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Created At</Label>
+                      <p className="text-sm text-muted-foreground">{new Date(report.createdAt).toLocaleString()}</p>
+                    </div>
+                    {report.metadata?.executionTime && (
+                      <div>
+                        <Label className="text-sm font-medium">Execution Time</Label>
+                        <p className="text-sm text-muted-foreground">{report.metadata.executionTime}ms</p>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
-            )}
-          </TabsContent>
 
-          <TabsContent value="parameters" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Settings className="h-4 w-4" />
-                  Report Parameters
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {report.parameters?.startDate && (
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Start Date</label>
-                    <p>{format(new Date(report.parameters.startDate), "PPP")}</p>
-                  </div>
-                )}
-                {report.parameters?.endDate && (
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">End Date</label>
-                    <p>{format(new Date(report.parameters.endDate), "PPP")}</p>
-                  </div>
-                )}
-                {report.parameters?.modules && report.parameters.modules.length > 0 && (
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Modules</label>
-                    <div className="flex flex-wrap gap-2 mt-1">
-                      {report.parameters.modules.map((module, index) => (
-                        <Badge key={index} variant="secondary" className="capitalize">
-                          {module}
-                        </Badge>
+              {/* Parameters */}
+              {report.parameters && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Parameters</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {report.parameters.startDate && (
+                        <div>
+                          <Label className="text-sm font-medium">Start Date</Label>
+                          <p className="text-sm text-muted-foreground">
+                            {new Date(report.parameters.startDate).toLocaleDateString()}
+                          </p>
+                        </div>
+                      )}
+                      {report.parameters.endDate && (
+                        <div>
+                          <Label className="text-sm font-medium">End Date</Label>
+                          <p className="text-sm text-muted-foreground">
+                            {new Date(report.parameters.endDate).toLocaleDateString()}
+                          </p>
+                        </div>
+                      )}
+                      {report.parameters.modules && report.parameters.modules.length > 0 && (
+                        <div className="md:col-span-2">
+                          <Label className="text-sm font-medium">Modules</Label>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {report.parameters.modules.map((module: string) => (
+                              <Badge key={module} variant="secondary" className="text-xs">
+                                {module}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Data Summary */}
+              {report.data?.summary && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Summary</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {Object.entries(report.data.summary).map(([key, value]) => (
+                        <div key={key}>
+                          <Label className="text-sm font-medium capitalize">
+                            {key.replace(/([A-Z])/g, " $1").trim()}
+                          </Label>
+                          <p className="text-sm text-muted-foreground">
+                            {typeof value === "number" ? value.toLocaleString() : String(value)}
+                          </p>
+                        </div>
                       ))}
                     </div>
-                  </div>
-                )}
-                {report.parameters?.groupBy && (
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Group By</label>
-                    <p className="capitalize">{report.parameters.groupBy}</p>
-                  </div>
-                )}
-                {report.parameters?.filters && (
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Filters</label>
-                    <pre className="text-xs bg-muted p-2 rounded mt-1 overflow-auto">
-                      {JSON.stringify(report.parameters.filters, null, 2)}
-                    </pre>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+                  </CardContent>
+                </Card>
+              )}
 
-          <TabsContent value="data" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Database className="h-4 w-4" />
-                  Report Data
-                </CardTitle>
-                <CardDescription>
-                  {report.metadata?.recordCount && `${report.metadata.recordCount.toLocaleString()} records`}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {report.status === "completed" && report.data ? (
-                  <div className="space-y-4">
-                    {report.data.summary && (
-                      <div>
-                        <h4 className="font-medium mb-2">Summary</h4>
-                        <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
-                          {Object.entries(report.data.summary).map(([key, value]) => (
-                            <div key={key} className="p-2 bg-muted rounded">
-                              <div className="text-xs text-muted-foreground capitalize">{key}</div>
-                              <div className="font-medium">
-                                {typeof value === "number" ? value.toLocaleString() : String(value)}
-                              </div>
-                            </div>
-                          ))}
+              {/* Email Recipients */}
+              {report.recipients && report.recipients.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Email Recipients</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {report.recipients.map((recipient: any, index: number) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <Badge variant="outline">{recipient.email}</Badge>
+                          {recipient.name && <span className="text-sm text-muted-foreground">({recipient.name})</span>}
                         </div>
-                      </div>
-                    )}
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
-                    {report.data.modules && (
-                      <div>
-                        <h4 className="font-medium mb-2">Module Data</h4>
-                        <div className="space-y-2">
-                          {Object.entries(report.data.modules).map(([moduleName, moduleData]) => (
-                            <div key={moduleName} className="border rounded p-3">
-                              <h5 className="font-medium capitalize mb-2">{moduleName}</h5>
-                              <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
-                                {Object.entries(moduleData as Record<string, any>).map(([key, value]) => (
-                                  <div key={key} className="text-sm">
-                                    <span className="text-muted-foreground capitalize">{key}:</span>{" "}
-                                    <span className="font-medium">
-                                      {typeof value === "number" ? value.toLocaleString() : String(value)}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground">
-                    {report.status === "pending" && "Report is pending generation"}
-                    {report.status === "processing" && "Report is being generated"}
-                    {report.status === "failed" && "Report generation failed"}
-                  </p>
+              {/* Actions */}
+              <div className="flex justify-end gap-2 pt-4 border-t">
+                {report.status === "completed" && (
+                  <Button onClick={() => handleDownload(report._id)} variant="outline">
+                    <Download className="h-4 w-4 mr-2" />
+                    Download
+                  </Button>
                 )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="metadata" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Technical Metadata</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <pre className="text-xs bg-muted p-4 rounded overflow-auto">
-                  {JSON.stringify(
-                    {
-                      id: report._id,
-                      status: report.status,
-                      metadata: report.metadata,
-                      filePath: report.filePath,
-                      fileSize: report.fileSize,
-                      isScheduled: report.isScheduled,
-                      frequency: report.frequency,
-                      nextRun: report.nextRun,
-                      createdAt: report.createdAt,
-                      updatedAt: report.updatedAt,
-                    },
-                    null,
-                    2,
-                  )}
-                </pre>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+                <Button onClick={() => setOpen(false)}>Close</Button>
+              </div>
+            </div>
+          </ScrollArea>
+        </div>
       </DialogContent>
     </Dialog>
   )
