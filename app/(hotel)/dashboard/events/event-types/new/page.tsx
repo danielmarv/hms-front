@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -12,18 +12,27 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
-import { ArrowLeft, Save, Tag, DollarSign, Clock, Users, Plus, X } from "lucide-react"
+import {
+  ArrowLeft,
+  Save,
+  Tag,
+  DollarSign,
+  Clock,
+  Users,
+  Plus,
+  X,
+  BuildingIcon,
+  StarIcon,
+  CheckCircleIcon,
+} from "lucide-react"
 import { useEventTypes } from "@/hooks/use-event-types"
-
+import { useHotels, type Hotel } from "@/hooks/use-hotels"
 const eventCategories = [
-  { value: "corporate", label: "Corporate" },
-  { value: "wedding", label: "Wedding" },
+  { value: "business", label: "Business" },
   { value: "social", label: "Social" },
-  { value: "conference", label: "Conference" },
-  { value: "exhibition", label: "Exhibition" },
-  { value: "entertainment", label: "Entertainment" },
+  { value: "celebration", label: "celebration" },
   { value: "educational", label: "Educational" },
-  { value: "charity", label: "Charity" },
+  { value: "other", label: "Other" },
 ]
 
 const colorOptions = [
@@ -55,6 +64,67 @@ export default function NewEventTypePage() {
     features: [] as string[],
     status: "active",
   })
+
+  const { getAllHotels } = useHotels()
+  const [selectedHotelId, setSelectedHotelId] = useState<string>("")
+  const [hotels, setHotels] = useState<Hotel[]>([])
+  const [hotelsLoading, setHotelsLoading] = useState(true)
+  const [selectedHotel, setSelectedHotel] = useState<Hotel | null>(null)
+
+  // Fetch hotels on component mount
+  useEffect(() => {
+    const fetchHotels = async () => {
+      try {
+        setHotelsLoading(true)
+        // Try to restore from localStorage
+        const savedHotelId = localStorage.getItem("selectedHotelId")
+
+        const response = await getAllHotels({ active: true })
+        let hotelsData: Hotel[] = []
+
+        if (response?.data?.data) {
+          hotelsData = response.data.data
+        } else if (response?.data && Array.isArray(response.data)) {
+          hotelsData = response.data
+        } else if (response && Array.isArray(response)) {
+          hotelsData = response
+        }
+
+        setHotels(hotelsData)
+
+        if (hotelsData.length > 0) {
+          let hotelToSelect = hotelsData[0]
+
+          // Try to restore saved hotel
+          if (savedHotelId) {
+            const savedHotel = hotelsData.find((h) => h._id === savedHotelId)
+            if (savedHotel) {
+              hotelToSelect = savedHotel
+            }
+          }
+
+          setSelectedHotelId(hotelToSelect._id)
+          setSelectedHotel(hotelToSelect)
+          localStorage.setItem("selectedHotelId", hotelToSelect._id)
+        }
+      } catch (error) {
+        console.error("Failed to fetch hotels:", error)
+        toast.error("Failed to load hotels")
+      } finally {
+        setHotelsLoading(false)
+      }
+    }
+
+    fetchHotels()
+  }, [getAllHotels])
+
+  // Handle hotel selection
+  const handleHotelChange = (hotelId: string) => {
+    setSelectedHotelId(hotelId)
+    const hotel = hotels.find((h) => h._id === hotelId)
+    setSelectedHotel(hotel || null)
+    localStorage.setItem("selectedHotelId", hotelId)
+  }
 
   const [newFeature, setNewFeature] = useState("")
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -107,8 +177,17 @@ export default function NewEventTypePage() {
       return
     }
 
+    if (!selectedHotelId) {
+      toast.error("Please select a hotel")
+      return
+    }
+
     try {
-      await createEventType(eventTypeData)
+      const eventTypeWithHotel = {
+        ...eventTypeData,
+        hotel_id: selectedHotelId,
+      }
+      await createEventType(eventTypeWithHotel)
       toast.success("Event type created successfully!")
       router.push("/dashboard/events/event-types")
     } catch (error) {
@@ -136,6 +215,88 @@ export default function NewEventTypePage() {
             Back
           </Button>
         </div>
+
+        {/* Hotel Selection Section */}
+        <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border-0 shadow-xl">
+          <CardHeader className="bg-gradient-to-r from-blue-500 to-cyan-600 dark:from-blue-600 dark:to-cyan-700 text-white rounded-t-lg">
+            <CardTitle className="flex items-center text-xl">
+              <BuildingIcon className="mr-2 h-5 w-5" />
+              Select Hotel
+            </CardTitle>
+            <CardDescription className="text-blue-100 dark:text-blue-200">
+              Choose the hotel for this event type
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="hotel">Hotel *</Label>
+                <Select value={selectedHotelId} onValueChange={handleHotelChange} disabled={hotelsLoading}>
+                  <SelectTrigger className={!selectedHotelId ? "border-red-500" : ""}>
+                    <SelectValue placeholder={hotelsLoading ? "Loading hotels..." : "Select a hotel"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {hotels.map((hotel) => (
+                      <SelectItem key={hotel._id} value={hotel._id}>
+                        <div className="flex items-center space-x-2">
+                          <BuildingIcon className="h-4 w-4" />
+                          <span>{hotel.name}</span>
+                          <Badge variant="outline" className="text-xs">
+                            {hotel.code}
+                          </Badge>
+                          {hotel.isHeadquarters && (
+                            <Badge className="text-xs bg-primary/10 text-primary">
+                              <StarIcon className="h-3 w-3 mr-1" />
+                              HQ
+                            </Badge>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {!selectedHotelId && <p className="text-sm text-red-500">Please select a hotel</p>}
+              </div>
+
+              {selectedHotel && (
+                <div className="bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-medium text-sm text-blue-900 dark:text-blue-100">Selected Hotel</h3>
+                    <CheckCircleIcon className="h-4 w-4 text-green-600" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="font-semibold text-blue-900 dark:text-blue-100">{selectedHotel.name}</p>
+                    <div className="flex items-center space-x-2 text-sm text-blue-700 dark:text-blue-300">
+                      <Badge
+                        variant="outline"
+                        className="border-blue-300 text-blue-700 dark:border-blue-600 dark:text-blue-300"
+                      >
+                        {selectedHotel.code}
+                      </Badge>
+                      <span>•</span>
+                      <span className="capitalize">{selectedHotel.type}</span>
+                      {selectedHotel.starRating && (
+                        <>
+                          <span>•</span>
+                          <div className="flex items-center">
+                            {Array.from({ length: selectedHotel.starRating }).map((_, i) => (
+                              <StarIcon key={i} className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    {selectedHotel.description && (
+                      <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 line-clamp-2">
+                        {selectedHotel.description}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Basic Information */}
@@ -394,7 +555,7 @@ export default function NewEventTypePage() {
             </Button>
             <Button
               type="submit"
-              disabled={loading}
+              disabled={loading || !selectedHotelId}
               className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
             >
               {loading ? (
