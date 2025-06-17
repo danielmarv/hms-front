@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form"
@@ -13,26 +14,25 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useReports } from "@/hooks/use-reports"
 
 const scheduleReportSchema = z.object({
-  name: z.string().min(1, "Name is required"),
+  title: z.string().min(1, "Title is required"),
+  description: z.string().optional(),
   type: z.enum(["analytics", "financial", "operational", "system", "audit", "custom"]),
+  format: z.enum(["json", "pdf", "excel", "csv"]).default("json"),
+  frequency: z.enum(["once", "daily", "weekly", "monthly", "quarterly", "yearly"]),
+  scheduledFor: z.string().optional(),
   parameters: z.object({
     startDate: z.string().min(1, "Start date is required"),
     endDate: z.string().min(1, "End date is required"),
     modules: z.array(z.string()).optional(),
   }),
-  schedule: z.object({
-    frequency: z.enum(["daily", "weekly", "monthly", "quarterly", "yearly"]),
-    time: z.string().min(1, "Time is required"),
-    dayOfWeek: z.number().optional(),
-    dayOfMonth: z.number().optional(),
-    isActive: z.boolean().default(true),
-  }),
-  emailNotification: z.object({
-    enabled: z.boolean().default(false),
-    recipients: z.array(z.string()).optional(),
-    subject: z.string().optional(),
-    includeAttachment: z.boolean().default(false),
-  }),
+  recipients: z
+    .array(
+      z.object({
+        email: z.string().email(),
+        name: z.string(),
+      }),
+    )
+    .optional(),
 })
 
 type ScheduleReportFormData = z.infer<typeof scheduleReportSchema>
@@ -50,19 +50,12 @@ export function ScheduleReportForm({ onSuccess }: ScheduleReportFormProps) {
     resolver: zodResolver(scheduleReportSchema),
     defaultValues: {
       type: "analytics",
+      format: "json",
+      frequency: "weekly",
       parameters: {
         startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
         endDate: new Date().toISOString().split("T")[0],
         modules: [],
-      },
-      schedule: {
-        frequency: "weekly",
-        time: "08:00",
-        isActive: true,
-      },
-      emailNotification: {
-        enabled: false,
-        includeAttachment: false,
       },
     },
   })
@@ -72,11 +65,12 @@ export function ScheduleReportForm({ onSuccess }: ScheduleReportFormProps) {
       setIsSubmitting(true)
 
       // Parse email recipients
-      if (data.emailNotification.enabled && emailRecipients) {
-        data.emailNotification.recipients = emailRecipients
+      if (emailRecipients) {
+        data.recipients = emailRecipients
           .split(",")
           .map((email) => email.trim())
           .filter((email) => email.length > 0)
+          .map((email) => ({ email, name: email.split("@")[0] }))
       }
 
       await scheduleReport(data)
@@ -97,7 +91,7 @@ export function ScheduleReportForm({ onSuccess }: ScheduleReportFormProps) {
   }
 
   const currentModules = availableModules[form.watch("type") as keyof typeof availableModules] || []
-  const frequency = form.watch("schedule.frequency")
+  const frequency = form.watch("frequency")
 
   return (
     <Form {...form}>
@@ -105,12 +99,12 @@ export function ScheduleReportForm({ onSuccess }: ScheduleReportFormProps) {
         <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="name"
+            name="title"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Report Name</FormLabel>
+                <FormLabel>Report Title</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter report name" {...field} />
+                  <Input placeholder="Enter report title" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -144,6 +138,20 @@ export function ScheduleReportForm({ onSuccess }: ScheduleReportFormProps) {
           />
         </div>
 
+        <FormField
+          control={form.control}
+          name="description"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Description (Optional)</FormLabel>
+              <FormControl>
+                <Textarea placeholder="Enter report description" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
         {/* Schedule Configuration */}
         <Card>
           <CardHeader>
@@ -154,7 +162,7 @@ export function ScheduleReportForm({ onSuccess }: ScheduleReportFormProps) {
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="schedule.frequency"
+                name="frequency"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Frequency</FormLabel>
@@ -165,6 +173,7 @@ export function ScheduleReportForm({ onSuccess }: ScheduleReportFormProps) {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
+                        <SelectItem value="once">Once</SelectItem>
                         <SelectItem value="daily">Daily</SelectItem>
                         <SelectItem value="weekly">Weekly</SelectItem>
                         <SelectItem value="monthly">Monthly</SelectItem>
@@ -177,75 +186,22 @@ export function ScheduleReportForm({ onSuccess }: ScheduleReportFormProps) {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="schedule.time"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Time</FormLabel>
-                    <FormControl>
-                      <Input type="time" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            {frequency === "weekly" && (
-              <FormField
-                control={form.control}
-                name="schedule.dayOfWeek"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Day of Week</FormLabel>
-                    <Select
-                      onValueChange={(value) => field.onChange(Number.parseInt(value))}
-                      defaultValue={field.value?.toString()}
-                    >
+              {frequency === "once" && (
+                <FormField
+                  control={form.control}
+                  name="scheduledFor"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Scheduled For</FormLabel>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select day" />
-                        </SelectTrigger>
+                        <Input type="datetime-local" {...field} />
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="1">Monday</SelectItem>
-                        <SelectItem value="2">Tuesday</SelectItem>
-                        <SelectItem value="3">Wednesday</SelectItem>
-                        <SelectItem value="4">Thursday</SelectItem>
-                        <SelectItem value="5">Friday</SelectItem>
-                        <SelectItem value="6">Saturday</SelectItem>
-                        <SelectItem value="0">Sunday</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-
-            {(frequency === "monthly" || frequency === "quarterly" || frequency === "yearly") && (
-              <FormField
-                control={form.control}
-                name="schedule.dayOfMonth"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Day of Month</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min="1"
-                        max="31"
-                        placeholder="1-31"
-                        {...field}
-                        onChange={(e) => field.onChange(Number.parseInt(e.target.value) || undefined)}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+            </div>
           </CardContent>
         </Card>
 
@@ -326,72 +282,55 @@ export function ScheduleReportForm({ onSuccess }: ScheduleReportFormProps) {
           </CardContent>
         </Card>
 
-        {/* Email Notification */}
+        {/* Output Format */}
         <Card>
           <CardHeader>
-            <CardTitle>Email Notification</CardTitle>
-            <CardDescription>Configure email notifications for scheduled reports</CardDescription>
+            <CardTitle>Output Format</CardTitle>
+            <CardDescription>Choose the format for the generated report</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent>
             <FormField
               control={form.control}
-              name="emailNotification.enabled"
+              name="format"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                  <FormControl>
-                    <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                  </FormControl>
-                  <div className="space-y-1 leading-none">
-                    <FormLabel>Send Email Notification</FormLabel>
-                    <FormDescription>Send an email when the report is generated</FormDescription>
-                  </div>
+                <FormItem>
+                  <FormLabel>Format</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select format" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="json">JSON</SelectItem>
+                      <SelectItem value="excel">Excel (XLSX)</SelectItem>
+                      <SelectItem value="pdf">PDF</SelectItem>
+                      <SelectItem value="csv">CSV</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
                 </FormItem>
               )}
             />
+          </CardContent>
+        </Card>
 
-            {form.watch("emailNotification.enabled") && (
-              <>
-                <div>
-                  <FormLabel>Email Recipients</FormLabel>
-                  <Input
-                    placeholder="email1@example.com, email2@example.com"
-                    value={emailRecipients}
-                    onChange={(e) => setEmailRecipients(e.target.value)}
-                  />
-                  <FormDescription>Enter email addresses separated by commas</FormDescription>
-                </div>
-
-                <FormField
-                  control={form.control}
-                  name="emailNotification.subject"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email Subject (Optional)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Scheduled Report Generated" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="emailNotification.includeAttachment"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                      <FormControl>
-                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel>Include Report as Attachment</FormLabel>
-                        <FormDescription>Attach the report file to the email</FormDescription>
-                      </div>
-                    </FormItem>
-                  )}
-                />
-              </>
-            )}
+        {/* Email Recipients */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Email Notification (Optional)</CardTitle>
+            <CardDescription>Send the report to specific email addresses when completed</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div>
+              <FormLabel>Email Recipients</FormLabel>
+              <Input
+                placeholder="email1@example.com, email2@example.com"
+                value={emailRecipients}
+                onChange={(e) => setEmailRecipients(e.target.value)}
+              />
+              <FormDescription>Enter email addresses separated by commas</FormDescription>
+            </div>
           </CardContent>
         </Card>
 

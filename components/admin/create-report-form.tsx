@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form"
@@ -13,19 +14,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useReports } from "@/hooks/use-reports"
 
 const reportSchema = z.object({
-  name: z.string().min(1, "Name is required"),
+  title: z.string().min(1, "Title is required"),
+  description: z.string().optional(),
   type: z.enum(["analytics", "financial", "operational", "system", "audit", "custom"]),
+  format: z.enum(["json", "pdf", "excel", "csv"]).default("json"),
   parameters: z.object({
     startDate: z.string().min(1, "Start date is required"),
     endDate: z.string().min(1, "End date is required"),
     modules: z.array(z.string()).optional(),
+    groupBy: z.string().optional(),
   }),
-  emailNotification: z.object({
-    enabled: z.boolean().default(false),
-    recipients: z.array(z.string()).optional(),
-    subject: z.string().optional(),
-    includeAttachment: z.boolean().default(false),
-  }),
+  recipients: z
+    .array(
+      z.object({
+        email: z.string().email(),
+        name: z.string(),
+      }),
+    )
+    .optional(),
 })
 
 type ReportFormData = z.infer<typeof reportSchema>
@@ -43,14 +49,11 @@ export function CreateReportForm({ onSuccess }: CreateReportFormProps) {
     resolver: zodResolver(reportSchema),
     defaultValues: {
       type: "analytics",
+      format: "json",
       parameters: {
         startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
         endDate: new Date().toISOString().split("T")[0],
         modules: [],
-      },
-      emailNotification: {
-        enabled: false,
-        includeAttachment: false,
       },
     },
   })
@@ -60,11 +63,12 @@ export function CreateReportForm({ onSuccess }: CreateReportFormProps) {
       setIsSubmitting(true)
 
       // Parse email recipients
-      if (data.emailNotification.enabled && emailRecipients) {
-        data.emailNotification.recipients = emailRecipients
+      if (emailRecipients) {
+        data.recipients = emailRecipients
           .split(",")
           .map((email) => email.trim())
           .filter((email) => email.length > 0)
+          .map((email) => ({ email, name: email.split("@")[0] }))
       }
 
       await createReport(data)
@@ -92,12 +96,12 @@ export function CreateReportForm({ onSuccess }: CreateReportFormProps) {
         <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="name"
+            name="title"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Report Name</FormLabel>
+                <FormLabel>Report Title</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter report name" {...field} />
+                  <Input placeholder="Enter report title" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -130,6 +134,20 @@ export function CreateReportForm({ onSuccess }: CreateReportFormProps) {
             )}
           />
         </div>
+
+        <FormField
+          control={form.control}
+          name="description"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Description (Optional)</FormLabel>
+              <FormControl>
+                <Textarea placeholder="Enter report description" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         {/* Date Range */}
         <Card>
@@ -211,72 +229,55 @@ export function CreateReportForm({ onSuccess }: CreateReportFormProps) {
           </Card>
         )}
 
-        {/* Email Notification */}
+        {/* Output Format */}
         <Card>
           <CardHeader>
-            <CardTitle>Email Notification</CardTitle>
-            <CardDescription>Configure email notifications for report completion</CardDescription>
+            <CardTitle>Output Format</CardTitle>
+            <CardDescription>Choose the format for the generated report</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent>
             <FormField
               control={form.control}
-              name="emailNotification.enabled"
+              name="format"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                  <FormControl>
-                    <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                  </FormControl>
-                  <div className="space-y-1 leading-none">
-                    <FormLabel>Send Email Notification</FormLabel>
-                    <FormDescription>Send an email when the report is completed</FormDescription>
-                  </div>
+                <FormItem>
+                  <FormLabel>Format</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select format" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="json">JSON</SelectItem>
+                      <SelectItem value="excel">Excel (XLSX)</SelectItem>
+                      <SelectItem value="pdf">PDF</SelectItem>
+                      <SelectItem value="csv">CSV</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
                 </FormItem>
               )}
             />
+          </CardContent>
+        </Card>
 
-            {form.watch("emailNotification.enabled") && (
-              <>
-                <div>
-                  <FormLabel>Email Recipients</FormLabel>
-                  <Input
-                    placeholder="email1@example.com, email2@example.com"
-                    value={emailRecipients}
-                    onChange={(e) => setEmailRecipients(e.target.value)}
-                  />
-                  <FormDescription>Enter email addresses separated by commas</FormDescription>
-                </div>
-
-                <FormField
-                  control={form.control}
-                  name="emailNotification.subject"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email Subject (Optional)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Report Generated" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="emailNotification.includeAttachment"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                      <FormControl>
-                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel>Include Report as Attachment</FormLabel>
-                        <FormDescription>Attach the report file to the email</FormDescription>
-                      </div>
-                    </FormItem>
-                  )}
-                />
-              </>
-            )}
+        {/* Email Recipients */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Email Notification (Optional)</CardTitle>
+            <CardDescription>Send the report to specific email addresses when completed</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div>
+              <FormLabel>Email Recipients</FormLabel>
+              <Input
+                placeholder="email1@example.com, email2@example.com"
+                value={emailRecipients}
+                onChange={(e) => setEmailRecipients(e.target.value)}
+              />
+              <FormDescription>Enter email addresses separated by commas</FormDescription>
+            </div>
           </CardContent>
         </Card>
 
