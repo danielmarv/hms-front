@@ -29,7 +29,7 @@ export default function NewUserPage() {
   const router = useRouter()
   const { createUser, getUserRoles } = useUsers()
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [roles, setRoles] = useState<{ _id: string; name: string }[]>([])
+  const [roles, setRoles] = useState<{ id: string; name: string }[]>([])
   const [isLoadingRoles, setIsLoadingRoles] = useState(true)
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -47,7 +47,13 @@ export default function NewUserPage() {
     const fetchRoles = async () => {
       try {
         const rolesData = await getUserRoles()
-        setRoles(rolesData)
+        if (rolesData && rolesData.data && Array.isArray(rolesData.data)) {
+          setRoles(rolesData.data)
+        } else {
+          console.error("Invalid roles data structure:", rolesData)
+          setRoles([])
+          toast.error("Failed to load roles")
+        }
       } catch (error) {
         console.error("Error fetching roles:", error)
         toast.error("Failed to load user roles")
@@ -165,7 +171,7 @@ export default function NewUserPage() {
                           </div>
                         ) : (
                           roles.map((role) => (
-                            <SelectItem key={role._id} value={role._id}>
+                            <SelectItem key={role.id} value={role.id}>
                               {role.name}
                             </SelectItem>
                           ))
