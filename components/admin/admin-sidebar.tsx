@@ -84,6 +84,12 @@ export function AdminSidebar({ user }: AdminSidebarProps) {
       active: pathname.startsWith("/admin/analytics"),
     },
     {
+      label: "Reports",
+      icon: Sync,
+      href: "/admin/reports",
+      active: pathname.startsWith("/admin/reports"),
+    },
+    {
       label: "Settings",
       icon: Settings,
       href: "/admin/settings",
