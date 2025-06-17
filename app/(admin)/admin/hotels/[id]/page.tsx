@@ -40,6 +40,7 @@ export default function HotelDetailsPage() {
       try {
         setIsLoadingHotel(true)
         const response = await getHotelById(hotelId)
+        console.log("Hotel details response:", response)
         if (response.data) {
           setHotel(response.data.data)
         } else {
