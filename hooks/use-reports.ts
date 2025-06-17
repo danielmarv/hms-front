@@ -67,7 +67,7 @@ export const useReports = () => {
       const response = await request<{
         reports: Report[]
         pagination: { current: number; pages: number; total: number }
-      }>(`/api/reports${queryParams ? `?${queryParams}` : ""}`, "GET", undefined, false)
+      }>(`/reports${queryParams ? `?${queryParams}` : ""}`, "GET", undefined, false)
 
       if (response?.data) {
         setReports(response.data.reports)
@@ -81,7 +81,7 @@ export const useReports = () => {
 
   const createReport = async (reportData: Partial<Report>) => {
     try {
-      const response = await request<Report>("/api/reports", "POST", reportData)
+      const response = await request<Report>("/reports", "POST", reportData)
       if (response?.data) {
         setReports((prev) => [response.data, ...prev])
         toast.success("Report generation started")
@@ -95,7 +95,7 @@ export const useReports = () => {
 
   const scheduleReport = async (reportData: Partial<Report>) => {
     try {
-      const response = await request<Report>("/api/reports/schedule", "POST", reportData)
+      const response = await request<Report>("/reports/schedule", "POST", reportData)
       if (response?.data) {
         setReports((prev) => [response.data, ...prev])
         toast.success("Report scheduled successfully")
@@ -109,7 +109,7 @@ export const useReports = () => {
 
   const downloadReport = async (id: string, format: "json" | "excel" | "pdf" | "csv" = "json") => {
     try {
-      const response = await fetch(`/api/reports/${id}/download?format=${format}`, {
+      const response = await fetch(`/reports/${id}/download?format=${format}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
         },
@@ -139,7 +139,7 @@ export const useReports = () => {
 
   const deleteReport = async (id: string) => {
     try {
-      await request(`/api/reports/${id}`, "DELETE")
+      await request(`/reports/${id}`, "DELETE")
       setReports((prev) => prev.filter((report) => report._id !== id))
       toast.success("Report deleted successfully")
     } catch (error) {
@@ -155,7 +155,7 @@ export const useReports = () => {
     try {
       const queryParams = new URLSearchParams(params as any).toString()
       const response = await request<ReportAnalytics[]>(
-        `/api/reports/analytics${queryParams ? `?${queryParams}` : ""}`,
+        `/reports/analytics${queryParams ? `?${queryParams}` : ""}`,
         "GET",
         undefined,
         false,
