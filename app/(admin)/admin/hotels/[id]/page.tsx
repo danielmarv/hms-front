@@ -40,8 +40,8 @@ export default function HotelDetailsPage() {
       try {
         setIsLoadingHotel(true)
         const response = await getHotelById(hotelId)
-        if (response.data) {
-          setHotel(response.data.data)
+        if (response && response.data) {
+          setHotel(response.data)
         } else {
           toast.error("Failed to load hotel details")
         }
@@ -59,7 +59,7 @@ export default function HotelDetailsPage() {
   }, [hotelId, getHotelById])
 
   const renderStarRating = (rating: number) => {
-    if (rating === 0) return <span className="text-muted-foreground">Not Rated</span>
+    if (!rating || rating === 0) return <span className="text-muted-foreground">Not Rated</span>
 
     return (
       <div className="flex items-center gap-1">
@@ -165,6 +165,14 @@ export default function HotelDetailsPage() {
                     <label className="text-sm font-medium text-muted-foreground">Chain</label>
                     <Link href={`/admin/chains/${hotel.chainCode}`} className="text-primary hover:underline">
                       {hotel.chainCode}
+                    </Link>
+                  </div>
+                )}
+                {hotel.parentHotel && (
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Parent Hotel</label>
+                    <Link href={`/admin/hotels/${hotel.parentHotel}`} className="text-primary hover:underline">
+                      View Parent Hotel
                     </Link>
                   </div>
                 )}
@@ -346,6 +354,18 @@ export default function HotelDetailsPage() {
                   <label className="text-sm font-medium text-muted-foreground">Last Updated</label>
                   <p>{hotel.updatedAt ? new Date(hotel.updatedAt).toLocaleDateString() : "N/A"}</p>
                 </div>
+                {hotel.createdBy && (
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Created By</label>
+                    <p>{hotel.createdBy}</p>
+                  </div>
+                )}
+                {hotel.updatedBy && (
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Updated By</label>
+                    <p>{hotel.updatedBy}</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -356,13 +376,13 @@ export default function HotelDetailsPage() {
               <CardContent className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">Headquarters Hotel</span>
-                  <Badge variant={hotel.isHeadquarters ? "success" : "secondary"}>
+                  <Badge variant={hotel.isHeadquarters ? "default" : "secondary"}>
                     {hotel.isHeadquarters ? "Yes" : "No"}
                   </Badge>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">Active Status</span>
-                  <Badge variant={hotel.active ? "success" : "destructive"}>
+                  <Badge variant={hotel.active ? "default" : "destructive"}>
                     {hotel.active ? "Active" : "Inactive"}
                   </Badge>
                 </div>
@@ -370,6 +390,12 @@ export default function HotelDetailsPage() {
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Part of Chain</span>
                     <Badge variant="outline">{hotel.chainCode}</Badge>
+                  </div>
+                )}
+                {hotel.parentHotel && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Has Parent Hotel</span>
+                    <Badge variant="outline">Yes</Badge>
                   </div>
                 )}
               </CardContent>

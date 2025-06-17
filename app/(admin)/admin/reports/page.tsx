@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Plus, FileText, Calendar, MoreHorizontal, TrendingUp } from "lucide-react"
+import { Plus, FileText, Calendar, MoreHorizontal, TrendingUp, Download, Eye, Trash2, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -9,9 +9,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Input } from "@/components/ui/input"
 import { useReports, type Report } from "@/hooks/use-reports"
 import { CreateReportForm } from "@/components/admin/create-report-form"
 import { ScheduleReportForm } from "@/components/admin/schedule-report-form"
+import { ReportDetailsDialog } from "@/components/admin/report-details-dialog"
+import { format } from "date-fns"
+import { toast } from "sonner"
 
 export default function ReportsPage() {
   const { reports, analytics, isLoading, fetchReports, fetchReportAnalytics, deleteReport, downloadReport } =
@@ -20,8 +24,10 @@ export default function ReportsPage() {
   const [selectedReport, setSelectedReport] = useState<Report | null>(null)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showScheduleDialog, setShowScheduleDialog] = useState(false)
+  const [showDetailsDialog, setShowDetailsDialog] = useState(false)
   const [typeFilter, setTypeFilter] = useState<string>("")
   const [statusFilter, setStatusFilter] = useState<string>("")
+  const [searchQuery, setSearchQuery] = useState("")
 
   useEffect(() => {
     fetchReports()
@@ -31,7 +37,11 @@ export default function ReportsPage() {
   const filteredReports = reports.filter((report) => {
     const matchesType = !typeFilter || report.type === typeFilter
     const matchesStatus = !statusFilter || report.status === statusFilter
-    return matchesType && matchesStatus
+    const matchesSearch =
+      !searchQuery ||
+      report.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      report.description?.toLowerCase().includes(searchQuery.toLowerCase())
+    return matchesType && matchesStatus && matchesSearch
   })
 
   const getStatusColor = (status: string) => {
@@ -60,14 +70,29 @@ export default function ReportsPage() {
     }
   }
 
-  const handleDeleteReport = async (id: string) => {
-    if (confirm("Are you sure you want to delete this report?")) {
-      await deleteReport(id)
+  const handleDeleteReport = async (report: Report) => {
+    if (confirm(`Are you sure you want to delete "${report.title}"?`)) {
+      try {
+        await deleteReport(report._id)
+        toast.success("Report deleted successfully")
+      } catch (error) {
+        toast.error("Failed to delete report")
+      }
     }
   }
 
   const handleDownloadReport = async (report: Report, format: "json" | "excel" | "pdf" | "csv") => {
-    await downloadReport(report._id, format)
+    try {
+      await downloadReport(report._id, format)
+      toast.success("Report download started")
+    } catch (error) {
+      toast.error("Failed to download report")
+    }
+  }
+
+  const handleViewDetails = (report: Report) => {
+    setSelectedReport(report)
+    setShowDetailsDialog(true)
   }
 
   return (
@@ -85,7 +110,7 @@ export default function ReportsPage() {
                 Schedule Report
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Schedule Report</DialogTitle>
               </DialogHeader>
@@ -100,7 +125,7 @@ export default function ReportsPage() {
                 Generate Report
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Generate New Report</DialogTitle>
               </DialogHeader>
@@ -187,6 +212,13 @@ export default function ReportsPage() {
         </CardHeader>
         <CardContent>
           <div className="flex gap-4 mb-6">
+            <Input
+              placeholder="Search reports..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="max-w-sm"
+            />
+
             <Select value={typeFilter} onValueChange={setTypeFilter}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Filter by type" />
@@ -220,7 +252,7 @@ export default function ReportsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
+                  <TableHead>Title</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Records</TableHead>
@@ -237,12 +269,12 @@ export default function ReportsPage() {
                       <div className="flex items-center gap-2">
                         {getTypeIcon(report.type)}
                         <div>
-                          <div className="font-medium">{report.name}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {report.parameters.startDate &&
-                              report.parameters.endDate &&
-                              `${new Date(report.parameters.startDate).toLocaleDateString()} - ${new Date(report.parameters.endDate).toLocaleDateString()}`}
-                          </div>
+                          <div className="font-medium">{report.title}</div>
+                          {report.description && (
+                            <div className="text-sm text-muted-foreground truncate max-w-[200px]">
+                              {report.description}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </TableCell>
@@ -250,14 +282,17 @@ export default function ReportsPage() {
                     <TableCell>
                       <Badge className={getStatusColor(report.status)}>{report.status}</Badge>
                     </TableCell>
-                    <TableCell>{report.metadata.recordCount?.toLocaleString() || "-"}</TableCell>
+                    <TableCell>{report.metadata?.recordCount?.toLocaleString() || "-"}</TableCell>
                     <TableCell>
-                      {report.metadata.executionTime ? `${Math.round(report.metadata.executionTime / 1000)}s` : "-"}
+                      {report.metadata?.executionTime ? `${Math.round(report.metadata.executionTime / 1000)}s` : "-"}
                     </TableCell>
-                    <TableCell>{new Date(report.createdAt).toLocaleDateString()}</TableCell>
+                    <TableCell>{report.createdAt ? format(new Date(report.createdAt), "MMM dd, yyyy") : "-"}</TableCell>
                     <TableCell>
                       {report.isScheduled ? (
-                        <Badge variant="outline">{report.schedule?.frequency}</Badge>
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          <Badge variant="outline">{report.frequency}</Badge>
+                        </div>
                       ) : (
                         <span className="text-muted-foreground">Manual</span>
                       )}
@@ -270,23 +305,32 @@ export default function ReportsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleViewDetails(report)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            View Details
+                          </DropdownMenuItem>
                           {report.status === "completed" && (
                             <>
                               <DropdownMenuItem onClick={() => handleDownloadReport(report, "json")}>
+                                <Download className="mr-2 h-4 w-4" />
                                 Download JSON
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleDownloadReport(report, "excel")}>
+                                <Download className="mr-2 h-4 w-4" />
                                 Download Excel
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleDownloadReport(report, "pdf")}>
+                                <Download className="mr-2 h-4 w-4" />
                                 Download PDF
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleDownloadReport(report, "csv")}>
+                                <Download className="mr-2 h-4 w-4" />
                                 Download CSV
                               </DropdownMenuItem>
                             </>
                           )}
-                          <DropdownMenuItem onClick={() => handleDeleteReport(report._id)} className="text-red-600">
+                          <DropdownMenuItem onClick={() => handleDeleteReport(report)} className="text-red-600">
+                            <Trash2 className="mr-2 h-4 w-4" />
                             Delete
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -299,6 +343,9 @@ export default function ReportsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Report Details Dialog */}
+      <ReportDetailsDialog report={selectedReport} open={showDetailsDialog} onOpenChange={setShowDetailsDialog} />
     </div>
   )
 }
