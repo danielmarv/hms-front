@@ -6,41 +6,37 @@ import { toast } from "sonner"
 
 export interface Report {
   _id: string
-  name: string
+  title: string
+  description?: string
   type: "analytics" | "financial" | "operational" | "system" | "audit" | "custom"
   status: "pending" | "processing" | "completed" | "failed"
+  format: "json" | "pdf" | "excel" | "csv"
   parameters: {
     startDate?: string
     endDate?: string
     modules?: string[]
     filters?: Record<string, any>
+    groupBy?: string
   }
   data?: any
   filePath?: string
-  schedule?: {
-    frequency: "hourly" | "daily" | "weekly" | "monthly"
-    time: string
-    dayOfWeek?: number
-    dayOfMonth?: number
-    isActive: boolean
-    nextExecution?: string
-  }
-  emailNotification?: {
-    enabled: boolean
-    recipients: string[]
-    subject?: string
-    includeAttachment?: boolean
-  }
+  fileSize?: number
+  generatedBy: string
+  scheduledFor?: string
+  isScheduled: boolean
+  frequency?: "once" | "daily" | "weekly" | "monthly" | "quarterly" | "yearly"
+  nextRun?: string
+  recipients?: Array<{
+    email: string
+    name: string
+  }>
   metadata: {
     startTime?: string
     endTime?: string
     executionTime?: number
     recordCount?: number
-    error?: string
+    errorMessage?: string
   }
-  isScheduled: boolean
-  parentReportId?: string
-  generatedBy: string
   createdAt: string
   updatedAt: string
 }
@@ -67,10 +63,11 @@ export const useReports = () => {
     status?: string
   }) => {
     try {
+      const queryParams = new URLSearchParams(params as any).toString()
       const response = await request<{
         reports: Report[]
         pagination: { current: number; pages: number; total: number }
-      }>("/api/reports", "GET", undefined, false)
+      }>(`/reports${queryParams ? `?${queryParams}` : ""}`, "GET", undefined, false)
 
       if (response?.data) {
         setReports(response.data.reports)
@@ -84,7 +81,7 @@ export const useReports = () => {
 
   const createReport = async (reportData: Partial<Report>) => {
     try {
-      const response = await request<Report>("/api/reports", "POST", reportData)
+      const response = await request<Report>("/reports", "POST", reportData)
       if (response?.data) {
         setReports((prev) => [response.data, ...prev])
         toast.success("Report generation started")
@@ -98,7 +95,7 @@ export const useReports = () => {
 
   const scheduleReport = async (reportData: Partial<Report>) => {
     try {
-      const response = await request<Report>("/api/reports/schedule", "POST", reportData)
+      const response = await request<Report>("/reports/schedule", "POST", reportData)
       if (response?.data) {
         setReports((prev) => [response.data, ...prev])
         toast.success("Report scheduled successfully")
@@ -112,7 +109,7 @@ export const useReports = () => {
 
   const downloadReport = async (id: string, format: "json" | "excel" | "pdf" | "csv" = "json") => {
     try {
-      const response = await fetch(`/api/reports/${id}/download?format=${format}`, {
+      const response = await fetch(`/reports/${id}/download?format=${format}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
         },
@@ -142,7 +139,7 @@ export const useReports = () => {
 
   const deleteReport = async (id: string) => {
     try {
-      await request(`/api/reports/${id}`, "DELETE")
+      await request(`/reports/${id}`, "DELETE")
       setReports((prev) => prev.filter((report) => report._id !== id))
       toast.success("Report deleted successfully")
     } catch (error) {
@@ -156,9 +153,9 @@ export const useReports = () => {
     endDate?: string
   }) => {
     try {
-      const queryParams = new URLSearchParams(params).toString()
+      const queryParams = new URLSearchParams(params as any).toString()
       const response = await request<ReportAnalytics[]>(
-        `/api/reports/analytics${queryParams ? `?${queryParams}` : ""}`,
+        `/reports/analytics${queryParams ? `?${queryParams}` : ""}`,
         "GET",
         undefined,
         false,

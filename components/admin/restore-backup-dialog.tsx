@@ -87,7 +87,7 @@ export function RestoreBackupDialog({ backup, open, onOpenChange }: RestoreBacku
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-2xl max-h-[70vh] overflow-y-auto flex flex-col">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle>Restore Backup</DialogTitle>
           <DialogDescription>
