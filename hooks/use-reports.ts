@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useApi } from "./use-api"
 import { toast } from "sonner"
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
 
 export interface Report {
@@ -83,10 +84,12 @@ export const useReports = () => {
   }) => {
     try {
       const queryParams = new URLSearchParams(params as any).toString()
-      const response = await request<{
-        reports: Report[]
-        pagination: { current: number; pages: number; total: number }
-      }>(`/reports${queryParams ? `?${queryParams}` : ""}`, "GET", undefined, false)
+      const response = await request(
+        `/reports${queryParams ? `?${queryParams}` : ""}`,
+        "GET",
+        undefined,
+        false
+      )
 
       if (response?.data) {
         setReports(response.data.reports)
@@ -100,7 +103,7 @@ export const useReports = () => {
 
   const createReport = async (reportData: Partial<Report>) => {
     try {
-      const response = await request<Report>("/reports", "POST", reportData)
+      const response = await request("/reports", "POST", reportData)
       if (response?.data) {
         setReports((prev) => [response.data, ...prev])
         toast.success("Report generation started")
@@ -115,7 +118,7 @@ export const useReports = () => {
 
   const scheduleReport = async (reportData: Partial<Report>) => {
     try {
-      const response = await request<Report>("/reports/schedule", "POST", reportData)
+      const response = await request("/reports/schedule", "POST", reportData)
       if (response?.data) {
         setReports((prev) => [response.data, ...prev])
         toast.success("Report scheduled successfully")
@@ -130,20 +133,31 @@ export const useReports = () => {
 
   const triggerDailyReport = async () => {
     try {
-      const response = await request<{
-        message: string
-        data: Report
-      }>("/reports/trigger-daily", "POST")
+      console.log("Triggering daily report...")
+
+      const response = await request(
+        "/reports/trigger-daily",
+        "POST",
+        {},
+        true
+      )
+
+      console.log("Daily report response:", response)
 
       if (response?.data) {
-        toast.success("Daily report triggered successfully")
+        toast.success((response as any).message || "Daily report triggered successfully")
         // Refresh reports list to show the new daily report
-        await fetchReports()
+        setTimeout(() => {
+          fetchReports()
+        }, 1000) // Small delay to allow report to be created
         return response.data
+      } else {
+        throw new Error((response as any)?.message || "Failed to trigger daily report")
       }
     } catch (error) {
       console.error("Error triggering daily report:", error)
-      toast.error("Failed to trigger daily report")
+      const errorMessage = error instanceof Error ? error.message : "Failed to trigger daily report"
+      toast.error(errorMessage)
       throw error
     }
   }
@@ -196,7 +210,7 @@ export const useReports = () => {
   }) => {
     try {
       const queryParams = new URLSearchParams(params as any).toString()
-      const response = await request<ReportAnalytics[]>(
+      const response = await request(
         `/reports/analytics${queryParams ? `?${queryParams}` : ""}`,
         "GET",
         undefined,
@@ -215,7 +229,7 @@ export const useReports = () => {
 
   const getReport = async (id: string) => {
     try {
-      const response = await request<Report>(`/reports/${id}`, "GET", undefined, false)
+      const response = await request(`/reports/${id}`, "GET", undefined, false)
       if (response?.data) {
         return response.data
       }

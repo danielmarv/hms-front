@@ -19,8 +19,6 @@ const scheduleReportSchema = z.object({
   description: z.string().optional(),
   type: z.enum(["analytics", "financial", "operational", "system", "audit", "custom"]),
   format: z.enum(["json", "pdf", "excel", "csv"]).default("json"),
-  frequency: z.enum(["once", "daily", "weekly", "monthly", "quarterly", "yearly"]),
-  scheduledFor: z.string().optional(),
   parameters: z.object({
     startDate: z.string().min(1, "Start date is required"),
     endDate: z.string().min(1, "End date is required"),
@@ -56,7 +54,6 @@ export function ScheduleReportForm({ onSuccess }: ScheduleReportFormProps) {
     defaultValues: {
       type: "analytics",
       format: "json",
-      frequency: "weekly",
       parameters: {
         startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
         endDate: new Date().toISOString().split("T")[0],
@@ -87,16 +84,32 @@ export function ScheduleReportForm({ onSuccess }: ScheduleReportFormProps) {
             .map((email) => ({ email, name: email.split("@")[0] }))
         : []
 
-      // Prepare the data for the backend
+      // Prepare the data in the format expected by the backend
       const reportData = {
-        ...data,
-        recipients,
+        title: data.title,
+        name: data.title, // Backend uses 'name' field
+        description: data.description,
+        type: data.type,
+        format: data.format,
+        parameters: data.parameters,
+        schedule: {
+          frequency: data.schedule.frequency,
+          time: data.schedule.time,
+          dayOfWeek: data.schedule.dayOfWeek,
+          dayOfMonth: data.schedule.dayOfMonth,
+          isActive: data.schedule.isActive,
+        },
         isScheduled: true,
         emailNotification: {
-          ...data.emailNotification,
+          enabled: data.emailNotification.enabled,
+          subject: data.emailNotification.subject,
+          includeAttachment: data.emailNotification.includeAttachment,
           recipients: recipients.map((r) => r.email),
         },
+        recipients: recipients,
       }
+
+      console.log("Sending schedule data:", reportData) // Debug log
 
       await scheduleReport(reportData)
       onSuccess()
@@ -246,13 +259,13 @@ export function ScheduleReportForm({ onSuccess }: ScheduleReportFormProps) {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
+                            <SelectItem value="0">Sunday</SelectItem>
                             <SelectItem value="1">Monday</SelectItem>
                             <SelectItem value="2">Tuesday</SelectItem>
                             <SelectItem value="3">Wednesday</SelectItem>
                             <SelectItem value="4">Thursday</SelectItem>
                             <SelectItem value="5">Friday</SelectItem>
                             <SelectItem value="6">Saturday</SelectItem>
-                            <SelectItem value="0">Sunday</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
