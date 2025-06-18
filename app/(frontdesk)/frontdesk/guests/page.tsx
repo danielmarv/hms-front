@@ -54,19 +54,27 @@ export default function GuestsPage() {
         ...filters,
         search: searchQuery,
       })
+      console.log("API Response:", response)
 
-      if (response.data && Array.isArray(response.data.data)) {
-        setGuests(response.data.data)
-        setPagination({
-          page: response.data.pagination?.page || 1,
-          limit: response.data.pagination?.limit || 10,
-          totalPages: response.data.pagination?.totalPages || 1,
-          total: response.data.total || 0,
-        })
+      if (response.data) {
+        console.log("Response data:", response.data)
+
+        if (response.data.success && Array.isArray(response.data.data)) {
+          console.log("Setting guests:", response.data.data)
+          setGuests(response.data.data)
+          setPagination({
+            page: response.data.pagination?.page || 1,
+            limit: response.data.pagination?.limit || 10,
+            totalPages: response.data.pagination?.totalPages || 1,
+            total: response.data.total || 0,
+          })
+        } else {
+          console.error("Unexpected API response structure:", response.data)
+          setGuests([])
+        }
       } else {
-        // If response doesn't have the expected structure, set empty array
+        console.error("No data in response:", response)
         setGuests([])
-        console.error("Unexpected API response format:", response)
       }
     } catch (error) {
       console.error("Failed to load guests:", error)

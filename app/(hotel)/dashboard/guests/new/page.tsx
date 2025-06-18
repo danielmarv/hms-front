@@ -138,7 +138,29 @@ export default function NewGuestPage() {
     setSubmitting(true)
 
     try {
-      const response = await createGuest(formData)
+      // Clean the form data to remove empty enum values
+      const cleanedData = { ...formData }
+
+      // Set default bed type if empty
+      if (cleanedData.preferences.bed_type === "") {
+        cleanedData.preferences.bed_type = "double"
+      }
+
+      // Clean other enum values
+      if (cleanedData.gender === "") {
+        delete cleanedData.gender
+      }
+
+      if (cleanedData.id_type === "") {
+        delete cleanedData.id_type
+      }
+
+      // Clean loyalty program tier if it's empty
+      if (cleanedData.loyalty_program.tier === "") {
+        cleanedData.loyalty_program.tier = "standard"
+      }
+
+      const response = await createGuest(cleanedData)
 
       if (response.data?.success) {
         toast.success("Guest created successfully")
