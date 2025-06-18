@@ -1,1333 +1,972 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
-import { Switch } from "@/components/ui/switch"
+import { Textarea } from "@/components/ui/textarea"
+import { DateTimePicker } from "@/components/ui/date-time-picker"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Separator } from "@/components/ui/separator"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Badge } from "@/components/ui/badge"
+import { toast } from "sonner"
 import {
   ArrowLeft,
+  CalendarIcon,
+  Clock,
+  MapPin,
   Save,
-  Loader2,
-  Package,
-  BuildingIcon,
-  StarIcon,
-  CheckCircleIcon,
+  Users,
   Plus,
+  Loader2,
   X,
   DollarSign,
-  Clock,
+  FileText,
+  Briefcase,
+  RefreshCw,
+  AlertTriangle,
 } from "lucide-react"
-import { useHotels, type Hotel } from "@/hooks/use-hotels"
+import { addHours, format } from "date-fns"
 import { useEventTypes } from "@/hooks/use-event-types"
+import { useVenues } from "@/hooks/use-venues"
 import { useEventServices } from "@/hooks/use-event-services"
-import { toast } from "sonner"
+import { useEventTemplates } from "@/hooks/use-event-templates"
+import { useUsers } from "@/hooks/use-users"
+import { useEvents } from "@/hooks/use-events"
+import { useCurrentHotel } from "@/hooks/use-current-hotel"
 
-// Service categories
-const serviceCategories = [
-  { value: "catering", label: "Catering" },
-  { value: "decoration", label: "Decoration" },
-  { value: "equipment", label: "Equipment" },
-  { value: "entertainment", label: "Entertainment" },
-  { value: "staffing", label: "Staffing" },
-  { value: "photography", label: "Photography" },
-  { value: "transportation", label: "Transportation" },
-  { value: "security", label: "Security" },
-  { value: "cleaning", label: "Cleaning" },
-  { value: "other", label: "Other" },
-]
-
-// Price types
-const priceTypes = [
-  { value: "flat", label: "Flat Rate" },
-  { value: "per_person", label: "Per Person" },
-  { value: "per_hour", label: "Per Hour" },
-  { value: "per_day", label: "Per Day" },
-  { value: "custom", label: "Custom" },
-]
-
-// Venue types
-const venueTypes = [
-  { value: "conference_hall", label: "Conference Hall" },
-  { value: "garden", label: "Garden" },
-  { value: "ballroom", label: "Ballroom" },
-  { value: "meeting_room", label: "Meeting Room" },
-  { value: "banquet_hall", label: "Banquet Hall" },
-  { value: "poolside", label: "Poolside" },
-  { value: "rooftop", label: "Rooftop" },
-  { value: "other", label: "Other" },
-]
-
-interface ServiceOption {
-  name: string
-  description: string
-  additionalPrice: number
-}
-
-interface ServiceImage {
-  url: string
-  caption: string
-  isDefault: boolean
-}
-
-export default function NewEventServicePage() {
+export default function NewEventPage() {
   const router = useRouter()
-  const { getAllHotels } = useHotels()
-  const { createService } = useEventServices()
+  const [activeTab, setActiveTab] = useState("details")
 
-  // Hotel selection state
-  const [selectedHotelId, setSelectedHotelId] = useState<string>("")
-  const [hotels, setHotels] = useState<Hotel[]>([])
-  const [hotelsLoading, setHotelsLoading] = useState(true)
-  const [selectedHotel, setSelectedHotel] = useState<Hotel | null>(null)
+  // Get current hotel data
+  const { hotel, hotelId, isLoading: hotelLoading, error: hotelError } = useCurrentHotel()
 
-  // Get event types for selected hotel
-  const { eventTypes } = useEventTypes(selectedHotelId)
+  // Fetch data using hooks with proper hotel ID - all hotel-specific
+  const { eventTypes, loading: loadingEventTypes, fetchEventTypes } = useEventTypes(hotelId)
+  const { venues, loading: loadingVenues, fetchVenues } = useVenues(hotelId)
+  const { services, loading: loadingServices, fetchServices } = useEventServices(hotelId)
+  const { templates, loading: loadingTemplates, fetchTemplates } = useEventTemplates(hotelId)
+  const { users, isLoading: loadingUsers, fetchUsers } = useUsers()
+  const { createEvent } = useEvents()
 
-  // Form state
-  const [formData, setFormData] = useState({
-    name: "",
+  const [eventData, setEventData] = useState({
+    title: "",
     description: "",
-    category: "",
-    subcategory: "",
-    price: "",
-    priceType: "flat",
-    customPriceDetails: "",
-    minimumQuantity: "1",
-    maximumQuantity: "",
-    leadTime: "24",
-    duration: "",
-    setupTime: "30",
-    cleanupTime: "30",
-    status: "active",
-    isExternalService: false,
+    eventType: "",
+    venue: "",
+    startDate: addHours(new Date(), 1),
+    endDate: addHours(new Date(), 3),
+    allDay: false,
+    attendees: 0,
+    status: "pending",
+    visibility: "public",
+    color: "",
+    notes: "",
+    services: [],
+    staffing: [],
   })
 
-  // External provider state
-  const [externalProvider, setExternalProvider] = useState({
-    name: "",
-    contactPerson: "",
-    phone: "",
-    email: "",
-    contractDetails: "",
-    commissionRate: "",
-  })
-
-  // Inventory state
-  const [inventory, setInventory] = useState({
-    isLimited: false,
-    totalQuantity: "",
-    availableQuantity: "",
-    lowStockThreshold: "",
-  })
-
-  // Restrictions state
-  const [restrictions, setRestrictions] = useState({
-    venueTypes: [] as string[],
-    eventTypes: [] as string[],
-    minCapacity: "",
-    maxCapacity: "",
-    availableDays: {
-      monday: true,
-      tuesday: true,
-      wednesday: true,
-      thursday: true,
-      friday: true,
-      saturday: true,
-      sunday: true,
-    },
-  })
-
-  // Seasonal availability state
-  const [seasonalAvailability, setSeasonalAvailability] = useState({
-    isAvailable: true,
-    startDate: "",
-    endDate: "",
-    description: "",
-  })
-
-  // Service options state
-  const [options, setOptions] = useState<ServiceOption[]>([{ name: "", description: "", additionalPrice: 0 }])
-
-  // Images state
-  const [images, setImages] = useState<ServiceImage[]>([{ url: "", caption: "", isDefault: true }])
-
+  const [selectedTemplate, setSelectedTemplate] = useState("")
+  const [selectedServices, setSelectedServices] = useState<string[]>([])
+  const [staffing, setStaffing] = useState<{ userId: string; role: string; notes?: string }[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [activeTab, setActiveTab] = useState("basic")
 
-  // Fetch hotels on component mount
+  // Debug logging
   useEffect(() => {
-    const fetchHotels = async () => {
-      try {
-        setHotelsLoading(true)
-        const savedHotelId = localStorage.getItem("selectedHotelId")
+    console.log("Hotel data:", { hotel, hotelId, hotelLoading })
+    console.log("Event Types:", eventTypes?.length || 0)
+    console.log("Venues:", venues?.length || 0)
+    console.log("Services:", services?.length || 0)
+    console.log("Templates:", templates?.length || 0)
+    console.log("Users:", users?.length || 0)
+  }, [hotel, hotelId, hotelLoading, eventTypes, venues, services, templates, users])
 
-        const response = await getAllHotels({ active: true })
-        let hotelsData = []
-        if (response?.data?.data) {
-          hotelsData = response.data.data
-        } else if (response?.data && Array.isArray(response.data)) {
-          hotelsData = response.data
-        } else if (response && Array.isArray(response)) {
-          hotelsData = response
-        }
+  // Fetch data when hotel ID is available
+  useEffect(() => {
+    if (hotelId && !hotelLoading) {
+      console.log("Fetching hotel-specific data for hotel:", hotelId)
 
-        setHotels(hotelsData)
+      // Fetch hotel-specific data
+      if (fetchEventTypes) {
+        console.log("Fetching event types for hotel:", hotelId)
+        fetchEventTypes()
+      }
+      if (fetchVenues) {
+        console.log("Fetching venues for hotel:", hotelId)
+        fetchVenues()
+      }
 
-        if (hotelsData.length > 0) {
-          let hotelToSelect = hotelsData[0]
+      // Make sure we're fetching services for the current hotel
+      if (fetchServices) {
+        console.log("Fetching event services for hotel:", hotelId)
+        fetchServices()
+      }
 
-          if (savedHotelId) {
-            const savedHotel = hotelsData.find((h: Hotel) => h._id === savedHotelId)
-            if (savedHotel) {
-              hotelToSelect = savedHotel
-            }
-          }
+      if (fetchTemplates) {
+        console.log("Fetching templates for hotel:", hotelId)
+        fetchTemplates()
+      }
 
-          setSelectedHotelId(hotelToSelect._id)
-          setSelectedHotel(hotelToSelect)
-          localStorage.setItem("selectedHotelId", hotelToSelect._id)
-        }
-      } catch (error) {
-        console.error("Failed to fetch hotels:", error)
-        toast.error("Failed to load hotels")
-      } finally {
-        setHotelsLoading(false)
+      // Fetch all users (system-wide for staffing)
+      if (fetchUsers) {
+        console.log("Fetching all users for staffing...")
+        fetchUsers()
       }
     }
+  }, [hotelId, hotelLoading, fetchEventTypes, fetchVenues, fetchServices, fetchTemplates, fetchUsers])
 
-    fetchHotels()
-  }, [getAllHotels])
-
-  // Handle hotel selection
-  const handleHotelChange = (hotelId: string) => {
-    setSelectedHotelId(hotelId)
-    const hotel = hotels.find((h) => h._id === hotelId)
-    setSelectedHotel(hotel || null)
-    localStorage.setItem("selectedHotelId", hotelId)
+  // Handle input change
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target
+    setEventData({ ...eventData, [name]: value })
   }
 
-  // Handle form input changes
-  const handleInputChange = (field: string, value: string | boolean) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
+  // Handle number input change
+  const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
+    setEventData({ ...eventData, [name]: Number.parseInt(value) || 0 })
   }
 
-  // Handle external provider changes
-  const handleExternalProviderChange = (field: string, value: string) => {
-    setExternalProvider((prev) => ({ ...prev, [field]: value }))
+  // Handle select change
+  const handleSelectChange = (name: string, value: string) => {
+    if (name === "eventType") {
+      const selectedType = eventTypes?.find((type) => type._id === value)
+      setEventData({
+        ...eventData,
+        [name]: value,
+        color: selectedType ? selectedType.color : eventData.color,
+      })
+    } else {
+      setEventData({ ...eventData, [name]: value })
+    }
   }
 
-  // Handle inventory changes
-  const handleInventoryChange = (field: string, value: string | boolean) => {
-    setInventory((prev) => ({ ...prev, [field]: value }))
+  // Handle date change
+  const handleDateChange = (name: string, date: Date) => {
+    setEventData({ ...eventData, [name]: date })
   }
 
-  // Handle restrictions changes
-  const handleRestrictionsChange = (field: string, value: any) => {
-    setRestrictions((prev) => ({ ...prev, [field]: value }))
+  // Handle checkbox change
+  const handleCheckboxChange = (name: string, checked: boolean) => {
+    setEventData({ ...eventData, [name]: checked })
   }
 
-  // Handle available days changes
-  const handleDayChange = (day: string, value: boolean) => {
-    setRestrictions((prev) => ({
-      ...prev,
-      availableDays: {
-        ...prev.availableDays,
-        [day]: value,
-      },
-    }))
+  // Handle service selection
+  const handleServiceChange = (serviceId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedServices([...selectedServices, serviceId])
+    } else {
+      setSelectedServices(selectedServices.filter((id) => id !== serviceId))
+    }
   }
 
-  // Handle seasonal availability changes
-  const handleSeasonalChange = (field: string, value: string | boolean) => {
-    setSeasonalAvailability((prev) => ({ ...prev, [field]: value }))
+  // Handle template selection
+  const handleTemplateSelect = (templateId: string) => {
+    const template = templates?.find((t) => t._id === templateId)
+    if (template) {
+      setSelectedTemplate(templateId)
+
+      // Pre-fill form with template data
+      setEventData({
+        ...eventData,
+        title: template.name,
+        description: template.description,
+        eventType: template.eventType,
+        color: eventTypes?.find((type) => type._id === template.eventType)?.color || "",
+      })
+    }
   }
 
-  // Handle venue type selection
-  const handleVenueTypeChange = (venueType: string) => {
-    setRestrictions((prev) => {
-      const venueTypes = prev.venueTypes.includes(venueType)
-        ? prev.venueTypes.filter((type) => type !== venueType)
-        : [...prev.venueTypes, venueType]
-      return { ...prev, venueTypes }
-    })
+  // Handle staffing
+  const addStaffMember = () => {
+    setStaffing([...staffing, { userId: "", role: "", notes: "" }])
   }
 
-  // Handle event type selection
-  const handleEventTypeChange = (eventTypeId: string) => {
-    setRestrictions((prev) => {
-      const eventTypes = prev.eventTypes.includes(eventTypeId)
-        ? prev.eventTypes.filter((type) => type !== eventTypeId)
-        : [...prev.eventTypes, eventTypeId]
-      return { ...prev, eventTypes }
-    })
+  const removeStaffMember = (index: number) => {
+    setStaffing(staffing.filter((_, i) => i !== index))
   }
 
-  // Handle service options
-  const addOption = () => {
-    setOptions((prev) => [...prev, { name: "", description: "", additionalPrice: 0 }])
+  const updateStaffMember = (index: number, field: string, value: string) => {
+    const updatedStaffing = [...staffing]
+    updatedStaffing[index] = { ...updatedStaffing[index], [field]: value }
+    setStaffing(updatedStaffing)
   }
 
-  const removeOption = (index: number) => {
-    setOptions((prev) => prev.filter((_, i) => i !== index))
+  // Calculate total price
+  const calculateTotalPrice = () => {
+    const selectedServiceItems = services?.filter((service) => selectedServices.includes(service._id))
+    return selectedServiceItems?.reduce((total, service) => total + service.price, 0) || 0
   }
 
-  const updateOption = (index: number, field: keyof ServiceOption, value: string | number) => {
-    setOptions((prev) => prev.map((option, i) => (i === index ? { ...option, [field]: value } : option)))
+  // Get selected items for summary
+  const getSelectedTemplate = () => {
+    return templates?.find((t) => t._id === selectedTemplate)
   }
 
-  // Handle images
-  const addImage = () => {
-    setImages((prev) => [...prev, { url: "", caption: "", isDefault: false }])
+  const getSelectedServices = () => {
+    return services?.filter((service) => selectedServices.includes(service._id)) || []
   }
 
-  const removeImage = (index: number) => {
-    setImages((prev) => prev.filter((_, i) => i !== index))
-  }
-
-  const updateImage = (index: number, field: keyof ServiceImage, value: string | boolean) => {
-    setImages((prev) =>
-      prev.map((image, i) => {
-        if (i === index) {
-          // If setting this image as default, unset others
-          if (field === "isDefault" && value === true) {
-            return { ...image, isDefault: true }
-          }
-          return { ...image, [field]: value }
-        } else {
-          // If setting another image as default, unset this one
-          if (field === "isDefault" && value === true) {
-            return { ...image, isDefault: false }
-          }
-          return image
-        }
-      }),
-    )
+  const getAssignedStaff = () => {
+    return staffing.filter((staff) => staff.userId && staff.role)
   }
 
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!selectedHotelId) {
-      toast.error("Please select a hotel")
+    // Validate form
+    if (!eventData.title) {
+      toast.error("Please enter an event title")
       return
     }
 
-    if (!formData.name.trim()) {
-      toast.error("Service name is required")
-      setActiveTab("basic")
+    if (!eventData.eventType) {
+      toast.error("Please select an event type")
       return
     }
 
-    if (!formData.category) {
-      toast.error("Category is required")
-      setActiveTab("basic")
+    if (!eventData.venue) {
+      toast.error("Please select a venue")
       return
     }
 
-    if (!formData.price || Number.parseFloat(formData.price) < 0) {
-      toast.error("Price must be 0 or greater")
-      setActiveTab("basic")
+    if (eventData.attendees <= 0) {
+      toast.error("Please enter a valid number of attendees")
       return
     }
+
+    if (!hotelId) {
+      toast.error("No hotel selected")
+      return
+    }
+
+    setIsSubmitting(true)
 
     try {
-      setIsSubmitting(true)
-
-      // Prepare service data - ensure hotel ID is properly included
-      const serviceData = {
-        name: formData.name,
-        description: formData.description,
-        category: formData.category,
-        subcategory: formData.subcategory || undefined,
-        price: Number.parseFloat(formData.price),
-        priceType: formData.priceType,
-        customPriceDetails: formData.customPriceDetails || undefined,
-        minimumQuantity: formData.minimumQuantity ? Number.parseInt(formData.minimumQuantity) : 1,
-        maximumQuantity: formData.maximumQuantity ? Number.parseInt(formData.maximumQuantity) : undefined,
-        leadTime: formData.leadTime ? Number.parseInt(formData.leadTime) : 24,
-        duration: formData.duration ? Number.parseInt(formData.duration) : undefined,
-        setupTime: formData.setupTime ? Number.parseInt(formData.setupTime) : 30,
-        cleanupTime: formData.cleanupTime ? Number.parseInt(formData.cleanupTime) : 30,
-        status: formData.status,
-        isExternalService: formData.isExternalService,
-
-        // Ensure hotel ID is included - try the most common field names
-        hotelId: selectedHotelId,
-        hotel: selectedHotelId,
-
-        // Only include external provider if it's an external service
-        ...(formData.isExternalService &&
-          externalProvider.name && {
-            externalProvider: {
-              name: externalProvider.name,
-              contactPerson: externalProvider.contactPerson,
-              phone: externalProvider.phone,
-              email: externalProvider.email,
-              contractDetails: externalProvider.contractDetails,
-              commissionRate: externalProvider.commissionRate
-                ? Number.parseFloat(externalProvider.commissionRate)
-                : undefined,
-            },
-          }),
-
-        // Only include inventory if it's limited
-        ...(inventory.isLimited && {
-          inventory: {
-            isLimited: true,
-            totalQuantity: inventory.totalQuantity ? Number.parseInt(inventory.totalQuantity) : undefined,
-            availableQuantity: inventory.availableQuantity ? Number.parseInt(inventory.availableQuantity) : undefined,
-            lowStockThreshold: inventory.lowStockThreshold ? Number.parseInt(inventory.lowStockThreshold) : undefined,
-          },
+      // Create event object with selected services and staffing
+      const eventWithServices = {
+        ...eventData,
+        hotel: hotelId,
+        event_type_id: eventData.eventType,
+        venue_id: eventData.venue,
+        start_date: eventData.startDate,
+        end_date: eventData.endDate,
+        template_id: selectedTemplate || undefined,
+        services: selectedServices.map((serviceId) => {
+          const service = services?.find((s) => s._id === serviceId)
+          return {
+            service_id: serviceId,
+            name: service?.name || "",
+            price: service?.price || 0,
+          }
         }),
-
-        // Include restrictions
-        restrictions: {
-          venueTypes: restrictions.venueTypes,
-          eventTypes: restrictions.eventTypes,
-          minCapacity: restrictions.minCapacity ? Number.parseInt(restrictions.minCapacity) : undefined,
-          maxCapacity: restrictions.maxCapacity ? Number.parseInt(restrictions.maxCapacity) : undefined,
-          availableDays: restrictions.availableDays,
-        },
-
-        // Include seasonal availability
-        seasonalAvailability: {
-          isAvailable: seasonalAvailability.isAvailable,
-          startDate: seasonalAvailability.startDate || undefined,
-          endDate: seasonalAvailability.endDate || undefined,
-          description: seasonalAvailability.description,
-        },
-
-        // Include options and images if they have values
-        options: options
-          .filter((option) => option.name.trim())
-          .map((option) => ({
-            name: option.name,
-            description: option.description,
-            additionalPrice: Number(option.additionalPrice),
-          })),
-
-        images: images.filter((image) => image.url.trim()),
+        staffing: staffing.filter((staff) => staff.userId && staff.role),
       }
 
-      console.log("Creating service with data:", serviceData)
-      console.log("Selected Hotel ID:", selectedHotelId)
-
-      // Validate that we have a hotel ID before making the API call
-      if (!selectedHotelId) {
-        toast.error("Please select a hotel before creating the service")
-        return
-      }
-
-      // Call API to create service
-      const result = await createService(serviceData)
-
-      if (result) {
-        toast.success("Event service created successfully!")
-        router.push("/dashboard/events/services")
-      } else {
-        throw new Error("Failed to create service")
-      }
+      await createEvent(eventWithServices)
+      toast.success("Event created successfully")
+      router.push("/dashboard/events")
     } catch (error) {
-      console.error("Failed to create service:", error)
-      toast.error("Failed to create service")
+      console.error("Error creating event:", error)
+      toast.error("Failed to create event")
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  if (hotelsLoading) {
+  // Loading state - wait for hotel data first
+  if (hotelLoading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-red-50 dark:from-slate-900 dark:via-purple-900 dark:to-pink-900">
-        <div className="flex flex-col items-center space-y-4">
-          <Loader2 className="h-12 w-12 animate-spin text-purple-600 dark:text-purple-400" />
-          <p className="text-lg font-medium text-slate-700 dark:text-slate-300">Loading hotels...</p>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <Skeleton className="h-8 w-64" />
+            <Skeleton className="h-4 w-48" />
+          </div>
+          <Skeleton className="h-10 w-20" />
         </div>
+        <Skeleton className="h-96 w-full" />
+      </div>
+    )
+  }
+
+  // No hotel selected
+  if (!hotelLoading && !hotelId && !hotelError) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <h2 className="text-3xl font-bold tracking-tight">Create New Event</h2>
+            <p className="text-muted-foreground">Please select a hotel to continue</p>
+          </div>
+          <Button variant="outline" onClick={() => router.back()}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
+          </Button>
+        </div>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center py-8">
+              <h3 className="text-lg font-medium">No Hotel Selected</h3>
+              <p className="text-muted-foreground">Please select a hotel from your dashboard to create events.</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-red-50 dark:from-slate-900 dark:via-purple-900 dark:to-pink-900 p-6">
-      <div className="max-w-4xl mx-auto space-y-8">
-        {/* Header */}
-        <div className="flex items-center justify-between bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20 dark:border-slate-700/20">
-          <div className="flex items-center space-x-4">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => router.back()}
-              className="border-purple-200 hover:bg-purple-50 dark:border-purple-700 dark:hover:bg-purple-900"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="space-y-1">
+          <h2 className="text-3xl font-bold tracking-tight">Create New Event</h2>
+          <p className="text-muted-foreground">
+            Schedule a new event at <span className="font-medium">{hotel?.name || "your hotel"}</span>
+          </p>
+          {hotelId && <p className="text-xs text-muted-foreground">Hotel ID: {hotelId}</p>}
+        </div>
+        <Button variant="outline" onClick={() => router.back()}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back
+        </Button>
+      </div>
+
+      {/* Hotel Information Card */}
+      <Card className="bg-blue-50 border-blue-200">
+        <CardContent className="pt-4">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+              <MapPin className="h-5 w-5 text-blue-600" />
+            </div>
             <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 via-pink-600 to-red-600 dark:from-purple-400 dark:via-pink-400 dark:to-red-400 bg-clip-text text-transparent">
-                Create Event Service
-              </h1>
-              <p className="text-slate-600 dark:text-slate-300 mt-1">Add a new service for events</p>
+              <h3 className="font-medium text-blue-900">Current Hotel</h3>
+              <p className="text-sm text-blue-700">{hotel?.name || "Loading hotel information..."}</p>
+              {hotel?.address && <p className="text-xs text-blue-600">{hotel.address}</p>}
             </div>
           </div>
-          <Package className="h-8 w-8 text-purple-600 dark:text-purple-400" />
-        </div>
+        </CardContent>
+      </Card>
 
-        {/* Hotel Selection */}
-        <Card className="border-2 border-dashed border-purple-200 dark:border-purple-800 bg-gradient-to-r from-purple-50/80 to-pink-50/80 dark:from-purple-900/20 dark:to-pink-900/20 backdrop-blur-sm">
-          <CardHeader className="pb-4">
-            <div className="flex items-center space-x-2">
-              <BuildingIcon className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-              <CardTitle className="text-lg text-purple-900 dark:text-purple-100">Select Hotel</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-slate-700 dark:text-slate-300">Choose Hotel *</Label>
-                <Select value={selectedHotelId} onValueChange={handleHotelChange} required>
-                  <SelectTrigger className="w-full bg-white/80 dark:bg-slate-800/80">
-                    <SelectValue placeholder="Select a hotel for this service" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {hotels.length === 0 ? (
-                      <SelectItem value="no-hotels" disabled>
-                        No hotels available
-                      </SelectItem>
-                    ) : (
-                      hotels.map((hotel) => (
-                        <SelectItem key={hotel._id} value={hotel._id}>
-                          <div className="flex items-center space-x-2">
-                            <BuildingIcon className="h-4 w-4" />
-                            <span>{hotel.name}</span>
-                            <Badge variant="outline" className="text-xs">
-                              {hotel.code}
-                            </Badge>
-                            {hotel.isHeadquarters && (
-                              <Badge className="text-xs bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
-                                <StarIcon className="h-3 w-3 mr-1" />
-                                HQ
-                              </Badge>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="template">Template</TabsTrigger>
+          <TabsTrigger value="details">Event Details</TabsTrigger>
+          <TabsTrigger value="services">Services</TabsTrigger>
+          <TabsTrigger value="staffing">Staffing</TabsTrigger>
+        </TabsList>
 
-              {selectedHotel && (
-                <div className="bg-white/60 dark:bg-slate-800/60 rounded-lg p-4 border border-purple-200 dark:border-purple-700">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-medium text-sm text-slate-700 dark:text-slate-300">Selected Hotel</h3>
-                    <CheckCircleIcon className="h-4 w-4 text-green-600 dark:text-green-400" />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="font-semibold text-slate-900 dark:text-slate-100">{selectedHotel.name}</p>
-                    <div className="flex items-center space-x-2 text-sm text-slate-600 dark:text-slate-400">
-                      <Badge variant="outline">{selectedHotel.code}</Badge>
-                      <span>•</span>
-                      <span className="capitalize">{selectedHotel.type}</span>
-                      {selectedHotel.starRating && (
-                        <>
-                          <span>•</span>
-                          <div className="flex items-center">
-                            {Array.from({ length: selectedHotel.starRating }).map((_, i) => (
-                              <StarIcon key={i} className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                            ))}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
+        <TabsContent value="template" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Event Templates</CardTitle>
+              <CardDescription>
+                Start with a pre-configured event template for {hotel?.name} or create from scratch
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {loadingTemplates ? (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <Skeleton className="h-24 w-full" />
+                  <Skeleton className="h-24 w-full" />
+                  <Skeleton className="h-24 w-full" />
                 </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+              ) : (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {templates && templates.length > 0 ? (
+                    templates.map((template) => {
+                      const eventType = eventTypes?.find((type) => type._id === template.eventType)
 
-        {/* Main Form */}
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid grid-cols-2 md:grid-cols-4 w-full bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-lg">
-              <TabsTrigger value="basic">Basic Info</TabsTrigger>
-              <TabsTrigger value="details">Details & Options</TabsTrigger>
-              <TabsTrigger value="availability">Availability</TabsTrigger>
-              <TabsTrigger value="media">Media & Provider</TabsTrigger>
-            </TabsList>
-
-            {/* Basic Info Tab */}
-            <TabsContent value="basic">
-              <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border-0 shadow-xl">
-                <CardHeader>
-                  <CardTitle className="text-xl text-slate-800 dark:text-slate-200">Basic Information</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name" className="text-slate-700 dark:text-slate-300">
-                        Service Name *
-                      </Label>
-                      <Input
-                        id="name"
-                        value={formData.name}
-                        onChange={(e) => handleInputChange("name", e.target.value)}
-                        placeholder="Enter service name"
-                        required
-                        className="bg-white/80 dark:bg-slate-700/80"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="category" className="text-slate-700 dark:text-slate-300">
-                        Category *
-                      </Label>
-                      <Select
-                        value={formData.category}
-                        onValueChange={(value) => handleInputChange("category", value)}
-                        required
-                      >
-                        <SelectTrigger className="bg-white/80 dark:bg-slate-700/80">
-                          <SelectValue placeholder="Select category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {serviceCategories.map((category) => (
-                            <SelectItem key={category.value} value={category.value}>
-                              {category.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="subcategory" className="text-slate-700 dark:text-slate-300">
-                      Subcategory
-                    </Label>
-                    <Input
-                      id="subcategory"
-                      value={formData.subcategory}
-                      onChange={(e) => handleInputChange("subcategory", e.target.value)}
-                      placeholder="Enter subcategory (optional)"
-                      className="bg-white/80 dark:bg-slate-700/80"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="description" className="text-slate-700 dark:text-slate-300">
-                      Description
-                    </Label>
-                    <Textarea
-                      id="description"
-                      value={formData.description}
-                      onChange={(e) => handleInputChange("description", e.target.value)}
-                      placeholder="Enter service description"
-                      rows={3}
-                      className="bg-white/80 dark:bg-slate-700/80"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="price" className="text-slate-700 dark:text-slate-300">
-                        Price *
-                      </Label>
-                      <div className="relative">
-                        <DollarSign className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-                        <Input
-                          id="price"
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={formData.price}
-                          onChange={(e) => handleInputChange("price", e.target.value)}
-                          placeholder="0.00"
-                          required
-                          className="pl-10 bg-white/80 dark:bg-slate-700/80"
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="priceType" className="text-slate-700 dark:text-slate-300">
-                        Price Type
-                      </Label>
-                      <Select
-                        value={formData.priceType}
-                        onValueChange={(value) => handleInputChange("priceType", value)}
-                      >
-                        <SelectTrigger className="bg-white/80 dark:bg-slate-700/80">
-                          <SelectValue placeholder="Select price type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {priceTypes.map((type) => (
-                            <SelectItem key={type.value} value={type.value}>
-                              {type.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  {formData.priceType === "custom" && (
-                    <div className="space-y-2">
-                      <Label htmlFor="customPriceDetails" className="text-slate-700 dark:text-slate-300">
-                        Custom Price Details
-                      </Label>
-                      <Textarea
-                        id="customPriceDetails"
-                        value={formData.customPriceDetails}
-                        onChange={(e) => handleInputChange("customPriceDetails", e.target.value)}
-                        placeholder="Explain custom pricing structure"
-                        rows={2}
-                        className="bg-white/80 dark:bg-slate-700/80"
-                      />
+                      return (
+                        <div
+                          key={template._id}
+                          className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                            selectedTemplate === template._id
+                              ? "border-primary bg-primary/5"
+                              : "hover:border-primary/50"
+                          }`}
+                          onClick={() => handleTemplateSelect(template._id)}
+                        >
+                          <div className="flex items-center space-x-2 mb-2">
+                            <div
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: eventType?.color || "#ccc" }}
+                            />
+                            <h3 className="font-medium">{template.name}</h3>
+                          </div>
+                          <p className="text-sm text-muted-foreground">{template.description}</p>
+                        </div>
+                      )
+                    })
+                  ) : (
+                    <div className="col-span-full text-center py-8 text-muted-foreground">
+                      No templates available for {hotel?.name}
                     </div>
                   )}
 
-                  <div className="flex items-center justify-between pt-4">
-                    <div className="space-y-1">
-                      <Label className="text-slate-700 dark:text-slate-300">Service Status</Label>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">Set the current availability status</p>
+                  <div
+                    className="border border-dashed rounded-lg p-4 cursor-pointer hover:border-primary/50 flex flex-col items-center justify-center text-center"
+                    onClick={() => {
+                      setSelectedTemplate("")
+                      setActiveTab("details")
+                    }}
+                  >
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mb-2">
+                      <Plus className="h-5 w-5 text-primary" />
                     </div>
-                    <Select value={formData.status} onValueChange={(value) => handleInputChange("status", value)}>
-                      <SelectTrigger className="w-[180px] bg-white/80 dark:bg-slate-700/80">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="inactive">Inactive</SelectItem>
-                        <SelectItem value="seasonal">Seasonal</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <h3 className="font-medium">Create from Scratch</h3>
+                    <p className="text-sm text-muted-foreground">Configure all event details manually</p>
                   </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
+                </div>
+              )}
+            </CardContent>
+            <CardFooter className="flex justify-between">
+              <Button variant="outline" onClick={() => router.back()}>
+                Cancel
+              </Button>
+              <Button onClick={() => setActiveTab("details")}>Continue to Details</Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
 
-            {/* Details & Options Tab */}
-            <TabsContent value="details">
-              <div className="space-y-6">
-                {/* Quantity & Timing */}
-                <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border-0 shadow-xl">
-                  <CardHeader>
-                    <CardTitle className="text-xl text-slate-800 dark:text-slate-200">Quantity & Timing</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="minimumQuantity" className="text-slate-700 dark:text-slate-300">
-                          Minimum Quantity
-                        </Label>
-                        <Input
-                          id="minimumQuantity"
-                          type="number"
-                          min="1"
-                          value={formData.minimumQuantity}
-                          onChange={(e) => handleInputChange("minimumQuantity", e.target.value)}
-                          className="bg-white/80 dark:bg-slate-700/80"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="maximumQuantity" className="text-slate-700 dark:text-slate-300">
-                          Maximum Quantity
-                        </Label>
-                        <Input
-                          id="maximumQuantity"
-                          type="number"
-                          min="1"
-                          value={formData.maximumQuantity}
-                          onChange={(e) => handleInputChange("maximumQuantity", e.target.value)}
-                          placeholder="No limit"
-                          className="bg-white/80 dark:bg-slate-700/80"
-                        />
-                      </div>
-                    </div>
+        <TabsContent value="details" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Event Details</CardTitle>
+              <CardDescription>Enter the basic information for your event at {hotel?.name}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="title">Event Title</Label>
+                  <Input
+                    id="title"
+                    name="title"
+                    value={eventData.title}
+                    onChange={handleInputChange}
+                    placeholder="Enter event title"
+                  />
+                </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="leadTime" className="text-slate-700 dark:text-slate-300">
-                          Lead Time (hours)
-                        </Label>
-                        <div className="relative">
-                          <Clock className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-                          <Input
-                            id="leadTime"
-                            type="number"
-                            min="0"
-                            value={formData.leadTime}
-                            onChange={(e) => handleInputChange("leadTime", e.target.value)}
-                            className="pl-10 bg-white/80 dark:bg-slate-700/80"
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="setupTime" className="text-slate-700 dark:text-slate-300">
-                          Setup Time (minutes)
-                        </Label>
-                        <Input
-                          id="setupTime"
-                          type="number"
-                          min="0"
-                          value={formData.setupTime}
-                          onChange={(e) => handleInputChange("setupTime", e.target.value)}
-                          className="bg-white/80 dark:bg-slate-700/80"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="cleanupTime" className="text-slate-700 dark:text-slate-300">
-                          Cleanup Time (minutes)
-                        </Label>
-                        <Input
-                          id="cleanupTime"
-                          type="number"
-                          min="0"
-                          value={formData.cleanupTime}
-                          onChange={(e) => handleInputChange("cleanupTime", e.target.value)}
-                          className="bg-white/80 dark:bg-slate-700/80"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="duration" className="text-slate-700 dark:text-slate-300">
-                        Service Duration (minutes)
-                      </Label>
-                      <Input
-                        id="duration"
-                        type="number"
-                        min="1"
-                        value={formData.duration}
-                        onChange={(e) => handleInputChange("duration", e.target.value)}
-                        placeholder="Leave empty if not applicable"
-                        className="bg-white/80 dark:bg-slate-700/80"
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Service Options */}
-                <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border-0 shadow-xl">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-xl text-slate-800 dark:text-slate-200">Service Options</CardTitle>
-                      <Button type="button" variant="outline" size="sm" onClick={addOption}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Option
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {options.map((option, index) => (
-                      <div
-                        key={index}
-                        className="flex items-start gap-4 p-4 border rounded-lg bg-slate-50 dark:bg-slate-700/50"
-                      >
-                        <div className="flex-1 space-y-2">
-                          <Input
-                            value={option.name}
-                            onChange={(e) => updateOption(index, "name", e.target.value)}
-                            placeholder="Option name"
-                            className="bg-white dark:bg-slate-700"
-                          />
-                          <Textarea
-                            value={option.description}
-                            onChange={(e) => updateOption(index, "description", e.target.value)}
-                            placeholder="Option description"
-                            rows={2}
-                            className="bg-white dark:bg-slate-700"
-                          />
-                        </div>
-                        <div className="w-32">
-                          <Label className="text-xs text-slate-600 dark:text-slate-400">Additional Price</Label>
-                          <div className="relative">
-                            <DollarSign className="absolute left-2 top-2.5 h-3 w-3 text-slate-400" />
-                            <Input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={option.additionalPrice}
-                              onChange={(e) =>
-                                updateOption(index, "additionalPrice", Number.parseFloat(e.target.value) || 0)
-                              }
-                              className="pl-6 bg-white dark:bg-slate-700"
-                            />
-                          </div>
-                        </div>
-                        {options.length > 1 && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            onClick={() => removeOption(index)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
-
-                {/* Inventory Management */}
-                <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border-0 shadow-xl">
-                  <CardHeader>
-                    <CardTitle className="text-xl text-slate-800 dark:text-slate-200">Inventory Management</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-1">
-                        <Label className="text-slate-700 dark:text-slate-300">Limited Inventory</Label>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">Track inventory for this service</p>
-                      </div>
-                      <Switch
-                        checked={inventory.isLimited}
-                        onCheckedChange={(checked) => handleInventoryChange("isLimited", checked)}
-                      />
-                    </div>
-
-                    {inventory.isLimited && (
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t">
-                        <div className="space-y-2">
-                          <Label htmlFor="totalQuantity" className="text-slate-700 dark:text-slate-300">
-                            Total Quantity
-                          </Label>
-                          <Input
-                            id="totalQuantity"
-                            type="number"
-                            min="0"
-                            value={inventory.totalQuantity}
-                            onChange={(e) => handleInventoryChange("totalQuantity", e.target.value)}
-                            className="bg-white/80 dark:bg-slate-700/80"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="availableQuantity" className="text-slate-700 dark:text-slate-300">
-                            Available Quantity
-                          </Label>
-                          <Input
-                            id="availableQuantity"
-                            type="number"
-                            min="0"
-                            value={inventory.availableQuantity}
-                            onChange={(e) => handleInventoryChange("availableQuantity", e.target.value)}
-                            className="bg-white/80 dark:bg-slate-700/80"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="lowStockThreshold" className="text-slate-700 dark:text-slate-300">
-                            Low Stock Alert
-                          </Label>
-                          <Input
-                            id="lowStockThreshold"
-                            type="number"
-                            min="0"
-                            value={inventory.lowStockThreshold}
-                            onChange={(e) => handleInventoryChange("lowStockThreshold", e.target.value)}
-                            className="bg-white/80 dark:bg-slate-700/80"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+                <div className="space-y-2">
+                  <Label htmlFor="eventType">Event Type</Label>
+                  <Select value={eventData.eventType} onValueChange={(value) => handleSelectChange("eventType", value)}>
+                    <SelectTrigger id="eventType">
+                      <SelectValue placeholder={loadingEventTypes ? "Loading..." : "Select event type"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {loadingEventTypes ? (
+                        <SelectItem value="loading" disabled>
+                          Loading event types...
+                        </SelectItem>
+                      ) : eventTypes && eventTypes.length > 0 ? (
+                        eventTypes.map((type) => (
+                          <SelectItem key={type._id} value={type._id}>
+                            <div className="flex items-center">
+                              <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: type.color }} />
+                              {type.name}
+                            </div>
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="no-types" disabled>
+                          No event types available for {hotel?.name}
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-            </TabsContent>
 
-            {/* Availability Tab */}
-            <TabsContent value="availability">
-              <div className="space-y-6">
-                {/* Venue & Event Restrictions */}
-                <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border-0 shadow-xl">
-                  <CardHeader>
-                    <CardTitle className="text-xl text-slate-800 dark:text-slate-200">
-                      Venue & Event Restrictions
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label className="text-slate-700 dark:text-slate-300">Applicable Venue Types</Label>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                        {venueTypes.map((venue) => (
-                          <div key={venue.value} className="flex items-center space-x-2">
-                            <input
-                              type="checkbox"
-                              id={`venue-${venue.value}`}
-                              checked={restrictions.venueTypes.includes(venue.value)}
-                              onChange={() => handleVenueTypeChange(venue.value)}
-                              className="rounded border-gray-300"
-                            />
-                            <Label htmlFor={`venue-${venue.value}`} className="text-sm">
-                              {venue.label}
-                            </Label>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-slate-700 dark:text-slate-300">Applicable Event Types</Label>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                        {eventTypes.map((eventType) => (
-                          <div key={eventType._id} className="flex items-center space-x-2">
-                            <input
-                              type="checkbox"
-                              id={`event-${eventType._id}`}
-                              checked={restrictions.eventTypes.includes(eventType._id)}
-                              onChange={() => handleEventTypeChange(eventType._id)}
-                              className="rounded border-gray-300"
-                            />
-                            <Label htmlFor={`event-${eventType._id}`} className="text-sm">
-                              {eventType.name}
-                            </Label>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="minCapacity" className="text-slate-700 dark:text-slate-300">
-                          Minimum Event Capacity
-                        </Label>
-                        <Input
-                          id="minCapacity"
-                          type="number"
-                          min="1"
-                          value={restrictions.minCapacity}
-                          onChange={(e) => handleRestrictionsChange("minCapacity", e.target.value)}
-                          placeholder="No minimum"
-                          className="bg-white/80 dark:bg-slate-700/80"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="maxCapacity" className="text-slate-700 dark:text-slate-300">
-                          Maximum Event Capacity
-                        </Label>
-                        <Input
-                          id="maxCapacity"
-                          type="number"
-                          min="1"
-                          value={restrictions.maxCapacity}
-                          onChange={(e) => handleRestrictionsChange("maxCapacity", e.target.value)}
-                          placeholder="No maximum"
-                          className="bg-white/80 dark:bg-slate-700/80"
-                        />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Available Days */}
-                <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border-0 shadow-xl">
-                  <CardHeader>
-                    <CardTitle className="text-xl text-slate-800 dark:text-slate-200">Available Days</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {Object.entries(restrictions.availableDays).map(([day, isAvailable]) => (
-                        <div key={day} className="flex items-center space-x-2">
-                          <Switch checked={isAvailable} onCheckedChange={(checked) => handleDayChange(day, checked)} />
-                          <Label className="capitalize text-slate-700 dark:text-slate-300">{day}</Label>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Seasonal Availability */}
-                <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border-0 shadow-xl">
-                  <CardHeader>
-                    <CardTitle className="text-xl text-slate-800 dark:text-slate-200">Seasonal Availability</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-1">
-                        <Label className="text-slate-700 dark:text-slate-300">Available Year Round</Label>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">
-                          Service is available throughout the year
-                        </p>
-                      </div>
-                      <Switch
-                        checked={seasonalAvailability.isAvailable}
-                        onCheckedChange={(checked) => handleSeasonalChange("isAvailable", checked)}
-                      />
-                    </div>
-
-                    {!seasonalAvailability.isAvailable && (
-                      <div className="space-y-4 pt-4 border-t">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="startDate" className="text-slate-700 dark:text-slate-300">
-                              Available From
-                            </Label>
-                            <Input
-                              id="startDate"
-                              type="date"
-                              value={seasonalAvailability.startDate}
-                              onChange={(e) => handleSeasonalChange("startDate", e.target.value)}
-                              className="bg-white/80 dark:bg-slate-700/80"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="endDate" className="text-slate-700 dark:text-slate-300">
-                              Available Until
-                            </Label>
-                            <Input
-                              id="endDate"
-                              type="date"
-                              value={seasonalAvailability.endDate}
-                              onChange={(e) => handleSeasonalChange("endDate", e.target.value)}
-                              className="bg-white/80 dark:bg-slate-700/80"
-                            />
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="seasonalDescription" className="text-slate-700 dark:text-slate-300">
-                            Seasonal Notes
-                          </Label>
-                          <Textarea
-                            id="seasonalDescription"
-                            value={seasonalAvailability.description}
-                            onChange={(e) => handleSeasonalChange("description", e.target.value)}
-                            placeholder="Additional notes about seasonal availability"
-                            rows={2}
-                            className="bg-white/80 dark:bg-slate-700/80"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  name="description"
+                  value={eventData.description}
+                  onChange={handleInputChange}
+                  placeholder="Enter event description"
+                  rows={3}
+                />
               </div>
-            </TabsContent>
 
-            {/* Media & Provider Tab */}
-            <TabsContent value="media">
-              <div className="space-y-6">
-                {/* External Service Provider */}
-                <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border-0 shadow-xl">
-                  <CardHeader>
-                    <CardTitle className="text-xl text-slate-800 dark:text-slate-200">
-                      External Service Provider
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-1">
-                        <Label className="text-slate-700 dark:text-slate-300">External Service</Label>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">
-                          This service is provided by an external vendor
-                        </p>
-                      </div>
-                      <Switch
-                        checked={formData.isExternalService}
-                        onCheckedChange={(checked) => handleInputChange("isExternalService", checked)}
-                      />
-                    </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="venue">Venue</Label>
+                  <Select value={eventData.venue} onValueChange={(value) => handleSelectChange("venue", value)}>
+                    <SelectTrigger id="venue">
+                      <SelectValue placeholder={loadingVenues ? "Loading..." : "Select venue"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {loadingVenues ? (
+                        <SelectItem value="loading" disabled>
+                          Loading venues...
+                        </SelectItem>
+                      ) : venues && venues.length > 0 ? (
+                        venues.map((venue) => (
+                          <SelectItem key={venue._id} value={venue._id}>
+                            {venue.name} (Capacity: {venue.capacity})
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="no-venues" disabled>
+                          No venues available for {hotel?.name}
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-                    {formData.isExternalService && (
-                      <div className="space-y-4 pt-4 border-t">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="providerName" className="text-slate-700 dark:text-slate-300">
-                              Provider Name *
-                            </Label>
-                            <Input
-                              id="providerName"
-                              value={externalProvider.name}
-                              onChange={(e) => handleExternalProviderChange("name", e.target.value)}
-                              placeholder="Enter provider name"
-                              className="bg-white/80 dark:bg-slate-700/80"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="contactPerson" className="text-slate-700 dark:text-slate-300">
-                              Contact Person
-                            </Label>
-                            <Input
-                              id="contactPerson"
-                              value={externalProvider.contactPerson}
-                              onChange={(e) => handleExternalProviderChange("contactPerson", e.target.value)}
-                              placeholder="Enter contact person"
-                              className="bg-white/80 dark:bg-slate-700/80"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="providerPhone" className="text-slate-700 dark:text-slate-300">
-                              Phone Number
-                            </Label>
-                            <Input
-                              id="providerPhone"
-                              value={externalProvider.phone}
-                              onChange={(e) => handleExternalProviderChange("phone", e.target.value)}
-                              placeholder="Enter phone number"
-                              className="bg-white/80 dark:bg-slate-700/80"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="providerEmail" className="text-slate-700 dark:text-slate-300">
-                              Email Address
-                            </Label>
-                            <Input
-                              id="providerEmail"
-                              type="email"
-                              value={externalProvider.email}
-                              onChange={(e) => handleExternalProviderChange("email", e.target.value)}
-                              placeholder="Enter email address"
-                              className="bg-white/80 dark:bg-slate-700/80"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="commissionRate" className="text-slate-700 dark:text-slate-300">
-                            Commission Rate (%)
-                          </Label>
-                          <Input
-                            id="commissionRate"
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="0.1"
-                            value={externalProvider.commissionRate}
-                            onChange={(e) => handleExternalProviderChange("commissionRate", e.target.value)}
-                            placeholder="0.0"
-                            className="bg-white/80 dark:bg-slate-700/80"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="contractDetails" className="text-slate-700 dark:text-slate-300">
-                            Contract Details
-                          </Label>
-                          <Textarea
-                            id="contractDetails"
-                            value={externalProvider.contractDetails}
-                            onChange={(e) => handleExternalProviderChange("contractDetails", e.target.value)}
-                            placeholder="Enter contract details and terms"
-                            rows={3}
-                            className="bg-white/80 dark:bg-slate-700/80"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Service Images */}
-                <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border-0 shadow-xl">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-xl text-slate-800 dark:text-slate-200">Service Images</CardTitle>
-                      <Button type="button" variant="outline" size="sm" onClick={addImage}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Image
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {images.map((image, index) => (
-                      <div
-                        key={index}
-                        className="flex items-start gap-4 p-4 border rounded-lg bg-slate-50 dark:bg-slate-700/50"
-                      >
-                        <div className="flex-1 space-y-2">
-                          <div className="space-y-2">
-                            <Label className="text-sm text-slate-700 dark:text-slate-300">Image URL</Label>
-                            <Input
-                              value={image.url}
-                              onChange={(e) => updateImage(index, "url", e.target.value)}
-                              placeholder="Enter image URL"
-                              className="bg-white dark:bg-slate-700"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-sm text-slate-700 dark:text-slate-300">Caption</Label>
-                            <Input
-                              value={image.caption}
-                              onChange={(e) => updateImage(index, "caption", e.target.value)}
-                              placeholder="Enter image caption"
-                              className="bg-white dark:bg-slate-700"
-                            />
-                          </div>
-                        </div>
-                        <div className="flex flex-col items-center space-y-2">
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type="checkbox"
-                              id={`default-${index}`}
-                              checked={image.isDefault}
-                              onChange={(e) => updateImage(index, "isDefault", e.target.checked)}
-                              className="rounded border-gray-300"
-                            />
-                            <Label htmlFor={`default-${index}`} className="text-xs">
-                              Default
-                            </Label>
-                          </div>
-                          {images.length > 1 && (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              onClick={() => removeImage(index)}
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
+                <div className="space-y-2">
+                  <Label htmlFor="attendees">Expected Attendees</Label>
+                  <Input
+                    id="attendees"
+                    name="attendees"
+                    type="number"
+                    min="1"
+                    value={eventData.attendees || ""}
+                    onChange={handleNumberChange}
+                    placeholder="Enter number of attendees"
+                  />
+                </div>
               </div>
-            </TabsContent>
-          </Tabs>
 
-          {/* Submit Button */}
-          <div className="flex justify-end space-x-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => router.back()}
-              disabled={isSubmitting}
-              className="border-slate-300 hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-700"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={isSubmitting || !selectedHotelId}
-              className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 dark:from-purple-600 dark:to-pink-700 dark:hover:from-purple-700 dark:hover:to-pink-800 text-white shadow-lg hover:shadow-xl transition-all duration-300"
-            >
-              {isSubmitting ? (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="startDate">Start Date & Time</Label>
+                  <DateTimePicker date={eventData.startDate} setDate={(date) => handleDateChange("startDate", date)} />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="endDate">End Date & Time</Label>
+                  <DateTimePicker date={eventData.endDate} setDate={(date) => handleDateChange("endDate", date)} />
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="allDay"
+                  checked={eventData.allDay}
+                  onCheckedChange={(checked) => handleCheckboxChange("allDay", !!checked)}
+                />
+                <Label htmlFor="allDay">All-day event</Label>
+              </div>
+
+              <Separator />
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="status">Status</Label>
+                  <Select value={eventData.status} onValueChange={(value) => handleSelectChange("status", value)}>
+                    <SelectTrigger id="status">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="confirmed">Confirmed</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="visibility">Visibility</Label>
+                  <Select
+                    value={eventData.visibility}
+                    onValueChange={(value) => handleSelectChange("visibility", value)}
+                  >
+                    <SelectTrigger id="visibility">
+                      <SelectValue placeholder="Select visibility" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="public">Public</SelectItem>
+                      <SelectItem value="private">Private</SelectItem>
+                      <SelectItem value="staff_only">Staff Only</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="notes">Additional Notes</Label>
+                <Textarea
+                  id="notes"
+                  name="notes"
+                  value={eventData.notes}
+                  onChange={handleInputChange}
+                  placeholder="Enter any additional notes"
+                  rows={3}
+                />
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-between">
+              <Button variant="outline" onClick={() => setActiveTab("template")}>
+                Back to Templates
+              </Button>
+              <Button onClick={() => setActiveTab("services")}>Continue to Services</Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="services" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Event Services</CardTitle>
+              <CardDescription>Select additional services available at {hotel?.name}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {loadingServices ? (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <Skeleton className="h-20 w-full" />
+                  <Skeleton className="h-20 w-full" />
+                  <Skeleton className="h-20 w-full" />
+                  <Skeleton className="h-20 w-full" />
+                </div>
+              ) : services && services.length > 0 ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating...
+                  <div className="text-sm text-muted-foreground mb-4">
+                    {services.length} service{services.length !== 1 ? "s" : ""} available at {hotel?.name}
+                  </div>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    {services.map((service) => (
+                      <div
+                        key={service._id}
+                        className="flex items-start space-x-3 border rounded-lg p-3 hover:bg-muted/50 transition-colors"
+                      >
+                        <Checkbox
+                          id={service._id}
+                          checked={selectedServices.includes(service._id)}
+                          onCheckedChange={(checked) => handleServiceChange(service._id, !!checked)}
+                        />
+                        <div className="space-y-1 flex-1">
+                          <Label htmlFor={service._id} className="font-medium cursor-pointer">
+                            {service.name}
+                          </Label>
+                          {service.description && (
+                            <p className="text-sm text-muted-foreground">{service.description}</p>
+                          )}
+                          <div className="flex justify-between">
+                            <Badge variant="outline">{service.category}</Badge>
+                            <span className="text-sm font-medium">${service.price}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <Separator />
+
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium">Total Services:</span>
+                    <span className="font-bold">${calculateTotalPrice()}</span>
+                  </div>
                 </>
               ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <div className="flex flex-col items-center space-y-2">
+                    <Briefcase className="h-12 w-12 text-muted-foreground" />
+                    <h3 className="font-medium">No Services Available</h3>
+                    <p className="text-sm">No event services have been configured for {hotel?.name} yet.</p>
+                    {hotelId && <p className="text-xs">Hotel ID: {hotelId}</p>}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-2"
+                      onClick={() => fetchServices && fetchServices()}
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Refresh Services
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+            <CardFooter className="flex justify-between">
+              <Button variant="outline" onClick={() => setActiveTab("details")}>
+                Back to Details
+              </Button>
+              <Button onClick={() => setActiveTab("staffing")}>Continue to Staffing</Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="staffing" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Event Staffing</CardTitle>
+              <CardDescription>Assign staff members to your event at {hotel?.name}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {loadingUsers ? (
+                <div className="space-y-4">
+                  <Skeleton className="h-20 w-full" />
+                  <Skeleton className="h-20 w-full" />
+                </div>
+              ) : (
                 <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Create Service
+                  {users && users.length > 0 ? (
+                    <div className="text-sm text-muted-foreground mb-4">
+                      {users.length} staff member{users.length !== 1 ? "s" : ""} available to assign to this event
+                    </div>
+                  ) : (
+                    <div className="text-sm text-amber-500 mb-4 flex items-center">
+                      <AlertTriangle className="h-4 w-4 mr-2" />
+                      No staff members found in the system
+                    </div>
+                  )}
+
+                  {staffing.length === 0 ? (
+                    <div className="border rounded-lg p-6 text-center">
+                      <div className="flex flex-col items-center justify-center space-y-2">
+                        <Users className="h-12 w-12 text-muted-foreground mb-2" />
+                        <h3 className="font-medium text-lg">No Staff Assigned</h3>
+                        <p className="text-muted-foreground">Add staff members to assign them to this event.</p>
+                        {users && users.length > 0 ? (
+                          <Button onClick={addStaffMember} className="mt-4">
+                            <Plus className="mr-2 h-4 w-4" />
+                            Add Staff Member
+                          </Button>
+                        ) : (
+                          <p className="text-sm text-muted-foreground mt-2">
+                            No users available in the system. Please add users first.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {staffing.map((staff, index) => (
+                        <div key={index} className="border rounded-lg p-4 space-y-4">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-medium">Staff Member {index + 1}</h4>
+                            <Button variant="outline" size="sm" onClick={() => removeStaffMember(index)}>
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+
+                          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div className="space-y-2">
+                              <Label>Staff Member</Label>
+                              <Select
+                                value={staff.userId}
+                                onValueChange={(value) => updateStaffMember(index, "userId", value)}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select staff member" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {users && users.length > 0 ? (
+                                    users.map((user) => (
+                                      <SelectItem key={user._id} value={user._id}>
+                                        <div className="flex items-center">
+                                          {user.full_name}
+                                          {user.role && (
+                                            <Badge variant="outline" className="ml-2 text-xs">
+                                              {user.role}
+                                            </Badge>
+                                          )}
+                                        </div>
+                                      </SelectItem>
+                                    ))
+                                  ) : (
+                                    <SelectItem value="no-users" disabled>
+                                      No users available
+                                    </SelectItem>
+                                  )}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label>Role for Event</Label>
+                              <Input
+                                value={staff.role}
+                                onChange={(e) => updateStaffMember(index, "role", e.target.value)}
+                                placeholder="e.g., Event Coordinator, Waiter"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label>Notes</Label>
+                            <Textarea
+                              value={staff.notes || ""}
+                              onChange={(e) => updateStaffMember(index, "notes", e.target.value)}
+                              placeholder="Additional notes for this staff member"
+                              rows={2}
+                            />
+                          </div>
+                        </div>
+                      ))}
+
+                      {users && users.length > 0 && (
+                        <Button onClick={addStaffMember} variant="outline" className="w-full">
+                          <Plus className="mr-2 h-4 w-4" />
+                          Add Another Staff Member
+                        </Button>
+                      )}
+                    </>
+                  )}
                 </>
               )}
-            </Button>
-          </div>
-        </form>
-      </div>
+            </CardContent>
+            <CardFooter className="flex justify-between">
+              <Button variant="outline" onClick={() => setActiveTab("services")}>
+                Back to Services
+              </Button>
+              <Button onClick={handleSubmit} disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Create Event
+                  </>
+                )}
+              </Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
+
+        {/* Enhanced Event Summary */}
+        <TabsContent value="summary" className="space-y-4">
+          <Card className="bg-muted/40">
+            <CardHeader>
+              <CardTitle>Event Summary</CardTitle>
+              <CardDescription>Review your event details before creating</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                {/* Basic Event Info */}
+                <div className="space-y-4">
+                  <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
+                    Basic Information
+                  </h4>
+
+                  <div className="flex items-center space-x-2">
+                    <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">Event Type</p>
+                      <p className="text-sm text-muted-foreground">
+                        {eventData.eventType
+                          ? eventTypes?.find((t) => t._id === eventData.eventType)?.name
+                          : "Not selected"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <MapPin className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">Venue</p>
+                      <p className="text-sm text-muted-foreground">
+                        {eventData.venue ? venues?.find((v) => v._id === eventData.venue)?.name : "Not selected"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">Date & Time</p>
+                      <p className="text-sm text-muted-foreground">
+                        {eventData.startDate ? format(eventData.startDate, "MMM d, yyyy h:mm a") : "Not set"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">Attendees</p>
+                      <p className="text-sm text-muted-foreground">
+                        {eventData.attendees > 0 ? eventData.attendees : "Not specified"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Selected Items */}
+                <div className="space-y-4">
+                  <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">Selected Items</h4>
+
+                  {/* Template */}
+                  <div className="flex items-start space-x-2">
+                    <FileText className="h-4 w-4 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium">Template</p>
+                      <p className="text-sm text-muted-foreground">
+                        {getSelectedTemplate()?.name || "No template selected"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Services */}
+                  <div className="flex items-start space-x-2">
+                    <Briefcase className="h-4 w-4 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium">Services ({getSelectedServices().length})</p>
+                      {getSelectedServices().length > 0 ? (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {getSelectedServices().map((service) => (
+                            <Badge key={service._id} variant="secondary" className="text-xs">
+                              {service.name} (${service.price})
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No services selected</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Staff */}
+                  <div className="flex items-start space-x-2">
+                    <Users className="h-4 w-4 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium">Staff ({getAssignedStaff().length})</p>
+                      {getAssignedStaff().length > 0 ? (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {getAssignedStaff().map((staff, index) => {
+                            const user = users?.find((u) => u._id === staff.userId)
+                            return (
+                              <Badge key={index} variant="outline" className="text-xs">
+                                {user?.full_name} - {staff.role}
+                              </Badge>
+                            )
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No staff assigned</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Total Cost */}
+                  <div className="flex items-center space-x-2">
+                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">Total Cost</p>
+                      <p className="text-sm font-bold text-green-600">${calculateTotalPrice()}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
