@@ -3,10 +3,12 @@
 import { useState } from "react"
 import { useApi } from "./use-api"
 import { toast } from "sonner"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
 
 export interface Report {
   _id: string
   title: string
+  name?: string // For backward compatibility
   description?: string
   type: "analytics" | "financial" | "operational" | "system" | "audit" | "custom"
   status: "pending" | "processing" | "completed" | "failed"
@@ -20,6 +22,7 @@ export interface Report {
   }
   data?: any
   filePath?: string
+  fileName?: string
   fileSize?: number
   generatedBy: string
   scheduledFor?: string
@@ -30,11 +33,27 @@ export interface Report {
     email: string
     name: string
   }>
+  emailNotification?: {
+    enabled: boolean
+    recipients: string[]
+    subject?: string
+    includeAttachment?: boolean
+  }
+  schedule?: {
+    frequency: "hourly" | "daily" | "weekly" | "monthly"
+    time: string
+    dayOfWeek?: number
+    dayOfMonth?: number
+    isActive: boolean
+    nextExecution?: string
+  }
+  parentReportId?: string
   metadata: {
     startTime?: string
     endTime?: string
     executionTime?: number
     recordCount?: number
+    error?: string
     errorMessage?: string
   }
   createdAt: string
@@ -89,6 +108,7 @@ export const useReports = () => {
       }
     } catch (error) {
       console.error("Error creating report:", error)
+      toast.error("Failed to create report")
       throw error
     }
   }
@@ -103,13 +123,34 @@ export const useReports = () => {
       }
     } catch (error) {
       console.error("Error scheduling report:", error)
+      toast.error("Failed to schedule report")
+      throw error
+    }
+  }
+
+  const triggerDailyReport = async () => {
+    try {
+      const response = await request<{
+        message: string
+        data: Report
+      }>("/reports/trigger-daily", "POST")
+
+      if (response?.data) {
+        toast.success("Daily report triggered successfully")
+        // Refresh reports list to show the new daily report
+        await fetchReports()
+        return response.data
+      }
+    } catch (error) {
+      console.error("Error triggering daily report:", error)
+      toast.error("Failed to trigger daily report")
       throw error
     }
   }
 
   const downloadReport = async (id: string, format: "json" | "excel" | "pdf" | "csv" = "json") => {
     try {
-      const response = await fetch(`/reports/${id}/download?format=${format}`, {
+      const response = await fetch(`${API_URL}/reports/${id}/download?format=${format}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
         },
@@ -144,6 +185,7 @@ export const useReports = () => {
       toast.success("Report deleted successfully")
     } catch (error) {
       console.error("Error deleting report:", error)
+      toast.error("Failed to delete report")
       throw error
     }
   }
@@ -171,6 +213,19 @@ export const useReports = () => {
     }
   }
 
+  const getReport = async (id: string) => {
+    try {
+      const response = await request<Report>(`/reports/${id}`, "GET", undefined, false)
+      if (response?.data) {
+        return response.data
+      }
+    } catch (error) {
+      console.error("Error fetching report:", error)
+      toast.error("Failed to fetch report details")
+      throw error
+    }
+  }
+
   return {
     reports,
     analytics,
@@ -178,8 +233,10 @@ export const useReports = () => {
     fetchReports,
     createReport,
     scheduleReport,
+    triggerDailyReport,
     downloadReport,
     deleteReport,
     fetchReportAnalytics,
+    getReport,
   }
 }
