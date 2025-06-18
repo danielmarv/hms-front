@@ -56,24 +56,18 @@ export default function GuestsPage() {
       })
       console.log("API Response:", response)
 
-      if (response.data) {
-        console.log("Response data:", response.data)
-
-        if (response.data.success && Array.isArray(response.data.data)) {
-          console.log("Setting guests:", response.data.data)
-          setGuests(response.data.data)
-          setPagination({
-            page: response.data.pagination?.page || 1,
-            limit: response.data.pagination?.limit || 10,
-            totalPages: response.data.pagination?.totalPages || 1,
-            total: response.data.total || 0,
-          })
-        } else {
-          console.error("Unexpected API response structure:", response.data)
-          setGuests([])
-        }
+      if (response.data && Array.isArray(response.data)) {
+        console.log("Setting guests:", response.data)
+        setGuests(response.data)
+        // Since the hook doesn't return pagination info, set basic pagination
+        setPagination({
+          page: filters.page || 1,
+          limit: filters.limit || 10,
+          totalPages: Math.ceil(response.data.length / (filters.limit || 10)),
+          total: response.data.length,
+        })
       } else {
-        console.error("No data in response:", response)
+        console.error("Unexpected API response structure:", response)
         setGuests([])
       }
     } catch (error) {
