@@ -26,7 +26,7 @@ export interface EventTemplate {
     additionalFees: Array<{
       name: string
       amount: number
-      type: 'fixed' | 'percentage'
+      type: "fixed" | "percentage"
     }>
   }
   inclusions: string[]
@@ -64,21 +64,21 @@ export function useEventTemplates(hotelId?: string) {
 
   // Function to create a new template
   const createTemplate = useCallback(
-    async (templateData: Partial<EventTemplate>) => {
+    async (templateData: any) => {
       const response = await request("/event-templates", "POST", templateData)
 
       if (response.error) {
         setError(response.error)
-        return null
+        return { success: false, message: response.error, data: null }
       }
 
       if (response.data) {
         // Add the new template to the state
         setTemplates((prevTemplates) => [...prevTemplates, response.data])
-        return response.data
+        return { success: true, message: "Template created successfully", data: response.data }
       }
 
-      return null
+      return { success: false, message: "Unknown error occurred", data: null }
     },
     [request],
   )

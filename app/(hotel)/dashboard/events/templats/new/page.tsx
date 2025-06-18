@@ -32,6 +32,7 @@ import { useEventTypes } from "@/hooks/use-event-types"
 import { useVenues } from "@/hooks/use-venues"
 import { useEventServices } from "@/hooks/use-event-services"
 import { toast } from "sonner"
+import { useEventTemplates } from "@/hooks/use-event-templates"
 
 interface StaffingRole {
   role: string
@@ -41,6 +42,7 @@ interface StaffingRole {
 export default function NewEventTemplatePage() {
   const router = useRouter()
   const { getAllHotels } = useHotels()
+  const { createTemplate } = useEventTemplates()
 
   // Hotel selection state
   const [selectedHotelId, setSelectedHotelId] = useState<string>("")
@@ -92,6 +94,12 @@ export default function NewEventTemplatePage() {
         }
 
         setHotels(hotelsData)
+
+        if (hotelsData.length === 0) {
+          toast.error("No hotels available. Please contact your administrator.")
+          router.push("/dashboard")
+          return
+        }
 
         if (hotelsData.length > 0) {
           let hotelToSelect = hotelsData[0]
@@ -208,14 +216,20 @@ export default function NewEventTemplatePage() {
 
       console.log("Creating template:", templateData)
 
-      // TODO: Implement API call to create template
-      // const response = await createEventTemplate(templateData)
+      const response = await createTemplate(templateData)
+
+      if (!response.success) {
+        throw new Error(response.message || "Failed to create template")
+      }
+
+      const result = response.data
+      console.log("Template created:", result)
 
       toast.success("Event template created successfully!")
-      router.push("/dashboard/events/templats")
-    } catch (error) {
+      router.push("/dashboard/events/templates")
+    } catch (error: any) {
       console.error("Failed to create template:", error)
-      toast.error("Failed to create template")
+      toast.error(error.message || "Failed to create template")
     } finally {
       setIsSubmitting(false)
     }
