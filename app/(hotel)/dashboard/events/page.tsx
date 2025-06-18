@@ -19,13 +19,36 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { CalendarIcon, ClipboardListIcon, FilterIcon, MapPinIcon, MoreHorizontalIcon, PlusIcon, SearchIcon, UsersIcon, Loader2 } from 'lucide-react'
+import {
+  CalendarIcon,
+  ClipboardListIcon,
+  FilterIcon,
+  MapPinIcon,
+  MoreHorizontalIcon,
+  PlusIcon,
+  SearchIcon,
+  UsersIcon,
+  Loader2,
+  Package,
+  BarChart3,
+  Tag,
+} from "lucide-react"
 import { format } from "date-fns"
 import { useEvents } from "@/hooks/use-events"
 import { useVenues } from "@/hooks/use-venues"
 import { useEventTypes } from "@/hooks/use-event-types"
 import { Checkbox } from "@/components/ui/checkbox"
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
 
 export default function EventsPage() {
@@ -63,7 +86,7 @@ export default function EventsPage() {
     now.setHours(0, 0, 0, 0) // Set to start of today
     const eventDate = new Date(event.start_date)
     eventDate.setHours(0, 0, 0, 0) // Set to start of event date
-    
+
     const isUpcoming = activeTab === "all" || eventDate >= now
 
     return matchesSearch && matchesVenue && matchesEventType && matchesStatus && isUpcoming
@@ -166,7 +189,7 @@ export default function EventsPage() {
   // Bulk action functions
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedEvents(filteredEvents.map(event => event._id))
+      setSelectedEvents(filteredEvents.map((event) => event._id))
     } else {
       setSelectedEvents([])
     }
@@ -174,9 +197,9 @@ export default function EventsPage() {
 
   const handleSelectEvent = (eventId: string, checked: boolean) => {
     if (checked) {
-      setSelectedEvents(prev => [...prev, eventId])
+      setSelectedEvents((prev) => [...prev, eventId])
     } else {
-      setSelectedEvents(prev => prev.filter(id => id !== eventId))
+      setSelectedEvents((prev) => prev.filter((id) => id !== eventId))
     }
   }
 
@@ -236,6 +259,87 @@ export default function EventsPage() {
           </Button>
         </div>
 
+        {/* Navigation Buttons */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <Button
+            asChild
+            variant="outline"
+            className="h-20 flex flex-col items-center justify-center space-y-2 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-2 border-blue-200 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/50 hover:border-blue-300 dark:hover:border-blue-600 transition-all duration-300 group"
+          >
+            <Link href="/dashboard/events/venues">
+              <MapPinIcon className="h-6 w-6 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform" />
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300 group-hover:text-blue-700 dark:group-hover:text-blue-300">
+                Venues
+              </span>
+            </Link>
+          </Button>
+
+          <Button
+            asChild
+            variant="outline"
+            className="h-20 flex flex-col items-center justify-center space-y-2 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-2 border-purple-200 dark:border-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/50 hover:border-purple-300 dark:hover:border-purple-600 transition-all duration-300 group"
+          >
+            <Link href="/dashboard/events/templats">
+              <ClipboardListIcon className="h-6 w-6 text-purple-600 dark:text-purple-400 group-hover:scale-110 transition-transform" />
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300 group-hover:text-purple-700 dark:group-hover:text-purple-300">
+                Templates
+              </span>
+            </Link>
+          </Button>
+
+          <Button
+            asChild
+            variant="outline"
+            className="h-20 flex flex-col items-center justify-center space-y-2 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-2 border-green-200 dark:border-green-700 hover:bg-green-50 dark:hover:bg-green-900/50 hover:border-green-300 dark:hover:border-green-600 transition-all duration-300 group"
+          >
+            <Link href="/dashboard/events/services">
+              <Package className="h-6 w-6 text-green-600 dark:text-green-400 group-hover:scale-110 transition-transform" />
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300 group-hover:text-green-700 dark:group-hover:text-green-300">
+                Services
+              </span>
+            </Link>
+          </Button>
+
+          <Button
+            asChild
+            variant="outline"
+            className="h-20 flex flex-col items-center justify-center space-y-2 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-2 border-orange-200 dark:border-orange-700 hover:bg-orange-50 dark:hover:bg-orange-900/50 hover:border-orange-300 dark:hover:border-orange-600 transition-all duration-300 group"
+          >
+            <Link href="/dashboard/events/reports">
+              <BarChart3 className="h-6 w-6 text-orange-600 dark:text-orange-400 group-hover:scale-110 transition-transform" />
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300 group-hover:text-orange-700 dark:group-hover:text-orange-300">
+                Reports
+              </span>
+            </Link>
+          </Button>
+
+          <Button
+            asChild
+            variant="outline"
+            className="h-20 flex flex-col items-center justify-center space-y-2 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-2 border-indigo-200 dark:border-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/50 hover:border-indigo-300 dark:hover:border-indigo-600 transition-all duration-300 group"
+          >
+            <Link href="/dashboard/events/event-types">
+              <Tag className="h-6 w-6 text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform" />
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300 group-hover:text-indigo-700 dark:group-hover:text-indigo-300">
+                Event Types
+              </span>
+            </Link>
+          </Button>
+
+          <Button
+            asChild
+            variant="outline"
+            className="h-20 flex flex-col items-center justify-center space-y-2 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-2 border-teal-200 dark:border-teal-700 hover:bg-teal-50 dark:hover:bg-teal-900/50 hover:border-teal-300 dark:hover:border-teal-600 transition-all duration-300 group"
+          >
+            <Link href="/dashboard/events/calendar">
+              <CalendarIcon className="h-6 w-6 text-teal-600 dark:text-teal-400 group-hover:scale-110 transition-transform" />
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300 group-hover:text-teal-700 dark:group-hover:text-teal-300">
+                Calendar
+              </span>
+            </Link>
+          </Button>
+        </div>
+
         {/* Event Statistics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-lg">
@@ -256,13 +360,15 @@ export default function EventsPage() {
                 <div>
                   <p className="text-green-100 text-sm font-medium">Upcoming Events</p>
                   <p className="text-3xl font-bold">
-                    {events.filter(event => {
-                      const now = new Date()
-                      now.setHours(0, 0, 0, 0)
-                      const eventDate = new Date(event.start_date)
-                      eventDate.setHours(0, 0, 0, 0)
-                      return eventDate >= now
-                    }).length}
+                    {
+                      events.filter((event) => {
+                        const now = new Date()
+                        now.setHours(0, 0, 0, 0)
+                        const eventDate = new Date(event.start_date)
+                        eventDate.setHours(0, 0, 0, 0)
+                        return eventDate >= now
+                      }).length
+                    }
                   </p>
                 </div>
                 <ClipboardListIcon className="h-8 w-8 text-green-200" />
@@ -276,11 +382,13 @@ export default function EventsPage() {
                 <div>
                   <p className="text-purple-100 text-sm font-medium">This Month</p>
                   <p className="text-3xl font-bold">
-                    {events.filter(event => {
-                      const now = new Date()
-                      const eventDate = new Date(event.start_date)
-                      return eventDate.getMonth() === now.getMonth() && eventDate.getFullYear() === now.getFullYear()
-                    }).length}
+                    {
+                      events.filter((event) => {
+                        const now = new Date()
+                        const eventDate = new Date(event.start_date)
+                        return eventDate.getMonth() === now.getMonth() && eventDate.getFullYear() === now.getFullYear()
+                      }).length
+                    }
                   </p>
                 </div>
                 <UsersIcon className="h-8 w-8 text-purple-200" />
@@ -293,9 +401,7 @@ export default function EventsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-orange-100 text-sm font-medium">Confirmed</p>
-                  <p className="text-3xl font-bold">
-                    {events.filter(event => event.status === 'confirmed').length}
-                  </p>
+                  <p className="text-3xl font-bold">{events.filter((event) => event.status === "confirmed").length}</p>
                 </div>
                 <MapPinIcon className="h-8 w-8 text-orange-200" />
               </div>
@@ -462,7 +568,7 @@ export default function EventsPage() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4">
                         <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
-                          {selectedEvents.length} event{selectedEvents.length > 1 ? 's' : ''} selected
+                          {selectedEvents.length} event{selectedEvents.length > 1 ? "s" : ""} selected
                         </span>
                         <Button
                           variant="outline"
@@ -495,7 +601,8 @@ export default function EventsPage() {
                             <AlertDialogHeader>
                               <AlertDialogTitle>Delete Events</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Are you sure you want to delete {selectedEvents.length} selected event{selectedEvents.length > 1 ? 's' : ''}? This action cannot be undone.
+                                Are you sure you want to delete {selectedEvents.length} selected event
+                                {selectedEvents.length > 1 ? "s" : ""}? This action cannot be undone.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
