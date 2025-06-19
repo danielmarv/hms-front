@@ -41,7 +41,7 @@ const setupSchema = z.object({
   // Basic Information
   name: z.string().min(2, "Hotel name is required"),
   legal_name: z.string().min(2, "Legal name is required"),
-  tax_id: z.string().min(1, "Tax ID is required"),
+  tax_id: z.string().optional(),
 
   // Contact Information
   contact: z.object({
