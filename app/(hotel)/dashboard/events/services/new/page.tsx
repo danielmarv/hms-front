@@ -343,7 +343,7 @@ export default function NewEventServicePage() {
     try {
       setIsSubmitting(true)
 
-      // Prepare service data - match exactly what the server expects
+      // Prepare service data - ensure hotel ID is properly included
       const serviceData = {
         name: formData.name,
         description: formData.description,
@@ -361,23 +361,24 @@ export default function NewEventServicePage() {
         status: formData.status,
         isExternalService: formData.isExternalService,
 
-        // Try both field names to see which one the server expects
-        hotel: selectedHotelId,
+        // Ensure hotel ID is included - try the most common field names
         hotelId: selectedHotelId,
+        hotel: selectedHotelId,
 
         // Only include external provider if it's an external service
-        ...(formData.isExternalService && {
-          externalProvider: {
-            name: externalProvider.name,
-            contactPerson: externalProvider.contactPerson,
-            phone: externalProvider.phone,
-            email: externalProvider.email,
-            contractDetails: externalProvider.contractDetails,
-            commissionRate: externalProvider.commissionRate
-              ? Number.parseFloat(externalProvider.commissionRate)
-              : undefined,
-          },
-        }),
+        ...(formData.isExternalService &&
+          externalProvider.name && {
+            externalProvider: {
+              name: externalProvider.name,
+              contactPerson: externalProvider.contactPerson,
+              phone: externalProvider.phone,
+              email: externalProvider.email,
+              contractDetails: externalProvider.contractDetails,
+              commissionRate: externalProvider.commissionRate
+                ? Number.parseFloat(externalProvider.commissionRate)
+                : undefined,
+            },
+          }),
 
         // Only include inventory if it's limited
         ...(inventory.isLimited && {
@@ -419,6 +420,13 @@ export default function NewEventServicePage() {
       }
 
       console.log("Creating service with data:", serviceData)
+      console.log("Selected Hotel ID:", selectedHotelId)
+
+      // Validate that we have a hotel ID before making the API call
+      if (!selectedHotelId) {
+        toast.error("Please select a hotel before creating the service")
+        return
+      }
 
       // Call API to create service
       const result = await createService(serviceData)

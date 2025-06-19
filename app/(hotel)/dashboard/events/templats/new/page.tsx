@@ -226,7 +226,7 @@ export default function NewEventTemplatePage() {
       console.log("Template created:", result)
 
       toast.success("Event template created successfully!")
-      router.push("/dashboard/events/templates")
+      router.push("/dashboard/events/templats")
     } catch (error: any) {
       console.error("Failed to create template:", error)
       toast.error(error.message || "Failed to create template")
