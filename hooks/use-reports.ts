@@ -4,9 +4,12 @@ import { useState } from "react"
 import { useApi } from "./use-api"
 import { toast } from "sonner"
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
+
 export interface Report {
   _id: string
   title: string
+  name?: string // For backward compatibility
   description?: string
   type: "analytics" | "financial" | "operational" | "system" | "audit" | "custom"
   status: "pending" | "processing" | "completed" | "failed"
@@ -20,6 +23,7 @@ export interface Report {
   }
   data?: any
   filePath?: string
+  fileName?: string
   fileSize?: number
   generatedBy: string
   scheduledFor?: string
@@ -30,11 +34,27 @@ export interface Report {
     email: string
     name: string
   }>
+  emailNotification?: {
+    enabled: boolean
+    recipients: string[]
+    subject?: string
+    includeAttachment?: boolean
+  }
+  schedule?: {
+    frequency: "hourly" | "daily" | "weekly" | "monthly"
+    time: string
+    dayOfWeek?: number
+    dayOfMonth?: number
+    isActive: boolean
+    nextExecution?: string
+  }
+  parentReportId?: string
   metadata: {
     startTime?: string
     endTime?: string
     executionTime?: number
     recordCount?: number
+    error?: string
     errorMessage?: string
   }
   createdAt: string
@@ -64,10 +84,12 @@ export const useReports = () => {
   }) => {
     try {
       const queryParams = new URLSearchParams(params as any).toString()
-      const response = await request<{
-        reports: Report[]
-        pagination: { current: number; pages: number; total: number }
-      }>(`/reports${queryParams ? `?${queryParams}` : ""}`, "GET", undefined, false)
+      const response = await request(
+        `/reports${queryParams ? `?${queryParams}` : ""}`,
+        "GET",
+        undefined,
+        false
+      )
 
       if (response?.data) {
         setReports(response.data.reports)
@@ -81,7 +103,7 @@ export const useReports = () => {
 
   const createReport = async (reportData: Partial<Report>) => {
     try {
-      const response = await request<Report>("/reports", "POST", reportData)
+      const response = await request("/reports", "POST", reportData)
       if (response?.data) {
         setReports((prev) => [response.data, ...prev])
         toast.success("Report generation started")
@@ -89,13 +111,14 @@ export const useReports = () => {
       }
     } catch (error) {
       console.error("Error creating report:", error)
+      toast.error("Failed to create report")
       throw error
     }
   }
 
   const scheduleReport = async (reportData: Partial<Report>) => {
     try {
-      const response = await request<Report>("/reports/schedule", "POST", reportData)
+      const response = await request("/reports/schedule", "POST", reportData)
       if (response?.data) {
         setReports((prev) => [response.data, ...prev])
         toast.success("Report scheduled successfully")
@@ -103,13 +126,45 @@ export const useReports = () => {
       }
     } catch (error) {
       console.error("Error scheduling report:", error)
+      toast.error("Failed to schedule report")
+      throw error
+    }
+  }
+
+  const triggerDailyReport = async () => {
+    try {
+      console.log("Triggering daily report...")
+
+      const response = await request(
+        "/reports/trigger-daily",
+        "POST",
+        {},
+        true
+      )
+
+      console.log("Daily report response:", response)
+
+      if (response?.data) {
+        toast.success((response as any).message || "Daily report triggered successfully")
+        // Refresh reports list to show the new daily report
+        setTimeout(() => {
+          fetchReports()
+        }, 1000) // Small delay to allow report to be created
+        return response.data
+      } else {
+        throw new Error((response as any)?.message || "Failed to trigger daily report")
+      }
+    } catch (error) {
+      console.error("Error triggering daily report:", error)
+      const errorMessage = error instanceof Error ? error.message : "Failed to trigger daily report"
+      toast.error(errorMessage)
       throw error
     }
   }
 
   const downloadReport = async (id: string, format: "json" | "excel" | "pdf" | "csv" = "json") => {
     try {
-      const response = await fetch(`/reports/${id}/download?format=${format}`, {
+      const response = await fetch(`${API_URL}/reports/${id}/download?format=${format}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
         },
@@ -144,6 +199,7 @@ export const useReports = () => {
       toast.success("Report deleted successfully")
     } catch (error) {
       console.error("Error deleting report:", error)
+      toast.error("Failed to delete report")
       throw error
     }
   }
@@ -154,7 +210,7 @@ export const useReports = () => {
   }) => {
     try {
       const queryParams = new URLSearchParams(params as any).toString()
-      const response = await request<ReportAnalytics[]>(
+      const response = await request(
         `/reports/analytics${queryParams ? `?${queryParams}` : ""}`,
         "GET",
         undefined,
@@ -171,6 +227,19 @@ export const useReports = () => {
     }
   }
 
+  const getReport = async (id: string) => {
+    try {
+      const response = await request(`/reports/${id}`, "GET", undefined, false)
+      if (response?.data) {
+        return response.data
+      }
+    } catch (error) {
+      console.error("Error fetching report:", error)
+      toast.error("Failed to fetch report details")
+      throw error
+    }
+  }
+
   return {
     reports,
     analytics,
@@ -178,8 +247,10 @@ export const useReports = () => {
     fetchReports,
     createReport,
     scheduleReport,
+    triggerDailyReport,
     downloadReport,
     deleteReport,
     fetchReportAnalytics,
+    getReport,
   }
 }

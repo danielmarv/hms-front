@@ -11,8 +11,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { useReports } from "@/hooks/use-reports"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { useReports } from "@/hooks/use-reports"
 
 const reportSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -25,14 +25,6 @@ const reportSchema = z.object({
     modules: z.array(z.string()).optional(),
     groupBy: z.string().optional(),
   }),
-  recipients: z
-    .array(
-      z.object({
-        email: z.string().email(),
-        name: z.string(),
-      }),
-    )
-    .optional(),
 })
 
 type ReportFormData = z.infer<typeof reportSchema>
@@ -64,15 +56,28 @@ export function CreateReportForm({ onSuccess }: CreateReportFormProps) {
       setIsSubmitting(true)
 
       // Parse email recipients
-      if (emailRecipients) {
-        data.recipients = emailRecipients
-          .split(",")
-          .map((email) => email.trim())
-          .filter((email) => email.length > 0)
-          .map((email) => ({ email, name: email.split("@")[0] }))
+      const recipients = emailRecipients
+        ? emailRecipients
+            .split(",")
+            .map((email) => email.trim())
+            .filter((email) => email.length > 0)
+            .map((email) => ({ email, name: email.split("@")[0] }))
+        : []
+
+      const reportData = {
+        ...data,
+        recipients,
+        emailNotification:
+          recipients.length > 0
+            ? {
+                enabled: true,
+                recipients: recipients.map((r) => r.email),
+                includeAttachment: true,
+              }
+            : undefined,
       }
 
-      await createReport(data)
+      await createReport(reportData)
       onSuccess()
     } catch (error) {
       console.error("Error creating report:", error)
@@ -87,9 +92,10 @@ export function CreateReportForm({ onSuccess }: CreateReportFormProps) {
     operational: ["maintenance", "inventory", "housekeeping"],
     system: ["users", "performance", "logs"],
     audit: ["activities", "changes", "access"],
+    custom: [],
   }
 
-  const currentModules = availableModules[form.watch("type") as keyof typeof availableModules] || []
+  const currentModules = availableModules[form.watch("type")] || []
 
   return (
     <div className="max-h-[80vh] overflow-hidden">
@@ -145,7 +151,7 @@ export function CreateReportForm({ onSuccess }: CreateReportFormProps) {
                 <FormItem>
                   <FormLabel>Description (Optional)</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Enter report description" className="min-h-[60px] resize-none" {...field} />
+                    <Textarea placeholder="Enter report description" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -192,7 +198,7 @@ export function CreateReportForm({ onSuccess }: CreateReportFormProps) {
             </Card>
 
             {/* Modules Selection */}
-            {currentModules.length > 0 && (
+            {currentModules && currentModules.length > 0 && (
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">Modules to Include</CardTitle>
@@ -274,7 +280,7 @@ export function CreateReportForm({ onSuccess }: CreateReportFormProps) {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
+                <div>
                   <FormLabel>Email Recipients</FormLabel>
                   <Input
                     placeholder="email1@example.com, email2@example.com"

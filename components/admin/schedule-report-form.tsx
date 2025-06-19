@@ -1,102 +1,151 @@
 "use client"
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
+import { useState } from "react"
 import { useForm } from "react-hook-form"
-import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { useEffect, useState } from "react"
+import * as z from "zod"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { useReports } from "@/hooks/use-reports"
 
-interface ScheduleReportFormProps {
-  onSubmit: (values: z.infer<typeof formSchema>) => void
-  onSuccess: () => void
-  isSubmitting: boolean
-  currentModules: string[]
-}
-
-const formSchema = z.object({
-  name: z.string().min(2, {
-    message: "Report name must be at least 2 characters.",
-  }),
-  type: z.string().min(1, {
-    message: "Please select a report type.",
-  }),
-  frequency: z.string().min(1, {
-    message: "Please select a frequency.",
-  }),
-  scheduledFor: z.string().min(1, {
-    message: "Please select a start date & time.",
-  }),
-  dayOfWeek: z.string().optional(),
-  dayOfMonth: z.string().optional(),
+const scheduleReportSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  description: z.string().optional(),
+  type: z.enum(["analytics", "financial", "operational", "system", "audit", "custom"]),
+  format: z.enum(["json", "pdf", "excel", "csv"]).default("json"),
   parameters: z.object({
-    startDate: z.string().optional(),
-    endDate: z.string().optional(),
+    startDate: z.string().min(1, "Start date is required"),
+    endDate: z.string().min(1, "End date is required"),
     modules: z.array(z.string()).optional(),
   }),
-  emailNotification: z
-    .object({
-      enabled: z.boolean().optional(),
-      subject: z.string().optional(),
-      includeAttachment: z.boolean().optional(),
-    })
-    .optional(),
+  schedule: z.object({
+    frequency: z.enum(["hourly", "daily", "weekly", "monthly"]),
+    time: z.string().min(1, "Time is required"),
+    dayOfWeek: z.number().optional(),
+    dayOfMonth: z.number().optional(),
+    isActive: z.boolean().default(true),
+  }),
+  emailNotification: z.object({
+    enabled: z.boolean().default(false),
+    subject: z.string().optional(),
+    includeAttachment: z.boolean().default(false),
+  }),
 })
 
-export function ScheduleReportForm({ onSubmit, onSuccess, isSubmitting, currentModules }: ScheduleReportFormProps) {
+type ScheduleReportFormData = z.infer<typeof scheduleReportSchema>
+
+interface ScheduleReportFormProps {
+  onSuccess: () => void
+}
+
+export function ScheduleReportForm({ onSuccess }: ScheduleReportFormProps) {
+  const { scheduleReport, isLoading } = useReports()
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [emailRecipients, setEmailRecipients] = useState<string>("")
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
+  const form = useForm<ScheduleReportFormData>({
+    resolver: zodResolver(scheduleReportSchema),
     defaultValues: {
-      name: "",
-      type: "",
-      frequency: "",
-      scheduledFor: "",
+      type: "analytics",
+      format: "json",
       parameters: {
-        startDate: "",
-        endDate: "",
+        startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+        endDate: new Date().toISOString().split("T")[0],
         modules: [],
+      },
+      schedule: {
+        frequency: "daily",
+        time: "08:00",
+        isActive: true,
       },
       emailNotification: {
         enabled: false,
-        subject: "",
         includeAttachment: false,
       },
     },
   })
 
-  const watchFrequency = form.watch("frequency")
+  const onSubmit = async (data: ScheduleReportFormData) => {
+    try {
+      setIsSubmitting(true)
 
-  useEffect(() => {
-    if (watchFrequency !== "weekly") {
-      form.setValue("dayOfWeek", "")
+      // Parse email recipients
+      const recipients = emailRecipients
+        ? emailRecipients
+            .split(",")
+            .map((email) => email.trim())
+            .filter((email) => email.length > 0)
+            .map((email) => ({ email, name: email.split("@")[0] }))
+        : []
+
+      // Prepare the data in the format expected by the backend
+      const reportData = {
+        title: data.title,
+        name: data.title, // Backend uses 'name' field
+        description: data.description,
+        type: data.type,
+        format: data.format,
+        parameters: data.parameters,
+        schedule: {
+          frequency: data.schedule.frequency,
+          time: data.schedule.time,
+          dayOfWeek: data.schedule.dayOfWeek,
+          dayOfMonth: data.schedule.dayOfMonth,
+          isActive: data.schedule.isActive,
+        },
+        isScheduled: true,
+        emailNotification: {
+          enabled: data.emailNotification.enabled,
+          subject: data.emailNotification.subject,
+          includeAttachment: data.emailNotification.includeAttachment,
+          recipients: recipients.map((r) => r.email),
+        },
+        recipients: recipients,
+      }
+
+      console.log("Sending schedule data:", reportData) // Debug log
+
+      await scheduleReport(reportData)
+      onSuccess()
+    } catch (error) {
+      console.error("Error scheduling report:", error)
+    } finally {
+      setIsSubmitting(false)
     }
-    if (watchFrequency !== "monthly") {
-      form.setValue("dayOfMonth", "")
-    }
-  }, [watchFrequency, form])
+  }
+
+  const availableModules = {
+    analytics: ["bookings", "guests", "rooms", "revenue"],
+    financial: ["revenue", "expenses", "profitLoss"],
+    operational: ["maintenance", "inventory", "housekeeping"],
+    system: ["users", "performance", "logs"],
+    audit: ["activities", "changes", "access"],
+    custom: [],
+  }
+
+  const currentModules = availableModules[form.watch("type")] || []
+  const frequency = form.watch("schedule.frequency")
 
   return (
     <div className="max-h-[80vh] overflow-hidden">
       <ScrollArea className="h-full pr-4">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pb-4">
-            {/* Basic Information */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="name"
+                name="title"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Report Name</FormLabel>
+                    <FormLabel>Report Title</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter report name" {...field} />
+                      <Input placeholder="Enter report title" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -130,19 +179,33 @@ export function ScheduleReportForm({ onSubmit, onSuccess, isSubmitting, currentM
               />
             </div>
 
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Description (Optional)</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="Enter report description" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             {/* Schedule Configuration */}
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">Schedule Configuration</CardTitle>
                 <CardDescription className="text-sm">
-                  Configure when and how often the report should run
+                  Configure when and how often the report should be generated
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="frequency"
+                    name="schedule.frequency"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Frequency</FormLabel>
@@ -153,12 +216,10 @@ export function ScheduleReportForm({ onSubmit, onSuccess, isSubmitting, currentM
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="once">Once</SelectItem>
+                            <SelectItem value="hourly">Hourly</SelectItem>
                             <SelectItem value="daily">Daily</SelectItem>
                             <SelectItem value="weekly">Weekly</SelectItem>
                             <SelectItem value="monthly">Monthly</SelectItem>
-                            <SelectItem value="quarterly">Quarterly</SelectItem>
-                            <SelectItem value="yearly">Yearly</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -168,12 +229,12 @@ export function ScheduleReportForm({ onSubmit, onSuccess, isSubmitting, currentM
 
                   <FormField
                     control={form.control}
-                    name="scheduledFor"
+                    name="schedule.time"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Start Date & Time</FormLabel>
+                        <FormLabel>Time</FormLabel>
                         <FormControl>
-                          <Input type="datetime-local" {...field} />
+                          <Input type="time" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -181,14 +242,17 @@ export function ScheduleReportForm({ onSubmit, onSuccess, isSubmitting, currentM
                   />
                 </div>
 
-                {watchFrequency === "weekly" && (
+                {frequency === "weekly" && (
                   <FormField
                     control={form.control}
-                    name="dayOfWeek"
+                    name="schedule.dayOfWeek"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Day of Week</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select
+                          onValueChange={(value) => field.onChange(Number.parseInt(value))}
+                          defaultValue={field.value?.toString()}
+                        >
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select day" />
@@ -210,15 +274,22 @@ export function ScheduleReportForm({ onSubmit, onSuccess, isSubmitting, currentM
                   />
                 )}
 
-                {watchFrequency === "monthly" && (
+                {frequency === "monthly" && (
                   <FormField
                     control={form.control}
-                    name="dayOfMonth"
+                    name="schedule.dayOfMonth"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Day of Month</FormLabel>
                         <FormControl>
-                          <Input type="number" min="1" max="31" placeholder="1-31" {...field} />
+                          <Input
+                            type="number"
+                            min="1"
+                            max="31"
+                            placeholder="1-31"
+                            {...field}
+                            onChange={(e) => field.onChange(Number.parseInt(e.target.value) || undefined)}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -228,11 +299,13 @@ export function ScheduleReportForm({ onSubmit, onSuccess, isSubmitting, currentM
               </CardContent>
             </Card>
 
-            {/* Report Parameters */}
+            {/* Date Range */}
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">Report Parameters</CardTitle>
-                <CardDescription className="text-sm">Configure the report data parameters</CardDescription>
+                <CardDescription className="text-sm">
+                  Configure the default date range and modules for the report
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -241,10 +314,13 @@ export function ScheduleReportForm({ onSubmit, onSuccess, isSubmitting, currentM
                     name="parameters.startDate"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Start Date</FormLabel>
+                        <FormLabel>Default Start Date</FormLabel>
                         <FormControl>
                           <Input type="date" {...field} />
                         </FormControl>
+                        <FormDescription className="text-xs">
+                          This will be adjusted relative to the generation date
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -255,10 +331,13 @@ export function ScheduleReportForm({ onSubmit, onSuccess, isSubmitting, currentM
                     name="parameters.endDate"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>End Date</FormLabel>
+                        <FormLabel>Default End Date</FormLabel>
                         <FormControl>
                           <Input type="date" {...field} />
                         </FormControl>
+                        <FormDescription className="text-xs">
+                          This will be adjusted relative to the generation date
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -266,7 +345,7 @@ export function ScheduleReportForm({ onSubmit, onSuccess, isSubmitting, currentM
                 </div>
 
                 {/* Modules Selection */}
-                {currentModules.length > 0 && (
+                {currentModules && currentModules.length > 0 && (
                   <div>
                     <FormLabel className="text-sm font-medium">Modules to Include</FormLabel>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
@@ -300,6 +379,39 @@ export function ScheduleReportForm({ onSubmit, onSuccess, isSubmitting, currentM
                     </div>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+
+            {/* Output Format */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Output Format</CardTitle>
+                <CardDescription className="text-sm">Choose the format for the generated report</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <FormField
+                  control={form.control}
+                  name="format"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Format</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select format" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="json">JSON</SelectItem>
+                          <SelectItem value="excel">Excel (XLSX)</SelectItem>
+                          <SelectItem value="pdf">PDF</SelectItem>
+                          <SelectItem value="csv">CSV</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </CardContent>
             </Card>
 
