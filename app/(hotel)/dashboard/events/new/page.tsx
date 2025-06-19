@@ -88,6 +88,7 @@ export default function NewEventPage() {
     console.log("Services:", services?.length || 0)
     console.log("Templates:", templates?.length || 0)
     console.log("Users:", users?.length || 0)
+    console.log("services for the hotel:", services)
   }, [hotel, hotelId, hotelLoading, eventTypes, venues, services, templates, users])
 
   // Fetch data when hotel ID is available
