@@ -1,8 +1,7 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -14,52 +13,49 @@ import { DateTimePicker } from "@/components/ui/date-time-picker"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
-import { ArrowLeft, CalendarIcon, Clock, MapPin, Save, Users, Plus } from "lucide-react"
+import {
+  ArrowLeft,
+  CalendarIcon,
+  Clock,
+  MapPin,
+  Save,
+  Users,
+  Plus,
+  Loader2,
+  X,
+  DollarSign,
+  FileText,
+  Briefcase,
+  RefreshCw,
+  AlertTriangle,
+  Building2,
+} from "lucide-react"
 import { addHours, format } from "date-fns"
-
-// Mock data for event types
-const eventTypes = [
-  { id: "et001", name: "Conference", color: "#3498db" },
-  { id: "et002", name: "Wedding", color: "#e74c3c" },
-  { id: "et003", name: "Corporate", color: "#2ecc71" },
-  { id: "et004", name: "Gala", color: "#9b59b6" },
-  { id: "et005", name: "Birthday", color: "#f39c12" },
-  { id: "et006", name: "Anniversary", color: "#34495e" },
-]
-
-// Mock data for venues
-const venues = [
-  { id: "v001", name: "Grand Ballroom", capacity: 300 },
-  { id: "v002", name: "Garden Terrace", capacity: 150 },
-  { id: "v003", name: "Crystal Hall", capacity: 250 },
-  { id: "v004", name: "Skyview Lounge", capacity: 80 },
-  { id: "v005", name: "Executive Boardroom", capacity: 20 },
-]
-
-// Mock data for services
-const services = [
-  { id: "s001", name: "Catering - Standard", price: 45, category: "Catering" },
-  { id: "s002", name: "Catering - Premium", price: 75, category: "Catering" },
-  { id: "s003", name: "Audio/Visual Equipment", price: 250, category: "Equipment" },
-  { id: "s004", name: "Decoration Package", price: 350, category: "Decoration" },
-  { id: "s005", name: "Photography", price: 500, category: "Services" },
-  { id: "s006", name: "DJ Services", price: 400, category: "Entertainment" },
-  { id: "s007", name: "Valet Parking", price: 200, category: "Services" },
-  { id: "s008", name: "Floral Arrangements", price: 300, category: "Decoration" },
-]
-
-// Mock data for templates
-const templates = [
-  { id: "t001", name: "Corporate Meeting", eventType: "et003", description: "Standard corporate meeting setup" },
-  { id: "t002", name: "Wedding Reception", eventType: "et002", description: "Elegant wedding reception package" },
-  { id: "t003", name: "Birthday Party", eventType: "et005", description: "Fun birthday celebration setup" },
-  { id: "t004", name: "Conference", eventType: "et001", description: "Full-day conference with all amenities" },
-]
+import { useEventTypes } from "@/hooks/use-event-types"
+import { useVenues } from "@/hooks/use-venues"
+import { useEventServices } from "@/hooks/use-event-services"
+import { useEventTemplates } from "@/hooks/use-event-templates"
+import { useUsers } from "@/hooks/use-users"
+import { useEvents } from "@/hooks/use-events"
+import { useCurrentHotel } from "@/hooks/use-current-hotel"
 
 export default function NewEventPage() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState("details")
+
+  // Get current hotel data
+  const { hotel, hotelId, isLoading: hotelLoading, error: hotelError } = useCurrentHotel()
+
+  // Fetch data using hooks with proper hotel ID - all hotel-specific
+  const { eventTypes, loading: loadingEventTypes, fetchEventTypes } = useEventTypes(hotelId)
+  const { venues, loading: loadingVenues, fetchVenues } = useVenues(hotelId)
+  const { services, loading: loadingServices, fetchServices } = useEventServices(hotelId)
+  const { templates, loading: loadingTemplates, fetchTemplates } = useEventTemplates(hotelId)
+  const { users, isLoading: loadingUsers, fetchUsers } = useUsers()
+  const { createEvent } = useEvents()
 
   const [eventData, setEventData] = useState({
     title: "",
@@ -80,6 +76,67 @@ export default function NewEventPage() {
 
   const [selectedTemplate, setSelectedTemplate] = useState("")
   const [selectedServices, setSelectedServices] = useState<string[]>([])
+  const [staffing, setStaffing] = useState<{ userId: string; role: string; notes?: string }[]>([])
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [hotelUsers, setHotelUsers] = useState<any[]>([])
+
+  // Debug logging
+  useEffect(() => {
+    console.log("Hotel data:", { hotel, hotelId, hotelLoading })
+    console.log("Event Types:", eventTypes?.length || 0)
+    console.log("Venues:", venues?.length || 0)
+    console.log("Services:", services?.length || 0)
+    console.log("Templates:", templates?.length || 0)
+    console.log("Users:", users?.length || 0)
+    console.log("services for the hotel:", services)
+  }, [hotel, hotelId, hotelLoading, eventTypes, venues, services, templates, users])
+
+  // Fetch data when hotel ID is available
+  useEffect(() => {
+    if (hotelId && !hotelLoading) {
+      console.log("Fetching hotel-specific data for hotel:", hotelId)
+
+      // Fetch hotel-specific data
+      if (fetchEventTypes) {
+        console.log("Fetching event types for hotel:", hotelId)
+        fetchEventTypes()
+      }
+      if (fetchVenues) {
+        console.log("Fetching venues for hotel:", hotelId)
+        fetchVenues()
+      }
+      if (fetchServices) {
+        console.log("Fetching services for hotel:", hotelId)
+        fetchServices()
+      }
+      if (fetchTemplates) {
+        console.log("Fetching templates for hotel:", hotelId)
+        fetchTemplates()
+      }
+
+      // Fetch users with hotel access filtering
+      if (fetchUsers) {
+        console.log("Fetching users with access to hotel:", hotelId)
+        // You can add hotel-specific filtering here if your API supports it
+        fetchUsers({ hotelAccess: hotelId }).then((data) => {
+          setHotelUsers(data)
+        })
+      }
+    }
+  }, [hotelId, hotelLoading, fetchEventTypes, fetchVenues, fetchServices, fetchTemplates, fetchUsers])
+
+  // Filter users who have access to the current hotel
+  const getHotelUsers = useCallback(() => {
+    if (!users || !hotelId) return []
+
+    // Filter users who have access to this hotel
+    // This assumes users have a hotelAccess field or similar
+    return users.filter(
+      (user) =>
+        user.status === "active" &&
+        (user.hotelAccess === hotelId || user.role === "admin" || user.role === "super_admin"),
+    )
+  }, [users, hotelId])
 
   // Handle input change
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -96,7 +153,7 @@ export default function NewEventPage() {
   // Handle select change
   const handleSelectChange = (name: string, value: string) => {
     if (name === "eventType") {
-      const selectedType = eventTypes.find((type) => type.id === value)
+      const selectedType = eventTypes?.find((type) => type._id === value)
       setEventData({
         ...eventData,
         [name]: value,
@@ -128,7 +185,7 @@ export default function NewEventPage() {
 
   // Handle template selection
   const handleTemplateSelect = (templateId: string) => {
-    const template = templates.find((t) => t.id === templateId)
+    const template = templates?.find((t) => t._id === templateId)
     if (template) {
       setSelectedTemplate(templateId)
 
@@ -138,19 +195,47 @@ export default function NewEventPage() {
         title: template.name,
         description: template.description,
         eventType: template.eventType,
-        color: eventTypes.find((type) => type.id === template.eventType)?.color || "",
+        color: eventTypes?.find((type) => type._id === template.eventType)?.color || "",
       })
     }
   }
 
+  // Handle staffing
+  const addStaffMember = () => {
+    setStaffing([...staffing, { userId: "", role: "", notes: "" }])
+  }
+
+  const removeStaffMember = (index: number) => {
+    setStaffing(staffing.filter((_, i) => i !== index))
+  }
+
+  const updateStaffMember = (index: number, field: string, value: string) => {
+    const updatedStaffing = [...staffing]
+    updatedStaffing[index] = { ...updatedStaffing[index], [field]: value }
+    setStaffing(updatedStaffing)
+  }
+
   // Calculate total price
   const calculateTotalPrice = () => {
-    const selectedServiceItems = services.filter((service) => selectedServices.includes(service.id))
-    return selectedServiceItems.reduce((total, service) => total + service.price, 0)
+    const selectedServiceItems = services?.filter((service) => selectedServices.includes(service._id))
+    return selectedServiceItems?.reduce((total, service) => total + service.price, 0) || 0
+  }
+
+  // Get selected items for summary
+  const getSelectedTemplate = () => {
+    return templates?.find((t) => t._id === selectedTemplate)
+  }
+
+  const getSelectedServices = () => {
+    return services?.filter((service) => selectedServices.includes(service._id)) || []
+  }
+
+  const getAssignedStaff = () => {
+    return staffing.filter((staff) => staff.userId && staff.role)
   }
 
   // Handle form submission
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     // Validate form
@@ -174,24 +259,88 @@ export default function NewEventPage() {
       return
     }
 
-    // Create event object with selected services
+    if (!hotelId) {
+      toast.error("No hotel selected. Please select a hotel first.")
+      return
+    }
+
+    console.log("Creating event with hotel ID:", hotelId)
+
+    setIsSubmitting(true)
+
     const eventWithServices = {
       ...eventData,
+      hotel_id: hotelId,
+      event_type_id: eventData.eventType,
+      venue_id: eventData.venue,
+      start_date: eventData.startDate,
+      end_date: eventData.endDate,
+      template_id: selectedTemplate || undefined,
       services: selectedServices.map((serviceId) => {
-        const service = services.find((s) => s.id === serviceId)
+        const service = services?.find((s) => s._id === serviceId)
         return {
-          id: serviceId,
+          service_id: serviceId,
           name: service?.name || "",
           price: service?.price || 0,
         }
       }),
+      staffing: staffing.filter((staff) => staff.userId && staff.role),
     }
 
-    // In a real app, you would send this to your API
-    console.log("Creating event:", eventWithServices)
+    console.log("Event data being sent:", eventWithServices)
 
-    toast.success("Event created successfully")
-    router.push("/dashboard/events")
+    try {
+      await createEvent(eventWithServices)
+      toast.success("Event created successfully")
+      router.push("/dashboard/events")
+    } catch (error) {
+      console.error("Error creating event:", error)
+      toast.error("Failed to create event")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Loading state - wait for hotel data first
+  if (hotelLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <Skeleton className="h-8 w-64" />
+            <Skeleton className="h-4 w-48" />
+          </div>
+          <Skeleton className="h-10 w-20" />
+        </div>
+        <Skeleton className="h-96 w-full" />
+      </div>
+    )
+  }
+
+  // No hotel selected
+  if (!hotelLoading && !hotelId && !hotelError) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <h2 className="text-3xl font-bold tracking-tight">Create New Event</h2>
+            <p className="text-muted-foreground">Please select a hotel to continue</p>
+          </div>
+          <Button variant="outline" onClick={() => router.back()}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
+          </Button>
+        </div>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center py-8">
+              <h3 className="text-lg font-medium">No Hotel Selected</h3>
+              <p className="text-muted-foreground">Please select a hotel from your dashboard to create events.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -199,13 +348,32 @@ export default function NewEventPage() {
       <div className="flex items-center justify-between">
         <div className="space-y-1">
           <h2 className="text-3xl font-bold tracking-tight">Create New Event</h2>
-          <p className="text-muted-foreground">Schedule a new event at your hotel</p>
+          <p className="text-muted-foreground">
+            Schedule a new event at <span className="font-medium">{hotel?.name || "your hotel"}</span>
+          </p>
+          {hotelId && <p className="text-xs text-muted-foreground">Hotel ID: {hotelId}</p>}
         </div>
         <Button variant="outline" onClick={() => router.back()}>
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back
         </Button>
       </div>
+
+      {/* Hotel Information Card */}
+      <Card className="bg-blue-50 border-blue-200">
+        <CardContent className="pt-4">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+              <Building2 className="h-5 w-5 text-blue-600" />
+            </div>
+            <div>
+              <h3 className="font-medium text-blue-900">Current Hotel</h3>
+              <p className="text-sm text-blue-700">{hotel?.name || "Loading hotel information..."}</p>
+              {hotel?.address && <p className="text-xs text-blue-600">{hotel.address}</p>}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
@@ -219,44 +387,65 @@ export default function NewEventPage() {
           <Card>
             <CardHeader>
               <CardTitle>Event Templates</CardTitle>
-              <CardDescription>Start with a pre-configured event template or create from scratch</CardDescription>
+              <CardDescription>
+                Start with a pre-configured event template for {hotel?.name} or create from scratch
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {templates.map((template) => {
-                  const eventType = eventTypes.find((type) => type.id === template.eventType)
-
-                  return (
-                    <div
-                      key={template.id}
-                      className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-                        selectedTemplate === template.id ? "border-primary bg-primary/5" : "hover:border-primary/50"
-                      }`}
-                      onClick={() => handleTemplateSelect(template.id)}
-                    >
-                      <div className="flex items-center space-x-2 mb-2">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: eventType?.color || "#ccc" }} />
-                        <h3 className="font-medium">{template.name}</h3>
-                      </div>
-                      <p className="text-sm text-muted-foreground">{template.description}</p>
-                    </div>
-                  )
-                })}
-
-                <div
-                  className="border border-dashed rounded-lg p-4 cursor-pointer hover:border-primary/50 flex flex-col items-center justify-center text-center"
-                  onClick={() => {
-                    setSelectedTemplate("")
-                    setActiveTab("details")
-                  }}
-                >
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mb-2">
-                    <Plus className="h-5 w-5 text-primary" />
-                  </div>
-                  <h3 className="font-medium">Create from Scratch</h3>
-                  <p className="text-sm text-muted-foreground">Configure all event details manually</p>
+              {loadingTemplates ? (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <Skeleton className="h-24 w-full" />
+                  <Skeleton className="h-24 w-full" />
+                  <Skeleton className="h-24 w-full" />
                 </div>
-              </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {templates && templates.length > 0 ? (
+                    templates.map((template) => {
+                      const eventType = eventTypes?.find((type) => type._id === template.eventType)
+
+                      return (
+                        <div
+                          key={template._id}
+                          className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                            selectedTemplate === template._id
+                              ? "border-primary bg-primary/5"
+                              : "hover:border-primary/50"
+                          }`}
+                          onClick={() => handleTemplateSelect(template._id)}
+                        >
+                          <div className="flex items-center space-x-2 mb-2">
+                            <div
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: eventType?.color || "#ccc" }}
+                            />
+                            <h3 className="font-medium">{template.name}</h3>
+                          </div>
+                          <p className="text-sm text-muted-foreground">{template.description}</p>
+                        </div>
+                      )
+                    })
+                  ) : (
+                    <div className="col-span-full text-center py-8 text-muted-foreground">
+                      No templates available for {hotel?.name}
+                    </div>
+                  )}
+
+                  <div
+                    className="border border-dashed rounded-lg p-4 cursor-pointer hover:border-primary/50 flex flex-col items-center justify-center text-center"
+                    onClick={() => {
+                      setSelectedTemplate("")
+                      setActiveTab("details")
+                    }}
+                  >
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mb-2">
+                      <Plus className="h-5 w-5 text-primary" />
+                    </div>
+                    <h3 className="font-medium">Create from Scratch</h3>
+                    <p className="text-sm text-muted-foreground">Configure all event details manually</p>
+                  </div>
+                </div>
+              )}
             </CardContent>
             <CardFooter className="flex justify-between">
               <Button variant="outline" onClick={() => router.back()}>
@@ -271,7 +460,7 @@ export default function NewEventPage() {
           <Card>
             <CardHeader>
               <CardTitle>Event Details</CardTitle>
-              <CardDescription>Enter the basic information for your event</CardDescription>
+              <CardDescription>Enter the basic information for your event at {hotel?.name}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -290,17 +479,27 @@ export default function NewEventPage() {
                   <Label htmlFor="eventType">Event Type</Label>
                   <Select value={eventData.eventType} onValueChange={(value) => handleSelectChange("eventType", value)}>
                     <SelectTrigger id="eventType">
-                      <SelectValue placeholder="Select event type" />
+                      <SelectValue placeholder={loadingEventTypes ? "Loading..." : "Select event type"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {eventTypes.map((type) => (
-                        <SelectItem key={type.id} value={type.id}>
-                          <div className="flex items-center">
-                            <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: type.color }} />
-                            {type.name}
-                          </div>
+                      {loadingEventTypes ? (
+                        <SelectItem value="loading" disabled>
+                          Loading event types...
                         </SelectItem>
-                      ))}
+                      ) : eventTypes && eventTypes.length > 0 ? (
+                        eventTypes.map((type) => (
+                          <SelectItem key={type._id} value={type._id}>
+                            <div className="flex items-center">
+                              <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: type.color }} />
+                              {type.name}
+                            </div>
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="no-types" disabled>
+                          No event types available for {hotel?.name}
+                        </SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -323,14 +522,24 @@ export default function NewEventPage() {
                   <Label htmlFor="venue">Venue</Label>
                   <Select value={eventData.venue} onValueChange={(value) => handleSelectChange("venue", value)}>
                     <SelectTrigger id="venue">
-                      <SelectValue placeholder="Select venue" />
+                      <SelectValue placeholder={loadingVenues ? "Loading..." : "Select venue"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {venues.map((venue) => (
-                        <SelectItem key={venue.id} value={venue.id}>
-                          {venue.name} (Capacity: {venue.capacity})
+                      {loadingVenues ? (
+                        <SelectItem value="loading" disabled>
+                          Loading venues...
                         </SelectItem>
-                      ))}
+                      ) : venues && venues.length > 0 ? (
+                        venues.map((venue) => (
+                          <SelectItem key={venue._id} value={venue._id}>
+                            {venue.name} (Capacity: {venue.capacity})
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="no-venues" disabled>
+                          No venues available for {hotel?.name}
+                        </SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -430,36 +639,73 @@ export default function NewEventPage() {
           <Card>
             <CardHeader>
               <CardTitle>Event Services</CardTitle>
-              <CardDescription>Select additional services for your event</CardDescription>
+              <CardDescription>Select additional services available at {hotel?.name}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                {services.map((service) => (
-                  <div key={service.id} className="flex items-start space-x-3 border rounded-lg p-3">
-                    <Checkbox
-                      id={service.id}
-                      checked={selectedServices.includes(service.id)}
-                      onCheckedChange={(checked) => handleServiceChange(service.id, !!checked)}
-                    />
-                    <div className="space-y-1">
-                      <Label htmlFor={service.id} className="font-medium cursor-pointer">
-                        {service.name}
-                      </Label>
-                      <div className="flex justify-between">
-                        <span className="text-sm text-muted-foreground">{service.category}</span>
-                        <span className="text-sm font-medium">${service.price}</span>
-                      </div>
-                    </div>
+              {loadingServices ? (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <Skeleton className="h-20 w-full" />
+                  <Skeleton className="h-20 w-full" />
+                  <Skeleton className="h-20 w-full" />
+                  <Skeleton className="h-20 w-full" />
+                </div>
+              ) : services && services.length > 0 ? (
+                <>
+                  <div className="text-sm text-muted-foreground mb-4">
+                    {services.length} service{services.length !== 1 ? "s" : ""} available at {hotel?.name}
                   </div>
-                ))}
-              </div>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    {services.map((service) => (
+                      <div
+                        key={service._id}
+                        className="flex items-start space-x-3 border rounded-lg p-3 hover:bg-muted/50 transition-colors"
+                      >
+                        <Checkbox
+                          id={service._id}
+                          checked={selectedServices.includes(service._id)}
+                          onCheckedChange={(checked) => handleServiceChange(service._id, !!checked)}
+                        />
+                        <div className="space-y-1 flex-1">
+                          <Label htmlFor={service._id} className="font-medium cursor-pointer">
+                            {service.name}
+                          </Label>
+                          {service.description && (
+                            <p className="text-sm text-muted-foreground">{service.description}</p>
+                          )}
+                          <div className="flex justify-between">
+                            <Badge variant="outline">{service.category}</Badge>
+                            <span className="text-sm font-medium">${service.price}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
 
-              <Separator />
+                  <Separator />
 
-              <div className="flex justify-between items-center">
-                <span className="font-medium">Total Services:</span>
-                <span className="font-bold">${calculateTotalPrice()}</span>
-              </div>
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium">Total Services:</span>
+                    <span className="font-bold">${calculateTotalPrice()}</span>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <div className="flex flex-col items-center space-y-2">
+                    <Briefcase className="h-12 w-12 text-muted-foreground" />
+                    <h3 className="font-medium">No Services Available</h3>
+                    <p className="text-sm">No event services have been configured for {hotel?.name} yet.</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-2"
+                      onClick={() => fetchServices && fetchServices()}
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Refresh Services
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
             <CardFooter className="flex justify-between">
               <Button variant="outline" onClick={() => setActiveTab("details")}>
@@ -474,75 +720,271 @@ export default function NewEventPage() {
           <Card>
             <CardHeader>
               <CardTitle>Event Staffing</CardTitle>
-              <CardDescription>Assign staff to your event</CardDescription>
+              <CardDescription>Assign staff members to your event at {hotel?.name}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="border rounded-lg p-6 text-center">
-                <div className="flex flex-col items-center justify-center space-y-2">
-                  <Users className="h-12 w-12 text-muted-foreground mb-2" />
-                  <h3 className="font-medium text-lg">Staff Assignment</h3>
-                  <p className="text-muted-foreground">
-                    Staff assignment will be available after the event is created.
-                  </p>
+              {loadingUsers ? (
+                <div className="space-y-4">
+                  <Skeleton className="h-20 w-full" />
+                  <Skeleton className="h-20 w-full" />
                 </div>
-              </div>
+              ) : (
+                <>
+                  {hotelUsers && hotelUsers.length > 0 ? (
+                    <div className="text-sm text-muted-foreground mb-4">
+                      {hotelUsers.length} staff member{hotelUsers.length !== 1 ? "s" : ""} available to assign to this
+                      event at {hotel?.name}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-amber-500 mb-4 flex items-center">
+                      <AlertTriangle className="h-4 w-4 mr-2" />
+                      No staff members with access to {hotel?.name} found
+                    </div>
+                  )}
+
+                  {staffing.length === 0 ? (
+                    <div className="border rounded-lg p-6 text-center">
+                      <div className="flex flex-col items-center justify-center space-y-2">
+                        <Users className="h-12 w-12 text-muted-foreground mb-2" />
+                        <h3 className="font-medium text-lg">No Staff Assigned</h3>
+                        <p className="text-muted-foreground">Add staff members to assign them to this event.</p>
+                        {hotelUsers && hotelUsers.length > 0 ? (
+                          <Button onClick={addStaffMember} className="mt-4">
+                            <Plus className="mr-2 h-4 w-4" />
+                            Add Staff Member
+                          </Button>
+                        ) : (
+                          <p className="text-sm text-muted-foreground mt-2">
+                            No users available in the system. Please add users first.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {staffing.map((staff, index) => (
+                        <div key={index} className="border rounded-lg p-4 space-y-4">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-medium">Staff Member {index + 1}</h4>
+                            <Button variant="outline" size="sm" onClick={() => removeStaffMember(index)}>
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+
+                          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div className="space-y-2">
+                              <Label>Staff Member</Label>
+                              <Select
+                                value={staff.userId}
+                                onValueChange={(value) => updateStaffMember(index, "userId", value)}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select staff member" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {hotelUsers && hotelUsers.length > 0 ? (
+                                    hotelUsers.map((user) => (
+                                      <SelectItem key={user._id} value={user._id}>
+                                        <div className="flex items-center">
+                                          {user.full_name}
+                                          {user.role && (
+                                            <Badge variant="outline" className="ml-2 text-xs">
+                                              {user.role}
+                                            </Badge>
+                                          )}
+                                        </div>
+                                      </SelectItem>
+                                    ))
+                                  ) : (
+                                    <SelectItem value="no-users" disabled>
+                                      No users available
+                                    </SelectItem>
+                                  )}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label>Role for Event</Label>
+                              <Input
+                                value={staff.role}
+                                onChange={(e) => updateStaffMember(index, "role", e.target.value)}
+                                placeholder="e.g., Event Coordinator, Waiter"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label>Notes</Label>
+                            <Textarea
+                              value={staff.notes || ""}
+                              onChange={(e) => updateStaffMember(index, "notes", e.target.value)}
+                              placeholder="Additional notes for this staff member"
+                              rows={2}
+                            />
+                          </div>
+                        </div>
+                      ))}
+
+                      {hotelUsers && hotelUsers.length > 0 && (
+                        <Button onClick={addStaffMember} variant="outline" className="w-full">
+                          <Plus className="mr-2 h-4 w-4" />
+                          Add Another Staff Member
+                        </Button>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
             </CardContent>
             <CardFooter className="flex justify-between">
               <Button variant="outline" onClick={() => setActiveTab("services")}>
                 Back to Services
               </Button>
-              <Button onClick={handleSubmit}>
-                <Save className="mr-2 h-4 w-4" />
-                Create Event
+              <Button onClick={handleSubmit} disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Create Event
+                  </>
+                )}
               </Button>
             </CardFooter>
           </Card>
         </TabsContent>
       </Tabs>
 
+      {/* Event Summary */}
       <Card className="bg-muted/40">
         <CardHeader>
           <CardTitle>Event Summary</CardTitle>
+          <CardDescription>Review your event details before creating</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
-            <div className="flex items-center space-x-2">
-              <CalendarIcon className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <p className="text-sm font-medium">Event Type</p>
-                <p className="text-sm text-muted-foreground">
-                  {eventData.eventType ? eventTypes.find((t) => t.id === eventData.eventType)?.name : "Not selected"}
-                </p>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+            {/* Basic Event Info */}
+            <div className="space-y-4">
+              <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">Basic Information</h4>
+
+              <div className="flex items-center space-x-2">
+                <Building2 className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">Hotel</p>
+                  <p className="text-sm text-muted-foreground">{hotel?.name || "Not selected"}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">Event Type</p>
+                  <p className="text-sm text-muted-foreground">
+                    {eventData.eventType
+                      ? eventTypes?.find((t) => t._id === eventData.eventType)?.name
+                      : "Not selected"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <MapPin className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">Venue</p>
+                  <p className="text-sm text-muted-foreground">
+                    {eventData.venue ? venues?.find((v) => v._id === eventData.venue)?.name : "Not selected"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">Date & Time</p>
+                  <p className="text-sm text-muted-foreground">
+                    {eventData.startDate ? format(eventData.startDate, "MMM d, yyyy h:mm a") : "Not set"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Users className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">Attendees</p>
+                  <p className="text-sm text-muted-foreground">
+                    {eventData.attendees > 0 ? eventData.attendees : "Not specified"}
+                  </p>
+                </div>
               </div>
             </div>
 
-            <div className="flex items-center space-x-2">
-              <MapPin className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <p className="text-sm font-medium">Venue</p>
-                <p className="text-sm text-muted-foreground">
-                  {eventData.venue ? venues.find((v) => v.id === eventData.venue)?.name : "Not selected"}
-                </p>
-              </div>
-            </div>
+            {/* Selected Items */}
+            <div className="space-y-4">
+              <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">Selected Items</h4>
 
-            <div className="flex items-center space-x-2">
-              <Clock className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <p className="text-sm font-medium">Date & Time</p>
-                <p className="text-sm text-muted-foreground">
-                  {eventData.startDate ? format(eventData.startDate, "MMM d, yyyy h:mm a") : "Not set"}
-                </p>
+              {/* Template */}
+              <div className="flex items-start space-x-2">
+                <FileText className="h-4 w-4 text-muted-foreground mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium">Template</p>
+                  <p className="text-sm text-muted-foreground">
+                    {getSelectedTemplate()?.name || "No template selected"}
+                  </p>
+                </div>
               </div>
-            </div>
 
-            <div className="flex items-center space-x-2">
-              <Users className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <p className="text-sm font-medium">Attendees</p>
-                <p className="text-sm text-muted-foreground">
-                  {eventData.attendees > 0 ? eventData.attendees : "Not specified"}
-                </p>
+              {/* Services */}
+              <div className="flex items-start space-x-2">
+                <Briefcase className="h-4 w-4 text-muted-foreground mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium">Services ({getSelectedServices().length})</p>
+                  {getSelectedServices().length > 0 ? (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {getSelectedServices().map((service) => (
+                        <Badge key={service._id} variant="secondary" className="text-xs">
+                          {service.name} (${service.price})
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No services selected</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Staff */}
+              <div className="flex items-start space-x-2">
+                <Users className="h-4 w-4 text-muted-foreground mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium">Staff ({getAssignedStaff().length})</p>
+                  {getAssignedStaff().length > 0 ? (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {getAssignedStaff().map((staff, index) => {
+                        const user = hotelUsers.find((u) => u._id === staff.userId)
+                        return (
+                          <Badge key={index} variant="outline" className="text-xs">
+                            {user?.full_name} - {staff.role}
+                          </Badge>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No staff assigned</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Total Cost */}
+              <div className="flex items-center space-x-2">
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">Total Cost</p>
+                  <p className="text-sm font-bold text-green-600">${calculateTotalPrice()}</p>
+                </div>
               </div>
             </div>
           </div>
