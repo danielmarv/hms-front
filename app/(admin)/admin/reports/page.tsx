@@ -1,7 +1,19 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Plus, FileText, Calendar, MoreHorizontal, TrendingUp, Download, Eye, Trash2, Clock } from "lucide-react"
+import {
+  Plus,
+  FileText,
+  Calendar,
+  MoreHorizontal,
+  TrendingUp,
+  Download,
+  Eye,
+  Trash2,
+  Clock,
+  Zap,
+  RefreshCw,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -18,8 +30,16 @@ import { format } from "date-fns"
 import { toast } from "sonner"
 
 export default function ReportsPage() {
-  const { reports, analytics, isLoading, fetchReports, fetchReportAnalytics, deleteReport, downloadReport } =
-    useReports()
+  const {
+    reports,
+    analytics,
+    isLoading,
+    fetchReports,
+    fetchReportAnalytics,
+    deleteReport,
+    downloadReport,
+    triggerDailyReport,
+  } = useReports()
 
   const [selectedReport, setSelectedReport] = useState<Report | null>(null)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
@@ -28,6 +48,7 @@ export default function ReportsPage() {
   const [typeFilter, setTypeFilter] = useState<string>("")
   const [statusFilter, setStatusFilter] = useState<string>("")
   const [searchQuery, setSearchQuery] = useState("")
+  const [isDailyReportLoading, setIsDailyReportLoading] = useState(false)
 
   useEffect(() => {
     fetchReports()
@@ -37,9 +58,10 @@ export default function ReportsPage() {
   const filteredReports = reports.filter((report) => {
     const matchesType = !typeFilter || report.type === typeFilter
     const matchesStatus = !statusFilter || report.status === statusFilter
+    const reportName = report.title || report.name || ""
     const matchesSearch =
       !searchQuery ||
-      report.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      reportName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       report.description?.toLowerCase().includes(searchQuery.toLowerCase())
     return matchesType && matchesStatus && matchesSearch
   })
@@ -71,12 +93,12 @@ export default function ReportsPage() {
   }
 
   const handleDeleteReport = async (report: Report) => {
-    if (confirm(`Are you sure you want to delete "${report.title}"?`)) {
+    const reportName = report.title || report.name || "this report"
+    if (confirm(`Are you sure you want to delete "${reportName}"?`)) {
       try {
         await deleteReport(report._id)
-        toast.success("Report deleted successfully")
       } catch (error) {
-        toast.error("Failed to delete report")
+        // Error is already handled in the hook
       }
     }
   }
@@ -84,15 +106,37 @@ export default function ReportsPage() {
   const handleDownloadReport = async (report: Report, format: "json" | "excel" | "pdf" | "csv") => {
     try {
       await downloadReport(report._id, format)
-      toast.success("Report download started")
     } catch (error) {
-      toast.error("Failed to download report")
+      // Error is already handled in the hook
     }
   }
 
   const handleViewDetails = (report: Report) => {
     setSelectedReport(report)
     setShowDetailsDialog(true)
+  }
+
+  const handleTriggerDailyReport = async () => {
+    setIsDailyReportLoading(true)
+    try {
+      console.log("Button clicked - triggering daily report")
+      const result = await triggerDailyReport()
+      console.log("Daily report triggered successfully:", result)
+    } catch (error) {
+      console.error("Failed to trigger daily report:", error)
+      // Error is already handled in the hook
+    } finally {
+      setIsDailyReportLoading(false)
+    }
+  }
+
+  const handleRefresh = async () => {
+    try {
+      await Promise.all([fetchReports(), fetchReportAnalytics()])
+      toast.success("Reports refreshed")
+    } catch (error) {
+      toast.error("Failed to refresh reports")
+    }
   }
 
   return (
@@ -103,6 +147,21 @@ export default function ReportsPage() {
           <p className="text-muted-foreground">Generate, schedule, and manage system reports</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={handleRefresh} disabled={isLoading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+
+          <Button
+            variant="outline"
+            onClick={handleTriggerDailyReport}
+            disabled={isDailyReportLoading}
+            className="bg-orange-50 hover:bg-orange-100 text-orange-700 border-orange-200"
+          >
+            <Zap className="h-4 w-4 mr-2" />
+            {isDailyReportLoading ? "Triggering..." : "Trigger Daily Report"}
+          </Button>
+
           <Dialog open={showScheduleDialog} onOpenChange={setShowScheduleDialog}>
             <DialogTrigger asChild>
               <Button variant="outline">
@@ -189,7 +248,8 @@ export default function ReportsPage() {
                   ? Math.round(
                       analytics.reduce((sum, item) => {
                         const avgTime =
-                          item.statuses.reduce((s, status) => s + status.avgExecutionTime, 0) / item.statuses.length
+                          item.statuses.reduce((s, status) => s + (status.avgExecutionTime || 0), 0) /
+                          item.statuses.length
                         return sum + avgTime
                       }, 0) /
                         analytics.length /
@@ -263,81 +323,88 @@ export default function ReportsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredReports.map((report) => (
-                  <TableRow key={report._id}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {getTypeIcon(report.type)}
-                        <div>
-                          <div className="font-medium">{report.title}</div>
-                          {report.description && (
-                            <div className="text-sm text-muted-foreground truncate max-w-[200px]">
-                              {report.description}
-                            </div>
-                          )}
+                {filteredReports.map((report) => {
+                  const reportName = report.title || report.name || "Untitled Report"
+                  return (
+                    <TableRow key={report._id}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {getTypeIcon(report.type)}
+                          <div>
+                            <div className="font-medium">{reportName}</div>
+                            {report.description && (
+                              <div className="text-sm text-muted-foreground truncate max-w-[200px]">
+                                {report.description}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="capitalize">{report.type}</TableCell>
-                    <TableCell>
-                      <Badge className={getStatusColor(report.status)}>{report.status}</Badge>
-                    </TableCell>
-                    <TableCell>{report.metadata?.recordCount?.toLocaleString() || "-"}</TableCell>
-                    <TableCell>
-                      {report.metadata?.executionTime ? `${Math.round(report.metadata.executionTime / 1000)}s` : "-"}
-                    </TableCell>
-                    <TableCell>{report.createdAt ? format(new Date(report.createdAt), "MMM dd, yyyy") : "-"}</TableCell>
-                    <TableCell>
-                      {report.isScheduled ? (
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          <Badge variant="outline">{report.frequency}</Badge>
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">Manual</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleViewDetails(report)}>
-                            <Eye className="mr-2 h-4 w-4" />
-                            View Details
-                          </DropdownMenuItem>
-                          {report.status === "completed" && (
-                            <>
-                              <DropdownMenuItem onClick={() => handleDownloadReport(report, "json")}>
-                                <Download className="mr-2 h-4 w-4" />
-                                Download JSON
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleDownloadReport(report, "excel")}>
-                                <Download className="mr-2 h-4 w-4" />
-                                Download Excel
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleDownloadReport(report, "pdf")}>
-                                <Download className="mr-2 h-4 w-4" />
-                                Download PDF
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleDownloadReport(report, "csv")}>
-                                <Download className="mr-2 h-4 w-4" />
-                                Download CSV
-                              </DropdownMenuItem>
-                            </>
-                          )}
-                          <DropdownMenuItem onClick={() => handleDeleteReport(report)} className="text-red-600">
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                      <TableCell className="capitalize">{report.type}</TableCell>
+                      <TableCell>
+                        <Badge className={getStatusColor(report.status)}>{report.status}</Badge>
+                      </TableCell>
+                      <TableCell>{report.metadata?.recordCount?.toLocaleString() || "-"}</TableCell>
+                      <TableCell>
+                        {report.metadata?.executionTime ? `${Math.round(report.metadata.executionTime / 1000)}s` : "-"}
+                      </TableCell>
+                      <TableCell>
+                        {report.createdAt ? format(new Date(report.createdAt), "MMM dd, yyyy") : "-"}
+                      </TableCell>
+                      <TableCell>
+                        {report.isScheduled ? (
+                          <div className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            <Badge variant="outline">
+                              {report.frequency || report.schedule?.frequency || "Scheduled"}
+                            </Badge>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">Manual</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleViewDetails(report)}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              View Details
+                            </DropdownMenuItem>
+                            {report.status === "completed" && (
+                              <>
+                                <DropdownMenuItem onClick={() => handleDownloadReport(report, "json")}>
+                                  <Download className="mr-2 h-4 w-4" />
+                                  Download JSON
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDownloadReport(report, "excel")}>
+                                  <Download className="mr-2 h-4 w-4" />
+                                  Download Excel
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDownloadReport(report, "pdf")}>
+                                  <Download className="mr-2 h-4 w-4" />
+                                  Download PDF
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDownloadReport(report, "csv")}>
+                                  <Download className="mr-2 h-4 w-4" />
+                                  Download CSV
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                            <DropdownMenuItem onClick={() => handleDeleteReport(report)} className="text-red-600">
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
               </TableBody>
             </Table>
           </div>

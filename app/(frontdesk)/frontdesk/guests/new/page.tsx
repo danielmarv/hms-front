@@ -138,11 +138,33 @@ export default function NewGuestPage() {
     setSubmitting(true)
 
     try {
-      const response = await createGuest(formData)
+      // Clean the form data to remove empty enum values
+      const cleanedData = { ...formData }
+
+      // Set default bed type if empty
+      if (cleanedData.preferences.bed_type === "") {
+        cleanedData.preferences.bed_type = "double"
+      }
+
+      // Clean other enum values
+      if (cleanedData.gender === "") {
+        delete cleanedData.gender
+      }
+
+      if (cleanedData.id_type === "") {
+        delete cleanedData.id_type
+      }
+
+      // Clean loyalty program tier if it's empty
+      if (cleanedData.loyalty_program.tier === "") {
+        cleanedData.loyalty_program.tier = "standard"
+      }
+
+      const response = await createGuest(cleanedData)
 
       if (response.data?.success) {
         toast.success("Guest created successfully")
-        router.push(`/frontdesk/guests/${response.data.data._id}`)
+        router.push(`/dashboard/guests/${response.data.data._id}`)
       } else {
         toast.error("Failed to create guest")
       }
@@ -159,7 +181,7 @@ export default function NewGuestPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" asChild>
-            <Link href="/frontdesk/guests">
+            <Link href="/dashboard/guests">
               <ChevronLeft className="h-4 w-4" />
               <span className="sr-only">Back</span>
             </Link>
@@ -678,7 +700,7 @@ export default function NewGuestPage() {
 
         <div className="mt-6 flex justify-end gap-4">
           <Button variant="outline" type="button" asChild>
-            <Link href="/frontdesk/guests">Cancel</Link>
+            <Link href="/dashboard/guests">Cancel</Link>
           </Button>
           <Button type="submit" disabled={submitting}>
             {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
