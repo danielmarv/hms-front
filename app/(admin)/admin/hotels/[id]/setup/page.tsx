@@ -15,6 +15,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Progress } from "@/components/ui/progress"
+import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useHotels } from "@/hooks/use-hotels"
 import { useHotelSettings } from "@/hooks/use-hotel-settings"
 import {
@@ -28,13 +30,18 @@ import {
   CreditCard,
   FileText,
   Shield,
+  Info,
+  LinkIcon,
 } from "lucide-react"
 
 const setupSchema = z.object({
+  // Hotel reference
+  hotel: z.string().min(1, "Hotel ID is required"),
+
   // Basic Information
   name: z.string().min(2, "Hotel name is required"),
   legal_name: z.string().min(2, "Legal name is required"),
-  tax_id: z.string().optional(),
+  tax_id: z.string().min(1, "Tax ID is required"),
 
   // Contact Information
   contact: z.object({
@@ -111,14 +118,37 @@ const SETUP_STEPS = [
   { id: "features", title: "Features", icon: Shield },
 ]
 
+const CURRENCIES = [
+  { code: "USD", symbol: "$", name: "US Dollar" },
+  { code: "EUR", symbol: "€", name: "Euro" },
+  { code: "GBP", symbol: "£", name: "British Pound" },
+  { code: "UGX", symbol: "USh", name: "Ugandan Shilling" },
+  { code: "KES", symbol: "KSh", name: "Kenyan Shilling" },
+  { code: "TZS", symbol: "TSh", name: "Tanzanian Shilling" },
+]
+
+const TIME_ZONES = [
+  { value: "UTC", label: "UTC (Coordinated Universal Time)" },
+  { value: "America/New_York", label: "Eastern Time (ET)" },
+  { value: "America/Chicago", label: "Central Time (CT)" },
+  { value: "America/Denver", label: "Mountain Time (MT)" },
+  { value: "America/Los_Angeles", label: "Pacific Time (PT)" },
+  { value: "Europe/London", label: "Greenwich Mean Time (GMT)" },
+  { value: "Europe/Paris", label: "Central European Time (CET)" },
+  { value: "Africa/Kampala", label: "East Africa Time (EAT)" },
+  { value: "Africa/Nairobi", label: "East Africa Time (EAT)" },
+]
+
 export default function HotelSetupPage() {
   const params = useParams()
   const router = useRouter()
   const hotelId = params.id as string
   const { getHotelById } = useHotels()
-  const { createConfiguration } = useHotelSettings()
+  const { createConfiguration, getHotelSetupStatus } = useHotelSettings()
 
   const [hotel, setHotel] = useState<any>(null)
+  const [setupStatus, setSetupStatus] = useState<any>(null)
+  const [chainConfig, setChainConfig] = useState<any>(null)
   const [currentStep, setCurrentStep] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -127,6 +157,7 @@ export default function HotelSetupPage() {
   const form = useForm<z.infer<typeof setupSchema>>({
     resolver: zodResolver(setupSchema),
     defaultValues: {
+      hotel: hotelId,
       name: "",
       legal_name: "",
       tax_id: "",
@@ -189,29 +220,55 @@ export default function HotelSetupPage() {
   })
 
   useEffect(() => {
-    const fetchHotel = async () => {
+    const fetchData = async () => {
       try {
-        const response = await getHotelById(hotelId)
-        if (response.data) {
-          setHotel(response.data)
+        // Get hotel information
+        const hotelResponse = await getHotelById(hotelId)
+        if (hotelResponse.data) {
+          setHotel(hotelResponse.data)
+
           // Pre-fill form with hotel data
-          form.setValue("name", response.data.name || "")
-          form.setValue("legal_name", response.data.name || "")
-          if (response.data.address) {
-            form.setValue("contact.address.street", response.data.address.street || "")
-            form.setValue("contact.address.city", response.data.address.city || "")
-            form.setValue("contact.address.state", response.data.address.state || "")
-            form.setValue("contact.address.postal_code", response.data.address.zipCode || "")
-            form.setValue("contact.address.country", response.data.address.country || "")
+          form.setValue("name", hotelResponse.data.name || "")
+          form.setValue("legal_name", hotelResponse.data.name || "")
+          form.setValue("tax_id", hotelResponse.data.taxId || "")
+
+          if (hotelResponse.data.address) {
+            form.setValue("contact.address.street", hotelResponse.data.address.street || "")
+            form.setValue("contact.address.city", hotelResponse.data.address.city || "")
+            form.setValue("contact.address.state", hotelResponse.data.address.state || "")
+            form.setValue("contact.address.postal_code", hotelResponse.data.address.zipCode || "")
+            form.setValue("contact.address.country", hotelResponse.data.address.country || "")
           }
-          if (response.data.contactInfo) {
-            form.setValue("contact.phone.primary", response.data.contactInfo.phone || "")
-            form.setValue("contact.email.primary", response.data.contactInfo.email || "")
-            form.setValue("contact.website", response.data.contactInfo.website || "")
+
+          if (hotelResponse.data.contactInfo) {
+            form.setValue("contact.phone.primary", hotelResponse.data.contactInfo.phone || "")
+            form.setValue("contact.email.primary", hotelResponse.data.contactInfo.email || "")
+            form.setValue("contact.website", hotelResponse.data.contactInfo.website || "")
+          }
+
+          // Set document prefixes based on hotel code
+          if (hotelResponse.data.code) {
+            form.setValue("financial.document_prefixes.invoice", `${hotelResponse.data.code}-INV-`)
+            form.setValue("financial.document_prefixes.receipt", `${hotelResponse.data.code}-REC-`)
+            form.setValue("financial.document_prefixes.quotation", `${hotelResponse.data.code}-QUO-`)
+            form.setValue("financial.document_prefixes.folio", `${hotelResponse.data.code}-FOL-`)
+          }
+        }
+
+        // Get setup status
+        const statusResponse = await getHotelSetupStatus(hotelId)
+        if (statusResponse.data) {
+          setSetupStatus(statusResponse.data)
+
+          // If setup is already completed, redirect to settings
+          if (statusResponse.data.setupCompleted) {
+            toast.info("Hotel setup is already completed")
+            router.push(`/admin/hotels/${hotelId}/settings`)
+            return
           }
         }
       } catch (error) {
-        console.error("Error fetching hotel:", error)
+        console.error("Error fetching data:", error)
         toast.error("Failed to load hotel information")
       } finally {
         setIsLoading(false)
@@ -219,9 +276,9 @@ export default function HotelSetupPage() {
     }
 
     if (hotelId) {
-      fetchHotel()
+      fetchData()
     }
-  }, [hotelId, getHotelById, form])
+  }, [hotelId, getHotelById, getHotelSetupStatus, form, router])
 
   const validateCurrentStep = async () => {
     const stepFields = getStepFields(currentStep)
@@ -269,8 +326,7 @@ export default function HotelSetupPage() {
   const onSubmit = async (values: z.infer<typeof setupSchema>) => {
     setIsSubmitting(true)
     try {
-      const response = await createConfiguration(hotelId, {
-        hotel: hotelId,
+      const response = await createConfiguration({
         ...values,
         notifications: {
           email_notifications: true,
@@ -341,13 +397,32 @@ export default function HotelSetupPage() {
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Hotel Setup</h1>
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold tracking-tight">Hotel Setup</h1>
+            {hotel.chainCode && (
+              <Badge variant="secondary" className="flex items-center gap-1">
+                <LinkIcon className="h-3 w-3" />
+                Chain: {hotel.chainCode}
+              </Badge>
+            )}
+          </div>
           <p className="text-muted-foreground">
             Configure {hotel.name} ({hotel.code})
           </p>
         </div>
       </div>
+
+      {/* Chain Configuration Alert */}
+      {chainConfig && (
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertDescription>
+            This hotel is part of the <strong>{hotel.chainCode}</strong> chain. Some settings have been pre-configured
+            based on chain defaults and may be inherited automatically.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Progress Bar */}
       <Card>
@@ -567,6 +642,36 @@ export default function HotelSetupPage() {
                     )}
                   />
                 </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <FormField
+                    control={form.control}
+                    name="contact.email.secondary"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Secondary Email (Optional)</FormLabel>
+                        <FormControl>
+                          <Input type="email" placeholder="reservations@hotel.com" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="contact.website"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Website (Optional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="https://www.hotel.com" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </CardContent>
             </Card>
           )}
@@ -577,6 +682,11 @@ export default function HotelSetupPage() {
                 <CardTitle className="flex items-center gap-2">
                   <Palette className="h-5 w-5" />
                   Branding
+                  {chainConfig?.branding && (
+                    <Badge variant="outline" className="ml-2">
+                      Chain Defaults Applied
+                    </Badge>
+                  )}
                 </CardTitle>
                 <CardDescription>Visual identity and brand colors</CardDescription>
               </CardHeader>
@@ -685,18 +795,28 @@ export default function HotelSetupPage() {
                     name="financial.currency.code"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Currency Code</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormLabel>Currency</FormLabel>
+                        <Select
+                          onValueChange={(value) => {
+                            field.onChange(value)
+                            const currency = CURRENCIES.find((c) => c.code === value)
+                            if (currency) {
+                              form.setValue("financial.currency.symbol", currency.symbol)
+                            }
+                          }}
+                          defaultValue={field.value}
+                        >
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="USD">USD - US Dollar</SelectItem>
-                            <SelectItem value="EUR">EUR - Euro</SelectItem>
-                            <SelectItem value="GBP">GBP - British Pound</SelectItem>
-                            <SelectItem value="UGX">UGX - Ugandan Shilling</SelectItem>
+                            {CURRENCIES.map((currency) => (
+                              <SelectItem key={currency.code} value={currency.code}>
+                                {currency.code} - {currency.name}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -751,6 +871,7 @@ export default function HotelSetupPage() {
                         <FormControl>
                           <Input placeholder="INV-" {...field} />
                         </FormControl>
+                        <FormDescription>Example: INV-2024-001</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -765,6 +886,39 @@ export default function HotelSetupPage() {
                         <FormControl>
                           <Input placeholder="REC-" {...field} />
                         </FormControl>
+                        <FormDescription>Example: REC-2024-001</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <FormField
+                    control={form.control}
+                    name="financial.document_prefixes.quotation"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Quotation Prefix</FormLabel>
+                        <FormControl>
+                          <Input placeholder="QUO-" {...field} />
+                        </FormControl>
+                        <FormDescription>Example: QUO-2024-001</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="financial.document_prefixes.folio"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Folio Prefix</FormLabel>
+                        <FormControl>
+                          <Input placeholder="FOL-" {...field} />
+                        </FormControl>
+                        <FormDescription>Example: FOL-2024-001</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -781,7 +935,7 @@ export default function HotelSetupPage() {
                   <Settings className="h-5 w-5" />
                   Operational Settings
                 </CardTitle>
-                <CardDescription>Check-in/out times and policies</CardDescription>
+                <CardDescription>Check-in/out times and operational policies</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-2">
@@ -814,6 +968,56 @@ export default function HotelSetupPage() {
                   />
                 </div>
 
+                <div className="grid gap-4 md:grid-cols-2">
+                  <FormField
+                    control={form.control}
+                    name="operational.time_zone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Time Zone</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {TIME_ZONES.map((tz) => (
+                              <SelectItem key={tz.value} value={tz.value}>
+                                {tz.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="operational.date_format"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Date Format</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="MM/DD/YYYY">MM/DD/YYYY (US)</SelectItem>
+                            <SelectItem value="DD/MM/YYYY">DD/MM/YYYY (UK)</SelectItem>
+                            <SelectItem value="YYYY-MM-DD">YYYY-MM-DD (ISO)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
                 <FormField
                   control={form.control}
                   name="operational.cancellation_policy"
@@ -821,8 +1025,9 @@ export default function HotelSetupPage() {
                     <FormItem>
                       <FormLabel>Cancellation Policy</FormLabel>
                       <FormControl>
-                        <Textarea placeholder="Describe your cancellation policy..." {...field} rows={3} />
+                        <Textarea placeholder="Describe your cancellation policy..." {...field} rows={4} />
                       </FormControl>
+                      <FormDescription>This policy will be displayed to guests during booking</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -898,6 +1103,38 @@ export default function HotelSetupPage() {
                         <div className="space-y-0.5">
                           <FormLabel className="text-base">Loyalty Program</FormLabel>
                           <FormDescription>Enable guest loyalty rewards</FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch checked={field.value} onCheckedChange={field.onChange} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="features.keyless_entry"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base">Keyless Entry</FormLabel>
+                          <FormDescription>Digital room keys via mobile app</FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch checked={field.value} onCheckedChange={field.onChange} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="features.multi_language"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base">Multi-Language Support</FormLabel>
+                          <FormDescription>Support multiple languages</FormDescription>
                         </div>
                         <FormControl>
                           <Switch checked={field.value} onCheckedChange={field.onChange} />
