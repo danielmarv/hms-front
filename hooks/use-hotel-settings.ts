@@ -124,7 +124,7 @@ export function useHotelSettings() {
       return await request<{
         configuration: HotelSettings
         effectiveConfiguration: HotelSettings
-      }>(`/configuration/${hotelId}`)
+      }>(`/hotel-configurations/${hotelId}`)
     },
     [request],
   )
@@ -132,7 +132,7 @@ export function useHotelSettings() {
   // Create hotel configuration - matches POST /configuration/
   const createConfiguration = useCallback(
     async (configData: Partial<HotelSettings>) => {
-      return await request<HotelSettings>(`/configuration`, "POST", configData)
+      return await request<HotelSettings>(`/hotel-configurations`, "POST", configData)
     },
     [request],
   )
@@ -140,7 +140,7 @@ export function useHotelSettings() {
   // Update hotel configuration - matches PUT /configuration/:hotelId
   const updateHotelConfiguration = useCallback(
     async (hotelId: string, configData: Partial<HotelSettings>) => {
-      return await request<HotelSettings>(`/configuration/${hotelId}`, "PUT", configData)
+      return await request<HotelSettings>(`/hotel-configurations/${hotelId}`, "PUT", configData)
     },
     [request],
   )

@@ -15,11 +15,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { useHotels } from "@/hooks/use-hotels"
-import { useHotelSettings } from "@/hooks/use-hotel-settings"
+import {
+  useHotelConfiguration,
+  type HotelConfiguration,
+  type EffectiveConfiguration,
+} from "@/hooks/use-hotel-configuration"
 import {
   Loader2,
   Save,
-  FolderSyncIcon as Sync,
   Settings,
   Palette,
   FileText,
@@ -30,117 +33,8 @@ import {
   AlertTriangle,
   ArrowLeft,
   Building,
+  Plus,
 } from "lucide-react"
-
-interface HotelSettings {
-  _id: string
-  hotel: string
-  name: string
-  legal_name: string
-  tax_id: string
-  contact: {
-    address: {
-      street: string
-      city: string
-      state: string
-      postal_code: string
-      country: string
-    }
-    phone: {
-      primary: string
-      secondary?: string
-      fax?: string
-    }
-    email: {
-      primary: string
-      secondary?: string
-      support?: string
-    }
-    website?: string
-  }
-  branding: {
-    logo_url?: string
-    logo_secondary_url?: string
-    favicon_url?: string
-    watermark_url?: string
-    primary_color: string
-    secondary_color: string
-    accent_color: string
-    text_color: string
-    fonts: {
-      primary: { name: string; url?: string }
-      secondary: { name: string; url?: string }
-      headings: { name: string; url?: string }
-    }
-  }
-  financial: {
-    currency: {
-      code: string
-      symbol: string
-      position: "before" | "after"
-    }
-    tax_rates: Array<{
-      name: string
-      rate: number
-      type: "percentage" | "fixed"
-      applies_to: string[]
-    }>
-    document_prefixes: {
-      invoice: string
-      receipt: string
-      quotation: string
-      folio: string
-    }
-  }
-  operational: {
-    check_in_time: string
-    check_out_time: string
-    time_zone: string
-    date_format: string
-    time_format: string
-    cancellation_policy: string
-    no_show_policy: string
-  }
-  features: {
-    online_booking: boolean
-    mobile_checkin: boolean
-    keyless_entry: boolean
-    loyalty_program: boolean
-    multi_language: boolean
-    payment_gateway: boolean
-  }
-  notifications: {
-    email_notifications: boolean
-    sms_notifications: boolean
-    push_notifications: boolean
-    booking_confirmations: boolean
-    payment_reminders: boolean
-    marketing_emails: boolean
-  }
-  banking: {
-    primary_account: {
-      bank_name: string
-      account_name: string
-      account_number: string
-      routing_number: string
-      swift_code?: string
-    }
-    payment_methods: {
-      accepted_cards: string[]
-      online_payments: boolean
-      cash_payments: boolean
-      bank_transfers: boolean
-    }
-  }
-  chainInheritance?: {
-    branding: boolean
-    financial: boolean
-    operational: boolean
-    features: boolean
-    notifications: boolean
-    document_templates: boolean
-  }
-}
 
 export default function HotelSettingsPage() {
   const params = useParams()
@@ -148,20 +42,22 @@ export default function HotelSettingsPage() {
   const hotelId = params.id as string
   const { getHotelById } = useHotels()
   const {
-    getEffectiveConfiguration,
+    getHotelConfiguration,
+    createHotelConfiguration,
+    updateHotelConfiguration,
+    updateInheritanceSettings,
     updateBranding,
     updateBanking,
-    syncFromChain,
-    updateInheritanceSettings,
     isLoading,
-  } = useHotelSettings()
+  } = useHotelConfiguration()
 
-  const [settings, setSettings] = useState<HotelSettings | null>(null)
+  const [configuration, setConfiguration] = useState<HotelConfiguration | null>(null)
+  const [effectiveConfiguration, setEffectiveConfiguration] = useState<EffectiveConfiguration | null>(null)
   const [hotel, setHotel] = useState<any>(null)
-  const [chainConfig, setChainConfig] = useState<any>(null)
   const [isSaving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState("general")
   const [isInitialLoading, setIsInitialLoading] = useState(true)
+  const [isNewConfiguration, setIsNewConfiguration] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -172,15 +68,204 @@ export default function HotelSettingsPage() {
           setHotel(hotelResponse.data)
         }
 
-        // Get effective configuration
-        const configResponse = await getEffectiveConfiguration(hotelId)
+        // Get hotel configuration
+        const configResponse = await getHotelConfiguration(hotelId)
         if (configResponse.data) {
-          setSettings(configResponse.data.hotelConfiguration)
-          setChainConfig(configResponse.data.chainConfiguration)
+          // Transform the API response to match the expected structure
+          const apiConfig = configResponse.data.configuration
+          const transformedConfig: HotelConfiguration = {
+            ...apiConfig,
+            // Transform address structure
+            address: {
+              street: apiConfig.contact?.address?.street || "",
+              city: apiConfig.contact?.address?.city || "",
+              state: apiConfig.contact?.address?.state || "",
+              postalCode: apiConfig.contact?.address?.postal_code || "",
+              country: apiConfig.contact?.address?.country || "",
+            },
+            // Transform contact structure
+            contact: {
+              phone: apiConfig.contact?.phone?.primary || "",
+              email: apiConfig.contact?.email?.primary || "",
+              website: apiConfig.contact?.website || "",
+            },
+            // Transform other fields to match interface
+            legalName: apiConfig.legal_name || apiConfig.name,
+            taxId: apiConfig.tax_id || "",
+            // Transform branding structure
+            branding: {
+              logoUrl: apiConfig.branding?.logo_url,
+              faviconUrl: apiConfig.branding?.favicon_url,
+              primaryColor: apiConfig.branding?.primary_color || "#1a73e8",
+              secondaryColor: apiConfig.branding?.secondary_color || "#f8f9fa",
+              accentColor: apiConfig.branding?.accent_color || "#fbbc04",
+              fonts: {
+                primary: apiConfig.branding?.fonts?.primary?.name || "Roboto",
+                secondary: apiConfig.branding?.fonts?.secondary?.name || "Open Sans",
+              },
+            },
+            // Transform financial structure
+            financial: {
+              currency: {
+                code: apiConfig.financial?.currency?.code || "USD",
+                symbol: apiConfig.financial?.currency?.symbol || "$",
+                position: apiConfig.financial?.currency?.position || "before",
+              },
+              taxRates: apiConfig.financial?.tax_rates || [],
+              documentPrefixes: {
+                invoice: apiConfig.financial?.document_prefixes?.invoice || "INV",
+                receipt: apiConfig.financial?.document_prefixes?.receipt || "RCP",
+                quotation: apiConfig.financial?.document_prefixes?.quotation || "QUO",
+                folio: apiConfig.financial?.document_prefixes?.folio || "FOL",
+              },
+            },
+            // Transform operational structure
+            operational: {
+              checkInTime: apiConfig.operational?.check_in_time || "15:00",
+              checkOutTime: apiConfig.operational?.check_out_time || "11:00",
+              timeZone: apiConfig.operational?.time_zone || "UTC",
+              dateFormat: apiConfig.operational?.date_format || "MM/DD/YYYY",
+              timeFormat: apiConfig.operational?.time_format || "12h",
+              cancellationPolicy: apiConfig.operational?.cancellation_policy || "",
+              noShowPolicy: apiConfig.operational?.no_show_policy || "",
+            },
+            // Transform features structure
+            features: {
+              onlineBooking: apiConfig.features?.enable_online_booking || false,
+              mobileCheckin: apiConfig.features?.enable_mobile_checkin || false,
+              keylessEntry: apiConfig.features?.enable_keyless_entry || false,
+              loyaltyProgram: apiConfig.features?.enable_loyalty_program || false,
+              multiLanguage: apiConfig.features?.enable_multi_language || false,
+              paymentGateway: apiConfig.features?.enable_payment_gateway || false,
+            },
+            // Transform notifications structure
+            notifications: {
+              emailNotifications: apiConfig.notifications?.email?.new_booking || false,
+              smsNotifications: apiConfig.notifications?.sms?.new_booking || false,
+              pushNotifications: false,
+              bookingConfirmations: apiConfig.notifications?.email?.booking_confirmation || false,
+              paymentReminders: apiConfig.notifications?.email?.payment_confirmation || false,
+              marketingEmails: false,
+            },
+            // Transform banking structure
+            banking: {
+              primaryAccount: {
+                bankName: apiConfig.banking?.accounts?.[0]?.bank_name || "",
+                accountName: apiConfig.banking?.accounts?.[0]?.account_name || "",
+                accountNumber: apiConfig.banking?.accounts?.[0]?.account_number || "",
+                routingNumber: apiConfig.banking?.accounts?.[0]?.routing_number || "",
+                swiftCode: apiConfig.banking?.accounts?.[0]?.swift_code,
+              },
+              paymentMethods: {
+                acceptedCards: apiConfig.banking?.payment_methods?.accepted_cards || [],
+                onlinePayments: apiConfig.banking?.payment_methods?.accepts_cards || false,
+                cashPayments: apiConfig.banking?.payment_methods?.accepts_cash || false,
+                bankTransfers: apiConfig.banking?.payment_methods?.accepts_bank_transfer || false,
+              },
+            },
+            // Keep other fields as they are
+            _id: apiConfig._id,
+            hotel: apiConfig.hotel?._id || hotelId,
+            chainInheritance: apiConfig.chainInheritance,
+            createdBy: apiConfig.createdBy,
+            updatedBy: apiConfig.updatedBy,
+            createdAt: apiConfig.createdAt,
+            updatedAt: apiConfig.updatedAt,
+          }
+
+          setConfiguration(transformedConfig)
+          setEffectiveConfiguration(configResponse.data.effectiveConfiguration)
+        } else if (configResponse.error && configResponse.error.includes("not found")) {
+          // Configuration doesn't exist, prepare for creation
+          setIsNewConfiguration(true)
+          if (hotelResponse.data) {
+            // Create a default configuration template
+            const defaultConfig: Partial<HotelConfiguration> = {
+              hotel: hotelId,
+              name: hotelResponse.data.name,
+              legalName: hotelResponse.data.name,
+              taxId: "",
+              address: {
+                street: "",
+                city: "",
+                state: "",
+                postalCode: "",
+                country: "",
+              },
+              contact: {
+                phone: "",
+                email: "",
+                website: "",
+              },
+              branding: {
+                primaryColor: "#1a73e8",
+                secondaryColor: "#f8f9fa",
+                accentColor: "#fbbc04",
+                fonts: {
+                  primary: "Roboto",
+                  secondary: "Open Sans",
+                },
+              },
+              financial: {
+                currency: {
+                  code: "USD",
+                  symbol: "$",
+                  position: "before",
+                },
+                taxRates: [],
+                documentPrefixes: {
+                  invoice: "INV",
+                  receipt: "RCP",
+                  quotation: "QUO",
+                  folio: "FOL",
+                },
+              },
+              operational: {
+                checkInTime: "15:00",
+                checkOutTime: "11:00",
+                timeZone: "UTC",
+                dateFormat: "MM/DD/YYYY",
+                timeFormat: "12h",
+                cancellationPolicy: "",
+                noShowPolicy: "",
+              },
+              features: {
+                onlineBooking: false,
+                mobileCheckin: false,
+                keylessEntry: false,
+                loyaltyProgram: false,
+                multiLanguage: false,
+                paymentGateway: false,
+              },
+              notifications: {
+                emailNotifications: true,
+                smsNotifications: false,
+                pushNotifications: false,
+                bookingConfirmations: true,
+                paymentReminders: true,
+                marketingEmails: false,
+              },
+              banking: {
+                primaryAccount: {
+                  bankName: "",
+                  accountName: "",
+                  accountNumber: "",
+                  routingNumber: "",
+                },
+                paymentMethods: {
+                  acceptedCards: [],
+                  onlinePayments: false,
+                  cashPayments: true,
+                  bankTransfers: false,
+                },
+              },
+            }
+            setConfiguration(defaultConfig as HotelConfiguration)
+          }
         }
       } catch (error) {
-        console.error("Error fetching hotel settings:", error)
-        toast.error("Failed to load hotel settings")
+        console.error("Error fetching hotel configuration:", error)
+        toast.error("Failed to load hotel configuration")
       } finally {
         setIsInitialLoading(false)
       }
@@ -189,71 +274,91 @@ export default function HotelSettingsPage() {
     if (hotelId) {
       fetchData()
     }
-  }, [hotelId, getHotelById, getEffectiveConfiguration])
+  }, [hotelId, getHotelById, getHotelConfiguration])
 
   const handleSave = async (section?: string) => {
-    if (!settings || !hotelId) return
+    if (!configuration || !hotelId) return
 
     setSaving(true)
     try {
       let response
 
-      switch (section) {
-        case "branding":
-          response = await updateBranding(hotelId, settings.branding)
-          break
-        case "banking":
-          response = await updateBanking(hotelId, settings.banking)
-          break
-        default:
-          // Update full configuration
-          response = await updateBranding(hotelId, settings)
-          break
+      if (isNewConfiguration) {
+        // Create new configuration
+        response = await createHotelConfiguration(configuration)
+        if (response.data) {
+          setConfiguration(response.data)
+          setIsNewConfiguration(false)
+          toast.success("Hotel configuration created successfully")
+        }
+      } else {
+        // Update existing configuration
+        switch (section) {
+          case "branding":
+            response = await updateBranding(hotelId, configuration.branding)
+            break
+          case "banking":
+            response = await updateBanking(hotelId, configuration.banking)
+            break
+          default:
+            response = await updateHotelConfiguration(hotelId, configuration)
+            break
+        }
+
+        if (response.data) {
+          if (section === "branding") {
+            setConfiguration((prev) => (prev ? { ...prev, branding: response.data } : prev))
+          } else if (section === "banking") {
+            setConfiguration((prev) => (prev ? { ...prev, banking: response.data } : prev))
+          } else {
+            setConfiguration(response.data)
+          }
+          toast.success("Configuration updated successfully")
+        }
       }
 
       if (response.error) {
         throw new Error(response.error)
       }
-      toast.success("Settings saved successfully")
     } catch (error) {
-      console.error("Error saving settings:", error)
-      toast.error(error instanceof Error ? error.message : "Failed to save settings")
+      console.error("Error saving configuration:", error)
+      toast.error(error instanceof Error ? error.message : "Failed to save configuration")
     } finally {
       setSaving(false)
     }
   }
 
   const handleInputChange = (section: string, field: string, value: any) => {
-    if (!settings) return
+    if (!configuration) return
 
-    setSettings((prev) => {
+    setConfiguration((prev) => {
       if (!prev) return prev
 
-      const newSettings = { ...prev }
+      const newConfig = { ...prev }
       if (section === "root") {
-        newSettings[field as keyof HotelSettings] = value
+        newConfig[field as keyof HotelConfiguration] = value
       } else {
-        newSettings[section as keyof HotelSettings] = {
-          ...newSettings[section as keyof HotelSettings],
+        newConfig[section as keyof HotelConfiguration] = {
+          ...newConfig[section as keyof HotelConfiguration],
           [field]: value,
         }
       }
-      return newSettings
+      return newConfig
     })
   }
 
   const handleNestedChange = (section: string, subsection: string, field: string, value: any) => {
-    if (!settings) return
+    if (!configuration) return
 
-    setSettings((prev) => {
+    setConfiguration((prev) => {
       if (!prev) return prev
 
       return {
         ...prev,
         [section]: {
-          ...prev[section as keyof HotelSettings],
+          ...prev[section as keyof HotelConfiguration],
           [subsection]: {
-            ...(prev[section as keyof HotelSettings] as any)?.[subsection],
+            ...(prev[section as keyof HotelConfiguration] as any)?.[subsection],
             [field]: value,
           },
         },
@@ -261,17 +366,22 @@ export default function HotelSettingsPage() {
     })
   }
 
-  const handleSyncFromChain = async () => {
-    if (!hotel?.chainCode) return
+  const handleInheritanceChange = async (setting: string, inherit: boolean) => {
+    if (!configuration || !configuration.chainInheritance) return
 
     try {
-      const response = await syncFromChain(hotelId)
+      const newInheritance = {
+        ...configuration.chainInheritance,
+        [setting]: inherit,
+      }
+
+      const response = await updateInheritanceSettings(hotelId, newInheritance)
       if (response.data) {
-        setSettings(response.data.configuration)
-        toast.success("Successfully synced from chain configuration")
+        setConfiguration(response.data)
+        toast.success("Inheritance settings updated")
       }
     } catch (error) {
-      toast.error("Failed to sync from chain")
+      toast.error("Failed to update inheritance settings")
     }
   }
 
@@ -296,11 +406,11 @@ export default function HotelSettingsPage() {
     )
   }
 
-  if (!settings) {
+  if (!configuration) {
     return (
       <div className="flex h-full flex-col items-center justify-center">
         <Settings className="h-16 w-16 text-muted-foreground" />
-        <h2 className="mt-4 text-2xl font-bold">Settings Not Found</h2>
+        <h2 className="mt-4 text-2xl font-bold">Configuration Not Found</h2>
         <p className="mt-2 text-muted-foreground">This hotel has not been configured yet</p>
         <Button className="mt-6" onClick={() => router.push(`/admin/hotels/${hotelId}/setup`)}>
           Start Setup
@@ -319,7 +429,7 @@ export default function HotelSettingsPage() {
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Hotel Settings</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Hotel Configuration</h1>
             <p className="text-muted-foreground">
               {hotel.name} ({hotel.code})
             </p>
@@ -329,25 +439,25 @@ export default function HotelSettingsPage() {
                 Chain: {hotel.chainCode}
               </Badge>
             )}
+            {isNewConfiguration && (
+              <Badge variant="secondary" className="mt-2">
+                <Plus className="mr-1 h-3 w-3" />
+                New Configuration
+              </Badge>
+            )}
           </div>
         </div>
         <div className="flex gap-2">
-          {hotel.chainCode && (
-            <Button variant="outline" onClick={handleSyncFromChain}>
-              <Sync className="mr-2 h-4 w-4" />
-              Sync from Chain
-            </Button>
-          )}
           <Button onClick={() => handleSave()} disabled={isSaving || isLoading}>
             {isSaving ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Saving...
+                {isNewConfiguration ? "Creating..." : "Saving..."}
               </>
             ) : (
               <>
                 <Save className="mr-2 h-4 w-4" />
-                Save Changes
+                {isNewConfiguration ? "Create Configuration" : "Save Changes"}
               </>
             )}
           </Button>
@@ -398,39 +508,39 @@ export default function HotelSettingsPage() {
                   <Label htmlFor="name">Hotel Name</Label>
                   <Input
                     id="name"
-                    value={settings.name}
+                    value={configuration.name}
                     onChange={(e) => handleInputChange("root", "name", e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="legal_name">Legal Name</Label>
+                  <Label htmlFor="legalName">Legal Name</Label>
                   <Input
-                    id="legal_name"
-                    value={settings.legal_name}
-                    onChange={(e) => handleInputChange("root", "legal_name", e.target.value)}
+                    id="legalName"
+                    value={configuration.legalName}
+                    onChange={(e) => handleInputChange("root", "legalName", e.target.value)}
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="tax_id">Tax ID / VAT Number</Label>
+                <Label htmlFor="taxId">Tax ID / VAT Number</Label>
                 <Input
-                  id="tax_id"
-                  value={settings.tax_id}
-                  onChange={(e) => handleInputChange("root", "tax_id", e.target.value)}
+                  id="taxId"
+                  value={configuration.taxId}
+                  onChange={(e) => handleInputChange("root", "taxId", e.target.value)}
                 />
               </div>
 
               <Separator />
 
-              <h3 className="text-lg font-semibold">Contact Information</h3>
+              <h3 className="text-lg font-semibold">Address</h3>
 
               <div className="space-y-2">
                 <Label htmlFor="street">Street Address</Label>
                 <Textarea
                   id="street"
-                  value={settings.contact.address.street}
-                  onChange={(e) => handleNestedChange("contact", "address", "street", e.target.value)}
+                  value={configuration.address.street}
+                  onChange={(e) => handleNestedChange("address", "", "street", e.target.value)}
                 />
               </div>
 
@@ -439,51 +549,64 @@ export default function HotelSettingsPage() {
                   <Label htmlFor="city">City</Label>
                   <Input
                     id="city"
-                    value={settings.contact.address.city}
-                    onChange={(e) => handleNestedChange("contact", "address", "city", e.target.value)}
+                    value={configuration.address.city}
+                    onChange={(e) => handleNestedChange("address", "", "city", e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="state">State / Province</Label>
                   <Input
                     id="state"
-                    value={settings.contact.address.state}
-                    onChange={(e) => handleNestedChange("contact", "address", "state", e.target.value)}
+                    value={configuration.address.state}
+                    onChange={(e) => handleNestedChange("address", "", "state", e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="postal_code">Postal Code</Label>
+                  <Label htmlFor="postalCode">Postal Code</Label>
                   <Input
-                    id="postal_code"
-                    value={settings.contact.address.postal_code}
-                    onChange={(e) => handleNestedChange("contact", "address", "postal_code", e.target.value)}
+                    id="postalCode"
+                    value={configuration.address.postalCode}
+                    onChange={(e) => handleNestedChange("address", "", "postalCode", e.target.value)}
                   />
                 </div>
               </div>
 
+              <div className="space-y-2">
+                <Label htmlFor="country">Country</Label>
+                <Input
+                  id="country"
+                  value={configuration.address.country}
+                  onChange={(e) => handleNestedChange("address", "", "country", e.target.value)}
+                />
+              </div>
+
+              <Separator />
+
+              <h3 className="text-lg font-semibold">Contact Information</h3>
+
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="space-y-2">
-                  <Label htmlFor="primary_phone">Primary Phone</Label>
+                  <Label htmlFor="phone">Phone</Label>
                   <Input
-                    id="primary_phone"
-                    value={settings.contact.phone.primary}
-                    onChange={(e) => handleNestedChange("contact", "phone", "primary", e.target.value)}
+                    id="phone"
+                    value={configuration.contact.phone}
+                    onChange={(e) => handleNestedChange("contact", "", "phone", e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="primary_email">Primary Email</Label>
+                  <Label htmlFor="email">Email</Label>
                   <Input
-                    id="primary_email"
+                    id="email"
                     type="email"
-                    value={settings.contact.email.primary}
-                    onChange={(e) => handleNestedChange("contact", "email", "primary", e.target.value)}
+                    value={configuration.contact.email}
+                    onChange={(e) => handleNestedChange("contact", "", "email", e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="website">Website</Label>
                   <Input
                     id="website"
-                    value={settings.contact.website || ""}
+                    value={configuration.contact.website || ""}
                     onChange={(e) => handleNestedChange("contact", "", "website", e.target.value)}
                   />
                 </div>
@@ -497,63 +620,83 @@ export default function HotelSettingsPage() {
             <CardHeader>
               <CardTitle>Brand Identity</CardTitle>
               <CardDescription>Visual identity and branding elements</CardDescription>
-              {settings.chainInheritance?.branding && (
-                <Badge variant="outline" className="w-fit">
-                  <AlertTriangle className="mr-1 h-3 w-3" />
-                  Inherited from Chain
-                </Badge>
+              {configuration.chainInheritance?.branding && (
+                <div className="flex items-center justify-between">
+                  <Badge variant="outline" className="w-fit">
+                    <AlertTriangle className="mr-1 h-3 w-3" />
+                    Inherited from Chain
+                  </Badge>
+                  <Button variant="outline" size="sm" onClick={() => handleInheritanceChange("branding", false)}>
+                    Override
+                  </Button>
+                </div>
               )}
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="logo_url">Logo URL</Label>
+                  <Label htmlFor="logoUrl">Logo URL</Label>
                   <Input
-                    id="logo_url"
-                    value={settings.branding.logo_url || ""}
-                    onChange={(e) => handleNestedChange("branding", "", "logo_url", e.target.value)}
-                    disabled={settings.chainInheritance?.branding}
+                    id="logoUrl"
+                    value={configuration.branding.logoUrl || ""}
+                    onChange={(e) => handleNestedChange("branding", "", "logoUrl", e.target.value)}
+                    disabled={configuration.chainInheritance?.branding}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="favicon_url">Favicon URL</Label>
+                  <Label htmlFor="faviconUrl">Favicon URL</Label>
                   <Input
-                    id="favicon_url"
-                    value={settings.branding.favicon_url || ""}
-                    onChange={(e) => handleNestedChange("branding", "", "favicon_url", e.target.value)}
-                    disabled={settings.chainInheritance?.branding}
+                    id="faviconUrl"
+                    value={configuration.branding.faviconUrl || ""}
+                    onChange={(e) => handleNestedChange("branding", "", "faviconUrl", e.target.value)}
+                    disabled={configuration.chainInheritance?.branding}
                   />
                 </div>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-3">
                 <div className="space-y-2">
-                  <Label htmlFor="primary_color">Primary Color</Label>
+                  <Label htmlFor="primaryColor">Primary Color</Label>
                   <div className="flex gap-2">
                     <Input
-                      id="primary_color"
-                      value={settings.branding.primary_color}
-                      onChange={(e) => handleNestedChange("branding", "", "primary_color", e.target.value)}
-                      disabled={settings.chainInheritance?.branding}
+                      id="primaryColor"
+                      value={configuration.branding.primaryColor}
+                      onChange={(e) => handleNestedChange("branding", "", "primaryColor", e.target.value)}
+                      disabled={configuration.chainInheritance?.branding}
                     />
                     <div
                       className="h-10 w-10 rounded border"
-                      style={{ backgroundColor: settings.branding.primary_color }}
+                      style={{ backgroundColor: configuration.branding.primaryColor }}
                     />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="secondary_color">Secondary Color</Label>
+                  <Label htmlFor="secondaryColor">Secondary Color</Label>
                   <div className="flex gap-2">
                     <Input
-                      id="secondary_color"
-                      value={settings.branding.secondary_color}
-                      onChange={(e) => handleNestedChange("branding", "", "secondary_color", e.target.value)}
-                      disabled={settings.chainInheritance?.branding}
+                      id="secondaryColor"
+                      value={configuration.branding.secondaryColor}
+                      onChange={(e) => handleNestedChange("branding", "", "secondaryColor", e.target.value)}
+                      disabled={configuration.chainInheritance?.branding}
                     />
                     <div
                       className="h-10 w-10 rounded border"
-                      style={{ backgroundColor: settings.branding.secondary_color }}
+                      style={{ backgroundColor: configuration.branding.secondaryColor }}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="accentColor">Accent Color</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="accentColor"
+                      value={configuration.branding.accentColor}
+                      onChange={(e) => handleNestedChange("branding", "", "accentColor", e.target.value)}
+                      disabled={configuration.chainInheritance?.branding}
+                    />
+                    <div
+                      className="h-10 w-10 rounded border"
+                      style={{ backgroundColor: configuration.branding.accentColor }}
                     />
                   </div>
                 </div>
@@ -580,32 +723,41 @@ export default function HotelSettingsPage() {
             <CardHeader>
               <CardTitle>Financial Settings</CardTitle>
               <CardDescription>Currency, tax rates, and document settings</CardDescription>
+              {configuration.chainInheritance?.financial && (
+                <Badge variant="outline" className="w-fit">
+                  <AlertTriangle className="mr-1 h-3 w-3" />
+                  Inherited from Chain
+                </Badge>
+              )}
             </CardHeader>
             <CardContent className="space-y-4">
               <h3 className="text-lg font-semibold">Currency</h3>
 
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="space-y-2">
-                  <Label htmlFor="currency_code">Currency Code</Label>
+                  <Label htmlFor="currencyCode">Currency Code</Label>
                   <Input
-                    id="currency_code"
-                    value={settings.financial.currency.code}
+                    id="currencyCode"
+                    value={configuration.financial.currency.code}
                     onChange={(e) => handleNestedChange("financial", "currency", "code", e.target.value)}
+                    disabled={configuration.chainInheritance?.financial}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="currency_symbol">Symbol</Label>
+                  <Label htmlFor="currencySymbol">Symbol</Label>
                   <Input
-                    id="currency_symbol"
-                    value={settings.financial.currency.symbol}
+                    id="currencySymbol"
+                    value={configuration.financial.currency.symbol}
                     onChange={(e) => handleNestedChange("financial", "currency", "symbol", e.target.value)}
+                    disabled={configuration.chainInheritance?.financial}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="currency_position">Position</Label>
+                  <Label htmlFor="currencyPosition">Position</Label>
                   <Select
-                    value={settings.financial.currency.position}
+                    value={configuration.financial.currency.position}
                     onValueChange={(value) => handleNestedChange("financial", "currency", "position", value)}
+                    disabled={configuration.chainInheritance?.financial}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -624,21 +776,23 @@ export default function HotelSettingsPage() {
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="invoice_prefix">Invoice Prefix</Label>
+                  <Label htmlFor="invoicePrefix">Invoice Prefix</Label>
                   <Input
-                    id="invoice_prefix"
-                    value={settings.financial.document_prefixes.invoice}
-                    onChange={(e) => handleNestedChange("financial", "document_prefixes", "invoice", e.target.value)}
-                    placeholder="INV-"
+                    id="invoicePrefix"
+                    value={configuration.financial.documentPrefixes.invoice}
+                    onChange={(e) => handleNestedChange("financial", "documentPrefixes", "invoice", e.target.value)}
+                    placeholder="INV"
+                    disabled={configuration.chainInheritance?.financial}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="receipt_prefix">Receipt Prefix</Label>
+                  <Label htmlFor="receiptPrefix">Receipt Prefix</Label>
                   <Input
-                    id="receipt_prefix"
-                    value={settings.financial.document_prefixes.receipt}
-                    onChange={(e) => handleNestedChange("financial", "document_prefixes", "receipt", e.target.value)}
-                    placeholder="REC-"
+                    id="receiptPrefix"
+                    value={configuration.financial.documentPrefixes.receipt}
+                    onChange={(e) => handleNestedChange("financial", "documentPrefixes", "receipt", e.target.value)}
+                    placeholder="RCP"
+                    disabled={configuration.chainInheritance?.financial}
                   />
                 </div>
               </div>
@@ -655,31 +809,31 @@ export default function HotelSettingsPage() {
             <CardContent className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="check_in_time">Check-in Time</Label>
+                  <Label htmlFor="checkInTime">Check-in Time</Label>
                   <Input
-                    id="check_in_time"
+                    id="checkInTime"
                     type="time"
-                    value={settings.operational.check_in_time}
-                    onChange={(e) => handleNestedChange("operational", "", "check_in_time", e.target.value)}
+                    value={configuration.operational.checkInTime}
+                    onChange={(e) => handleNestedChange("operational", "", "checkInTime", e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="check_out_time">Check-out Time</Label>
+                  <Label htmlFor="checkOutTime">Check-out Time</Label>
                   <Input
-                    id="check_out_time"
+                    id="checkOutTime"
                     type="time"
-                    value={settings.operational.check_out_time}
-                    onChange={(e) => handleNestedChange("operational", "", "check_out_time", e.target.value)}
+                    value={configuration.operational.checkOutTime}
+                    onChange={(e) => handleNestedChange("operational", "", "checkOutTime", e.target.value)}
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="cancellation_policy">Cancellation Policy</Label>
+                <Label htmlFor="cancellationPolicy">Cancellation Policy</Label>
                 <Textarea
-                  id="cancellation_policy"
-                  value={settings.operational.cancellation_policy}
-                  onChange={(e) => handleNestedChange("operational", "", "cancellation_policy", e.target.value)}
+                  id="cancellationPolicy"
+                  value={configuration.operational.cancellationPolicy}
+                  onChange={(e) => handleNestedChange("operational", "", "cancellationPolicy", e.target.value)}
                   rows={3}
                 />
               </div>
@@ -701,8 +855,8 @@ export default function HotelSettingsPage() {
                     <p className="text-sm text-muted-foreground">Allow guests to book online</p>
                   </div>
                   <Switch
-                    checked={settings.features.online_booking}
-                    onCheckedChange={(checked) => handleNestedChange("features", "", "online_booking", checked)}
+                    checked={configuration.features.onlineBooking}
+                    onCheckedChange={(checked) => handleNestedChange("features", "", "onlineBooking", checked)}
                   />
                 </div>
 
@@ -712,8 +866,8 @@ export default function HotelSettingsPage() {
                     <p className="text-sm text-muted-foreground">Enable mobile check-in</p>
                   </div>
                   <Switch
-                    checked={settings.features.mobile_checkin}
-                    onCheckedChange={(checked) => handleNestedChange("features", "", "mobile_checkin", checked)}
+                    checked={configuration.features.mobileCheckin}
+                    onCheckedChange={(checked) => handleNestedChange("features", "", "mobileCheckin", checked)}
                   />
                 </div>
               </div>
@@ -735,9 +889,9 @@ export default function HotelSettingsPage() {
                     <p className="text-sm text-muted-foreground">Send email notifications</p>
                   </div>
                   <Switch
-                    checked={settings.notifications.email_notifications}
+                    checked={configuration.notifications.emailNotifications}
                     onCheckedChange={(checked) =>
-                      handleNestedChange("notifications", "", "email_notifications", checked)
+                      handleNestedChange("notifications", "", "emailNotifications", checked)
                     }
                   />
                 </div>
@@ -748,9 +902,9 @@ export default function HotelSettingsPage() {
                     <p className="text-sm text-muted-foreground">Auto-send booking confirmations</p>
                   </div>
                   <Switch
-                    checked={settings.notifications.booking_confirmations}
+                    checked={configuration.notifications.bookingConfirmations}
                     onCheckedChange={(checked) =>
-                      handleNestedChange("notifications", "", "booking_confirmations", checked)
+                      handleNestedChange("notifications", "", "bookingConfirmations", checked)
                     }
                   />
                 </div>
@@ -770,19 +924,19 @@ export default function HotelSettingsPage() {
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="bank_name">Bank Name</Label>
+                  <Label htmlFor="bankName">Bank Name</Label>
                   <Input
-                    id="bank_name"
-                    value={settings.banking.primary_account.bank_name}
-                    onChange={(e) => handleNestedChange("banking", "primary_account", "bank_name", e.target.value)}
+                    id="bankName"
+                    value={configuration.banking.primaryAccount.bankName}
+                    onChange={(e) => handleNestedChange("banking", "primaryAccount", "bankName", e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="account_name">Account Name</Label>
+                  <Label htmlFor="accountName">Account Name</Label>
                   <Input
-                    id="account_name"
-                    value={settings.banking.primary_account.account_name}
-                    onChange={(e) => handleNestedChange("banking", "primary_account", "account_name", e.target.value)}
+                    id="accountName"
+                    value={configuration.banking.primaryAccount.accountName}
+                    onChange={(e) => handleNestedChange("banking", "primaryAccount", "accountName", e.target.value)}
                   />
                 </div>
               </div>

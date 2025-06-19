@@ -113,7 +113,7 @@ export function useHotelSettings() {
   // Create hotel configuration - matches POST /configuration/
   const createConfiguration = useCallback(
     async (hotelId: string, configData: Partial<HotelSettings>) => {
-      return await request<HotelSettings>(`/configuration`, "POST", {
+      return await request<HotelSettings>(`/hotel-configurations`, "POST", {
         hotel: hotelId,
         ...configData,
       })
@@ -124,7 +124,7 @@ export function useHotelSettings() {
   // Update hotel configuration - matches PUT /configuration/:hotelId
   const updateHotelConfiguration = useCallback(
     async (hotelId: string, configData: Partial<HotelSettings>) => {
-      return await request<HotelSettings>(`/configuration/${hotelId}`, "PUT", configData)
+      return await request<HotelSettings>(`/hotel-configurations/${hotelId}`, "PUT", configData)
     },
     [request],
   )
@@ -146,7 +146,7 @@ export function useHotelSettings() {
   const updateBranding = useCallback(
     async (hotelId: string, branding: Partial<HotelSettings["branding"]>) => {
       return await request<{ branding: HotelSettings["branding"] }>(
-        `/configuration/${hotelId}/branding`,
+        `/hotel-configurations/${hotelId}/branding`,
         "PUT",
         branding,
       )
@@ -157,7 +157,7 @@ export function useHotelSettings() {
   // Update banking - matches PUT /configuration/:hotelId/banking
   const updateBanking = useCallback(
     async (hotelId: string, banking: Partial<HotelSettings["banking"]>) => {
-      return await request<{ banking: HotelSettings["banking"] }>(`/configuration/${hotelId}/banking`, "PUT", banking)
+      return await request<{ banking: HotelSettings["banking"] }>(`/hotel-configurations/${hotelId}/banking`, "PUT", banking)
     },
     [request],
   )
@@ -165,7 +165,7 @@ export function useHotelSettings() {
   // Update inheritance settings - matches PUT /configuration/:hotelId/inheritance
   const updateInheritanceSettings = useCallback(
     async (hotelId: string, inheritanceSettings: any) => {
-      return await request<HotelSettings>(`/configuration/${hotelId}/inheritance`, "PUT", {
+      return await request<HotelSettings>(`/hotel-configurations/${hotelId}/inheritance`, "PUT", {
         chainInheritance: inheritanceSettings,
       })
     },
@@ -190,7 +190,7 @@ export function useHotelSettings() {
       return await request<{
         documentNumber: string
         documentType: string
-      }>(`/configuration/${hotelId}/generate-number/${documentType}`, "POST")
+      }>(`/hotel-configurations/${hotelId}/generate-number/${documentType}`, "POST")
     },
     [request],
   )
@@ -198,7 +198,7 @@ export function useHotelSettings() {
   // Get document data - matches GET /configuration/:hotelId/document-data
   const getDocumentData = useCallback(
     async (hotelId: string) => {
-      return await request(`/configuration/${hotelId}/document-data`)
+      return await request(`/hotel-configurations/${hotelId}/document-data`)
     },
     [request],
   )

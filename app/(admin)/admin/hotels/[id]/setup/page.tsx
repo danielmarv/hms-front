@@ -205,7 +205,7 @@ export default function HotelSetupPage() {
         check_out_time: "11:00",
         time_zone: "UTC",
         date_format: "MM/DD/YYYY",
-        time_format: "12",
+        time_format: "12h",
         cancellation_policy: "Cancellation is allowed up to 24 hours before check-in without penalty.",
       },
       features: {
@@ -871,7 +871,7 @@ export default function HotelSetupPage() {
                         <FormControl>
                           <Input placeholder="INV-" {...field} />
                         </FormControl>
-                        <FormDescription>Example: INV-2024-001</FormDescription>
+                        <FormDescription>Example: INV-2025-001</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -886,7 +886,7 @@ export default function HotelSetupPage() {
                         <FormControl>
                           <Input placeholder="REC-" {...field} />
                         </FormControl>
-                        <FormDescription>Example: REC-2024-001</FormDescription>
+                        <FormDescription>Example: REC-2025-001</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -903,7 +903,7 @@ export default function HotelSetupPage() {
                         <FormControl>
                           <Input placeholder="QUO-" {...field} />
                         </FormControl>
-                        <FormDescription>Example: QUO-2024-001</FormDescription>
+                        <FormDescription>Example: QUO-2025-001</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -918,7 +918,7 @@ export default function HotelSetupPage() {
                         <FormControl>
                           <Input placeholder="FOL-" {...field} />
                         </FormControl>
-                        <FormDescription>Example: FOL-2024-001</FormDescription>
+                        <FormDescription>Example: FOL-2025-001</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
