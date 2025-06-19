@@ -84,7 +84,6 @@ export function useEventServices(hotelId?: string) {
 
     const url = `/event-service?hotelId=${hotelId}`
     const response = await request(url, "GET")
-    console.log("response:", response)
 
     if (response.error) {
       setError(response.error)

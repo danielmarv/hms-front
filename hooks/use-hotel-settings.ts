@@ -96,6 +96,25 @@ export interface HotelSettings {
   }
 }
 
+export interface SetupStatus {
+  setupInitiated: boolean
+  setupCompleted: boolean
+  currentStep: number
+  steps?: Array<{
+    step: number
+    name: string
+    completed: boolean
+  }>
+}
+
+export interface SetupInitialization {
+  hotel: any
+  configuration: HotelSettings
+  setupWizard: any
+  sharedConfigurationApplied: boolean
+  sharedConfiguration?: any
+}
+
 export function useHotelSettings() {
   const { request, isLoading } = useApi()
 
@@ -105,18 +124,15 @@ export function useHotelSettings() {
       return await request<{
         configuration: HotelSettings
         effectiveConfiguration: HotelSettings
-      }>(`/configuration/${hotelId}`)
+      }>(`/hotel-configurations/${hotelId}`)
     },
     [request],
   )
 
   // Create hotel configuration - matches POST /configuration/
   const createConfiguration = useCallback(
-    async (hotelId: string, configData: Partial<HotelSettings>) => {
-      return await request<HotelSettings>(`/hotel-configurations`, "POST", {
-        hotel: hotelId,
-        ...configData,
-      })
+    async (configData: Partial<HotelSettings>) => {
+      return await request<HotelSettings>(`/hotel-configurations`, "POST", configData)
     },
     [request],
   )
@@ -146,7 +162,7 @@ export function useHotelSettings() {
   const updateBranding = useCallback(
     async (hotelId: string, branding: Partial<HotelSettings["branding"]>) => {
       return await request<{ branding: HotelSettings["branding"] }>(
-        `/hotel-configurations/${hotelId}/branding`,
+        `/configuration/${hotelId}/branding`,
         "PUT",
         branding,
       )
@@ -157,7 +173,7 @@ export function useHotelSettings() {
   // Update banking - matches PUT /configuration/:hotelId/banking
   const updateBanking = useCallback(
     async (hotelId: string, banking: Partial<HotelSettings["banking"]>) => {
-      return await request<{ banking: HotelSettings["banking"] }>(`/hotel-configurations/${hotelId}/banking`, "PUT", banking)
+      return await request<{ banking: HotelSettings["banking"] }>(`/configuration/${hotelId}/banking`, "PUT", banking)
     },
     [request],
   )
@@ -165,7 +181,7 @@ export function useHotelSettings() {
   // Update inheritance settings - matches PUT /configuration/:hotelId/inheritance
   const updateInheritanceSettings = useCallback(
     async (hotelId: string, inheritanceSettings: any) => {
-      return await request<HotelSettings>(`/hotel-configurations/${hotelId}/inheritance`, "PUT", {
+      return await request<HotelSettings>(`/configuration/${hotelId}/inheritance`, "PUT", {
         chainInheritance: inheritanceSettings,
       })
     },
@@ -190,7 +206,7 @@ export function useHotelSettings() {
       return await request<{
         documentNumber: string
         documentType: string
-      }>(`/hotel-configurations/${hotelId}/generate-number/${documentType}`, "POST")
+      }>(`/configuration/${hotelId}/generate-number/${documentType}`, "POST")
     },
     [request],
   )
@@ -198,7 +214,7 @@ export function useHotelSettings() {
   // Get document data - matches GET /configuration/:hotelId/document-data
   const getDocumentData = useCallback(
     async (hotelId: string) => {
-      return await request(`/hotel-configurations/${hotelId}/document-data`)
+      return await request(`/configuration/${hotelId}/document-data`)
     },
     [request],
   )
@@ -222,7 +238,7 @@ export function useHotelSettings() {
   // Initialize hotel setup - matches POST /hotels/:id/setup/initialize
   const initializeHotelSetup = useCallback(
     async (hotelId: string) => {
-      return await request(`/hotels/${hotelId}/setup/initialize`, "POST")
+      return await request<SetupInitialization>(`/hotels/${hotelId}/setup/initialize`, "POST")
     },
     [request],
   )
@@ -230,7 +246,7 @@ export function useHotelSettings() {
   // Get hotel setup status - matches GET /hotels/:id/setup/status
   const getHotelSetupStatus = useCallback(
     async (hotelId: string) => {
-      return await request(`/hotels/${hotelId}/setup/status`)
+      return await request<SetupStatus>(`/hotels/${hotelId}/setup/status`)
     },
     [request],
   )
