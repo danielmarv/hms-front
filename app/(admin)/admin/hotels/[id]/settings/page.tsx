@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -58,223 +58,271 @@ export default function HotelSettingsPage() {
   const [activeTab, setActiveTab] = useState("general")
   const [isInitialLoading, setIsInitialLoading] = useState(true)
   const [isNewConfiguration, setIsNewConfiguration] = useState(false)
+  const [dataFetched, setDataFetched] = useState(false) // Add flag to prevent refetching
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Get hotel information
-        const hotelResponse = await getHotelById(hotelId, false, true)
-        if (hotelResponse.data) {
-          setHotel(hotelResponse.data)
+  // Memoize the fetch function to prevent recreating it on every render
+  const fetchData = useCallback(async () => {
+    if (!hotelId || dataFetched) return // Prevent multiple calls
+
+    setDataFetched(true) // Set flag immediately to prevent duplicate calls
+
+    try {
+      // Get hotel information first
+      const hotelResponse = await getHotelById(hotelId, false, true)
+      if (hotelResponse.data) {
+        setHotel(hotelResponse.data)
+      }
+
+      // Get hotel configuration
+      const configResponse = await getHotelConfiguration(hotelId)
+      if (configResponse.data) {
+        // Transform the API response to match the expected structure
+        const apiConfig = configResponse.data.configuration
+        const transformedConfig: HotelConfiguration = {
+          ...apiConfig,
+          // Transform address structure
+          address: {
+            street: apiConfig.contact?.address?.street || "",
+            city: apiConfig.contact?.address?.city || "",
+            state: apiConfig.contact?.address?.state || "",
+            postalCode: apiConfig.contact?.address?.postal_code || "",
+            country: apiConfig.contact?.address?.country || "",
+          },
+          // Transform contact structure
+          contact: {
+            phone: apiConfig.contact?.phone?.primary || "",
+            email: apiConfig.contact?.email?.primary || "",
+            website: apiConfig.contact?.website || "",
+          },
+          // Transform other fields to match interface
+          legalName: apiConfig.legal_name || apiConfig.name,
+          taxId: apiConfig.tax_id || "",
+          // Transform branding structure
+          branding: {
+            logoUrl: apiConfig.branding?.logo_url,
+            faviconUrl: apiConfig.branding?.favicon_url,
+            primaryColor: apiConfig.branding?.primary_color || "#1a73e8",
+            secondaryColor: apiConfig.branding?.secondary_color || "#f8f9fa",
+            accentColor: apiConfig.branding?.accent_color || "#fbbc04",
+            fonts: {
+              primary: apiConfig.branding?.fonts?.primary?.name || "Roboto",
+              secondary: apiConfig.branding?.fonts?.secondary?.name || "Open Sans",
+            },
+          },
+          // Transform financial structure
+          financial: {
+            currency: {
+              code: apiConfig.financial?.currency?.code || "USD",
+              symbol: apiConfig.financial?.currency?.symbol || "$",
+              position: apiConfig.financial?.currency?.position || "before",
+            },
+            taxRates: apiConfig.financial?.tax_rates || [],
+            documentPrefixes: {
+              invoice: apiConfig.financial?.document_prefixes?.invoice || "INV",
+              receipt: apiConfig.financial?.document_prefixes?.receipt || "RCP",
+              quotation: apiConfig.financial?.document_prefixes?.quotation || "QUO",
+              folio: apiConfig.financial?.document_prefixes?.folio || "FOL",
+            },
+          },
+          // Transform operational structure
+          operational: {
+            checkInTime: apiConfig.operational?.check_in_time || "15:00",
+            checkOutTime: apiConfig.operational?.check_out_time || "11:00",
+            timeZone: apiConfig.operational?.time_zone || "UTC",
+            dateFormat: apiConfig.operational?.date_format || "MM/DD/YYYY",
+            timeFormat: apiConfig.operational?.time_format || "12h",
+            cancellationPolicy: apiConfig.operational?.cancellation_policy || "",
+            noShowPolicy: apiConfig.operational?.no_show_policy || "",
+          },
+          // Transform features structure
+          features: {
+            onlineBooking: apiConfig.features?.enable_online_booking || false,
+            mobileCheckin: apiConfig.features?.enable_mobile_checkin || false,
+            keylessEntry: apiConfig.features?.enable_keyless_entry || false,
+            loyaltyProgram: apiConfig.features?.enable_loyalty_program || false,
+            multiLanguage: apiConfig.features?.enable_multi_language || false,
+            paymentGateway: apiConfig.features?.enable_payment_gateway || false,
+          },
+          // Transform notifications structure
+          notifications: {
+            emailNotifications: apiConfig.notifications?.email?.new_booking || false,
+            smsNotifications: apiConfig.notifications?.sms?.new_booking || false,
+            pushNotifications: false,
+            bookingConfirmations: apiConfig.notifications?.email?.booking_confirmation || false,
+            paymentReminders: apiConfig.notifications?.email?.payment_confirmation || false,
+            marketingEmails: false,
+          },
+          // Transform banking structure
+          banking: {
+            primaryAccount: {
+              bankName: apiConfig.banking?.accounts?.[0]?.bank_name || "",
+              accountName: apiConfig.banking?.accounts?.[0]?.account_name || "",
+              accountNumber: apiConfig.banking?.accounts?.[0]?.account_number || "",
+              routingNumber: apiConfig.banking?.accounts?.[0]?.routing_number || "",
+              swiftCode: apiConfig.banking?.accounts?.[0]?.swift_code,
+            },
+            paymentMethods: {
+              acceptedCards: apiConfig.banking?.payment_methods?.accepted_cards || [],
+              onlinePayments: apiConfig.banking?.payment_methods?.accepts_cards || false,
+              cashPayments: apiConfig.banking?.payment_methods?.accepts_cash || false,
+              bankTransfers: apiConfig.banking?.payment_methods?.accepts_bank_transfer || false,
+            },
+          },
+          // Add these fields to the existing transformedConfig
+          document_templates: {
+            invoice: {
+              show_logo: apiConfig.document_templates?.invoice?.show_logo || true,
+              show_watermark: apiConfig.document_templates?.invoice?.show_watermark || false,
+              payment_terms: apiConfig.document_templates?.invoice?.payment_terms || "Payment due within 30 days",
+            },
+            receipt: {
+              show_logo: apiConfig.document_templates?.receipt?.show_logo || true,
+              show_watermark: apiConfig.document_templates?.receipt?.show_watermark || false,
+            },
+            folio: {
+              show_logo: apiConfig.document_templates?.folio?.show_logo || true,
+              show_watermark: apiConfig.document_templates?.folio?.show_watermark || false,
+            },
+          },
+          legal: {
+            business_type: apiConfig.legal?.business_type || "",
+          },
+          // Also add the raw server fields for compatibility
+          legal_name: apiConfig.legal_name || apiConfig.name,
+          tax_id: apiConfig.tax_id || "",
+          __v: apiConfig.__v,
+          // Keep other fields as they are
+          _id: apiConfig._id,
+          hotel: apiConfig.hotel?._id || hotelId,
+          chainInheritance: apiConfig.chainInheritance,
+          createdBy: apiConfig.createdBy,
+          updatedBy: apiConfig.updatedBy,
+          createdAt: apiConfig.createdAt,
+          updatedAt: apiConfig.updatedAt,
         }
 
-        // Get hotel configuration
-        const configResponse = await getHotelConfiguration(hotelId)
-        if (configResponse.data) {
-          // Transform the API response to match the expected structure
-          const apiConfig = configResponse.data.configuration
-          const transformedConfig: HotelConfiguration = {
-            ...apiConfig,
-            // Transform address structure
+        setConfiguration(transformedConfig)
+        setEffectiveConfiguration(configResponse.data.effectiveConfiguration)
+      } else if (configResponse.error && configResponse.error.includes("not found")) {
+        // Configuration doesn't exist, prepare for creation
+        setIsNewConfiguration(true)
+        if (hotelResponse.data) {
+          // Create a default configuration template
+          const defaultConfig: Partial<HotelConfiguration> = {
+            hotel: hotelId,
+            name: hotelResponse.data.name,
+            legalName: hotelResponse.data.name,
+            taxId: "",
             address: {
-              street: apiConfig.contact?.address?.street || "",
-              city: apiConfig.contact?.address?.city || "",
-              state: apiConfig.contact?.address?.state || "",
-              postalCode: apiConfig.contact?.address?.postal_code || "",
-              country: apiConfig.contact?.address?.country || "",
+              street: "",
+              city: "",
+              state: "",
+              postalCode: "",
+              country: "",
             },
-            // Transform contact structure
             contact: {
-              phone: apiConfig.contact?.phone?.primary || "",
-              email: apiConfig.contact?.email?.primary || "",
-              website: apiConfig.contact?.website || "",
+              phone: "",
+              email: "",
+              website: "",
             },
-            // Transform other fields to match interface
-            legalName: apiConfig.legal_name || apiConfig.name,
-            taxId: apiConfig.tax_id || "",
-            // Transform branding structure
             branding: {
-              logoUrl: apiConfig.branding?.logo_url,
-              faviconUrl: apiConfig.branding?.favicon_url,
-              primaryColor: apiConfig.branding?.primary_color || "#1a73e8",
-              secondaryColor: apiConfig.branding?.secondary_color || "#f8f9fa",
-              accentColor: apiConfig.branding?.accent_color || "#fbbc04",
+              primaryColor: "#1a73e8",
+              secondaryColor: "#f8f9fa",
+              accentColor: "#fbbc04",
               fonts: {
-                primary: apiConfig.branding?.fonts?.primary?.name || "Roboto",
-                secondary: apiConfig.branding?.fonts?.secondary?.name || "Open Sans",
+                primary: "Roboto",
+                secondary: "Open Sans",
               },
             },
-            // Transform financial structure
             financial: {
               currency: {
-                code: apiConfig.financial?.currency?.code || "USD",
-                symbol: apiConfig.financial?.currency?.symbol || "$",
-                position: apiConfig.financial?.currency?.position || "before",
+                code: "USD",
+                symbol: "$",
+                position: "before",
               },
-              taxRates: apiConfig.financial?.tax_rates || [],
+              taxRates: [],
               documentPrefixes: {
-                invoice: apiConfig.financial?.document_prefixes?.invoice || "INV",
-                receipt: apiConfig.financial?.document_prefixes?.receipt || "RCP",
-                quotation: apiConfig.financial?.document_prefixes?.quotation || "QUO",
-                folio: apiConfig.financial?.document_prefixes?.folio || "FOL",
+                invoice: "INV",
+                receipt: "RCP",
+                quotation: "QUO",
+                folio: "FOL",
               },
             },
-            // Transform operational structure
             operational: {
-              checkInTime: apiConfig.operational?.check_in_time || "15:00",
-              checkOutTime: apiConfig.operational?.check_out_time || "11:00",
-              timeZone: apiConfig.operational?.time_zone || "UTC",
-              dateFormat: apiConfig.operational?.date_format || "MM/DD/YYYY",
-              timeFormat: apiConfig.operational?.time_format || "12h",
-              cancellationPolicy: apiConfig.operational?.cancellation_policy || "",
-              noShowPolicy: apiConfig.operational?.no_show_policy || "",
+              checkInTime: "15:00",
+              checkOutTime: "11:00",
+              timeZone: "UTC",
+              dateFormat: "MM/DD/YYYY",
+              timeFormat: "12h",
+              cancellationPolicy: "",
+              noShowPolicy: "",
             },
-            // Transform features structure
             features: {
-              onlineBooking: apiConfig.features?.enable_online_booking || false,
-              mobileCheckin: apiConfig.features?.enable_mobile_checkin || false,
-              keylessEntry: apiConfig.features?.enable_keyless_entry || false,
-              loyaltyProgram: apiConfig.features?.enable_loyalty_program || false,
-              multiLanguage: apiConfig.features?.enable_multi_language || false,
-              paymentGateway: apiConfig.features?.enable_payment_gateway || false,
+              onlineBooking: false,
+              mobileCheckin: false,
+              keylessEntry: false,
+              loyaltyProgram: false,
+              multiLanguage: false,
+              paymentGateway: false,
             },
-            // Transform notifications structure
             notifications: {
-              emailNotifications: apiConfig.notifications?.email?.new_booking || false,
-              smsNotifications: apiConfig.notifications?.sms?.new_booking || false,
+              emailNotifications: true,
+              smsNotifications: false,
               pushNotifications: false,
-              bookingConfirmations: apiConfig.notifications?.email?.booking_confirmation || false,
-              paymentReminders: apiConfig.notifications?.email?.payment_confirmation || false,
+              bookingConfirmations: true,
+              paymentReminders: true,
               marketingEmails: false,
             },
-            // Transform banking structure
             banking: {
               primaryAccount: {
-                bankName: apiConfig.banking?.accounts?.[0]?.bank_name || "",
-                accountName: apiConfig.banking?.accounts?.[0]?.account_name || "",
-                accountNumber: apiConfig.banking?.accounts?.[0]?.account_number || "",
-                routingNumber: apiConfig.banking?.accounts?.[0]?.routing_number || "",
-                swiftCode: apiConfig.banking?.accounts?.[0]?.swift_code,
+                bankName: "",
+                accountName: "",
+                accountNumber: "",
+                routingNumber: "",
               },
               paymentMethods: {
-                acceptedCards: apiConfig.banking?.payment_methods?.accepted_cards || [],
-                onlinePayments: apiConfig.banking?.payment_methods?.accepts_cards || false,
-                cashPayments: apiConfig.banking?.payment_methods?.accepts_cash || false,
-                bankTransfers: apiConfig.banking?.payment_methods?.accepts_bank_transfer || false,
+                acceptedCards: [],
+                onlinePayments: false,
+                cashPayments: true,
+                bankTransfers: false,
               },
             },
-            // Keep other fields as they are
-            _id: apiConfig._id,
-            hotel: apiConfig.hotel?._id || hotelId,
-            chainInheritance: apiConfig.chainInheritance,
-            createdBy: apiConfig.createdBy,
-            updatedBy: apiConfig.updatedBy,
-            createdAt: apiConfig.createdAt,
-            updatedAt: apiConfig.updatedAt,
+            document_templates: {
+              invoice: {
+                show_logo: true,
+                show_watermark: false,
+                payment_terms: "Payment due within 30 days",
+              },
+              receipt: {
+                show_logo: true,
+                show_watermark: false,
+              },
+              folio: {
+                show_logo: true,
+                show_watermark: false,
+              },
+            },
+            legal: {
+              business_type: "",
+            },
           }
-
-          setConfiguration(transformedConfig)
-          setEffectiveConfiguration(configResponse.data.effectiveConfiguration)
-        } else if (configResponse.error && configResponse.error.includes("not found")) {
-          // Configuration doesn't exist, prepare for creation
-          setIsNewConfiguration(true)
-          if (hotelResponse.data) {
-            // Create a default configuration template
-            const defaultConfig: Partial<HotelConfiguration> = {
-              hotel: hotelId,
-              name: hotelResponse.data.name,
-              legalName: hotelResponse.data.name,
-              taxId: "",
-              address: {
-                street: "",
-                city: "",
-                state: "",
-                postalCode: "",
-                country: "",
-              },
-              contact: {
-                phone: "",
-                email: "",
-                website: "",
-              },
-              branding: {
-                primaryColor: "#1a73e8",
-                secondaryColor: "#f8f9fa",
-                accentColor: "#fbbc04",
-                fonts: {
-                  primary: "Roboto",
-                  secondary: "Open Sans",
-                },
-              },
-              financial: {
-                currency: {
-                  code: "USD",
-                  symbol: "$",
-                  position: "before",
-                },
-                taxRates: [],
-                documentPrefixes: {
-                  invoice: "INV",
-                  receipt: "RCP",
-                  quotation: "QUO",
-                  folio: "FOL",
-                },
-              },
-              operational: {
-                checkInTime: "15:00",
-                checkOutTime: "11:00",
-                timeZone: "UTC",
-                dateFormat: "MM/DD/YYYY",
-                timeFormat: "12h",
-                cancellationPolicy: "",
-                noShowPolicy: "",
-              },
-              features: {
-                onlineBooking: false,
-                mobileCheckin: false,
-                keylessEntry: false,
-                loyaltyProgram: false,
-                multiLanguage: false,
-                paymentGateway: false,
-              },
-              notifications: {
-                emailNotifications: true,
-                smsNotifications: false,
-                pushNotifications: false,
-                bookingConfirmations: true,
-                paymentReminders: true,
-                marketingEmails: false,
-              },
-              banking: {
-                primaryAccount: {
-                  bankName: "",
-                  accountName: "",
-                  accountNumber: "",
-                  routingNumber: "",
-                },
-                paymentMethods: {
-                  acceptedCards: [],
-                  onlinePayments: false,
-                  cashPayments: true,
-                  bankTransfers: false,
-                },
-              },
-            }
-            setConfiguration(defaultConfig as HotelConfiguration)
-          }
+          setConfiguration(defaultConfig as HotelConfiguration)
         }
-      } catch (error) {
-        console.error("Error fetching hotel configuration:", error)
-        toast.error("Failed to load hotel configuration")
-      } finally {
-        setIsInitialLoading(false)
       }
+    } catch (error) {
+      console.error("Error fetching hotel configuration:", error)
+      toast.error("Failed to load hotel configuration")
+      setDataFetched(false) // Reset flag on error to allow retry
+    } finally {
+      setIsInitialLoading(false)
     }
+  }, [hotelId, getHotelById, getHotelConfiguration, dataFetched])
 
-    if (hotelId) {
+  useEffect(() => {
+    if (hotelId && !dataFetched) {
       fetchData()
     }
-  }, [hotelId, getHotelById, getHotelConfiguration])
+  }, [hotelId, fetchData, dataFetched])
 
   const handleSave = async (section?: string) => {
     if (!configuration || !hotelId) return
@@ -353,17 +401,38 @@ export default function HotelSettingsPage() {
     setConfiguration((prev) => {
       if (!prev) return prev
 
-      return {
-        ...prev,
-        [section]: {
-          ...prev[section as keyof HotelConfiguration],
+      const newConfig = { ...prev }
+
+      if (subsection === "") {
+        // Direct nested field (e.g., address.street, contact.phone)
+        newConfig[section as keyof HotelConfiguration] = {
+          ...newConfig[section as keyof HotelConfiguration],
+          [field]: value,
+        }
+      } else {
+        // Double nested field (e.g., financial.currency.code, banking.primaryAccount.bankName)
+        const sectionData = newConfig[section as keyof HotelConfiguration] as any
+        newConfig[section as keyof HotelConfiguration] = {
+          ...sectionData,
           [subsection]: {
-            ...(prev[section as keyof HotelConfiguration] as any)?.[subsection],
+            ...sectionData[subsection],
             [field]: value,
           },
-        },
+        }
       }
+
+      return newConfig
     })
+  }
+
+  const handleInputChangeDebug = (section: string, field: string, value: any) => {
+    console.log(`Updating ${section}.${field} to:`, value)
+    handleInputChange(section, field, value)
+  }
+
+  const handleNestedChangeDebug = (section: string, subsection: string, field: string, value: any) => {
+    console.log(`Updating ${section}.${subsection}.${field} to:`, value)
+    handleNestedChange(section, subsection, field, value)
   }
 
   const handleInheritanceChange = async (setting: string, inherit: boolean) => {
@@ -465,7 +534,7 @@ export default function HotelSettingsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-9">
           <TabsTrigger value="general">
             <Settings className="mr-2 h-4 w-4" />
             General
@@ -494,6 +563,14 @@ export default function HotelSettingsPage() {
             <CreditCard className="mr-2 h-4 w-4" />
             Banking
           </TabsTrigger>
+          <TabsTrigger value="documents">
+            <FileText className="mr-2 h-4 w-4" />
+            Documents
+          </TabsTrigger>
+          <TabsTrigger value="legal">
+            <Shield className="mr-2 h-4 w-4" />
+            Legal
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="general" className="space-y-4 pt-4">
@@ -509,7 +586,7 @@ export default function HotelSettingsPage() {
                   <Input
                     id="name"
                     value={configuration.name}
-                    onChange={(e) => handleInputChange("root", "name", e.target.value)}
+                    onChange={(e) => handleInputChangeDebug("root", "name", e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
@@ -540,7 +617,7 @@ export default function HotelSettingsPage() {
                 <Textarea
                   id="street"
                   value={configuration.address.street}
-                  onChange={(e) => handleNestedChange("address", "", "street", e.target.value)}
+                  onChange={(e) => handleNestedChangeDebug("address", "", "street", e.target.value)}
                 />
               </div>
 
@@ -661,7 +738,7 @@ export default function HotelSettingsPage() {
                     <Input
                       id="primaryColor"
                       value={configuration.branding.primaryColor}
-                      onChange={(e) => handleNestedChange("branding", "", "primaryColor", e.target.value)}
+                      onChange={(e) => handleNestedChangeDebug("branding", "", "primaryColor", e.target.value)}
                       disabled={configuration.chainInheritance?.branding}
                     />
                     <div
@@ -870,6 +947,50 @@ export default function HotelSettingsPage() {
                     onCheckedChange={(checked) => handleNestedChange("features", "", "mobileCheckin", checked)}
                   />
                 </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>Keyless Entry</Label>
+                    <p className="text-sm text-muted-foreground">Enable keyless room entry</p>
+                  </div>
+                  <Switch
+                    checked={configuration.features.keylessEntry}
+                    onCheckedChange={(checked) => handleNestedChange("features", "", "keylessEntry", checked)}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>Loyalty Program</Label>
+                    <p className="text-sm text-muted-foreground">Enable loyalty program</p>
+                  </div>
+                  <Switch
+                    checked={configuration.features.loyaltyProgram}
+                    onCheckedChange={(checked) => handleNestedChange("features", "", "loyaltyProgram", checked)}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>Multi-Language</Label>
+                    <p className="text-sm text-muted-foreground">Support multiple languages</p>
+                  </div>
+                  <Switch
+                    checked={configuration.features.multiLanguage}
+                    onCheckedChange={(checked) => handleNestedChange("features", "", "multiLanguage", checked)}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>Payment Gateway</Label>
+                    <p className="text-sm text-muted-foreground">Integrated payment processing</p>
+                  </div>
+                  <Switch
+                    checked={configuration.features.paymentGateway}
+                    onCheckedChange={(checked) => handleNestedChange("features", "", "paymentGateway", checked)}
+                  />
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -941,6 +1062,79 @@ export default function HotelSettingsPage() {
                 </div>
               </div>
 
+              <Separator />
+
+              <h3 className="text-lg font-semibold">Payment Methods</h3>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Accepted Cards</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {["visa", "mastercard", "amex", "discover", "jcb", "diners"].map((card) => (
+                      <div key={card} className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id={card}
+                          checked={configuration.banking.paymentMethods.acceptedCards.includes(card)}
+                          onChange={(e) => {
+                            const currentCards = configuration.banking.paymentMethods.acceptedCards
+                            const newCards = e.target.checked
+                              ? [...currentCards, card]
+                              : currentCards.filter((c) => c !== card)
+                            handleNestedChange("banking", "paymentMethods", "acceptedCards", newCards)
+                          }}
+                          className="rounded border-gray-300"
+                        />
+                        <Label htmlFor={card} className="capitalize">
+                          {card}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>Online Payments</Label>
+                      <p className="text-sm text-muted-foreground">Accept online payments</p>
+                    </div>
+                    <Switch
+                      checked={configuration.banking.paymentMethods.onlinePayments}
+                      onCheckedChange={(checked) =>
+                        handleNestedChange("banking", "paymentMethods", "onlinePayments", checked)
+                      }
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>Cash Payments</Label>
+                      <p className="text-sm text-muted-foreground">Accept cash payments</p>
+                    </div>
+                    <Switch
+                      checked={configuration.banking.paymentMethods.cashPayments}
+                      onCheckedChange={(checked) =>
+                        handleNestedChange("banking", "paymentMethods", "cashPayments", checked)
+                      }
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>Bank Transfers</Label>
+                      <p className="text-sm text-muted-foreground">Accept bank transfers</p>
+                    </div>
+                    <Switch
+                      checked={configuration.banking.paymentMethods.bankTransfers}
+                      onCheckedChange={(checked) =>
+                        handleNestedChange("banking", "paymentMethods", "bankTransfers", checked)
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="flex justify-end">
                 <Button onClick={() => handleSave("banking")} disabled={isSaving}>
                   {isSaving ? (
@@ -952,6 +1146,170 @@ export default function HotelSettingsPage() {
                     "Save Banking"
                   )}
                 </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="documents" className="space-y-4 pt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Document Templates</CardTitle>
+              <CardDescription>Configure document template settings</CardDescription>
+              {configuration.chainInheritance?.document_templates && (
+                <Badge variant="outline" className="w-fit">
+                  <AlertTriangle className="mr-1 h-3 w-3" />
+                  Inherited from Chain
+                </Badge>
+              )}
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Invoice Template</h3>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>Show Logo</Label>
+                      <p className="text-sm text-muted-foreground">Display logo on invoices</p>
+                    </div>
+                    <Switch
+                      checked={configuration.document_templates?.invoice?.show_logo || false}
+                      onCheckedChange={(checked) =>
+                        handleNestedChange("document_templates", "invoice", "show_logo", checked)
+                      }
+                      disabled={configuration.chainInheritance?.document_templates}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>Show Watermark</Label>
+                      <p className="text-sm text-muted-foreground">Display watermark on invoices</p>
+                    </div>
+                    <Switch
+                      checked={configuration.document_templates?.invoice?.show_watermark || false}
+                      onCheckedChange={(checked) =>
+                        handleNestedChange("document_templates", "invoice", "show_watermark", checked)
+                      }
+                      disabled={configuration.chainInheritance?.document_templates}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="paymentTerms">Payment Terms</Label>
+                  <Textarea
+                    id="paymentTerms"
+                    value={configuration.document_templates?.invoice?.payment_terms || ""}
+                    onChange={(e) =>
+                      handleNestedChange("document_templates", "invoice", "payment_terms", e.target.value)
+                    }
+                    placeholder="Payment due within 30 days"
+                    disabled={configuration.chainInheritance?.document_templates}
+                  />
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Receipt Template</h3>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>Show Logo</Label>
+                      <p className="text-sm text-muted-foreground">Display logo on receipts</p>
+                    </div>
+                    <Switch
+                      checked={configuration.document_templates?.receipt?.show_logo || false}
+                      onCheckedChange={(checked) =>
+                        handleNestedChange("document_templates", "receipt", "show_logo", checked)
+                      }
+                      disabled={configuration.chainInheritance?.document_templates}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>Show Watermark</Label>
+                      <p className="text-sm text-muted-foreground">Display watermark on receipts</p>
+                    </div>
+                    <Switch
+                      checked={configuration.document_templates?.receipt?.show_watermark || false}
+                      onCheckedChange={(checked) =>
+                        handleNestedChange("document_templates", "receipt", "show_watermark", checked)
+                      }
+                      disabled={configuration.chainInheritance?.document_templates}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Folio Template</h3>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>Show Logo</Label>
+                      <p className="text-sm text-muted-foreground">Display logo on folios</p>
+                    </div>
+                    <Switch
+                      checked={configuration.document_templates?.folio?.show_logo || false}
+                      onCheckedChange={(checked) =>
+                        handleNestedChange("document_templates", "folio", "show_logo", checked)
+                      }
+                      disabled={configuration.chainInheritance?.document_templates}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>Show Watermark</Label>
+                      <p className="text-sm text-muted-foreground">Display watermark on folios</p>
+                    </div>
+                    <Switch
+                      checked={configuration.document_templates?.folio?.show_watermark || false}
+                      onCheckedChange={(checked) =>
+                        handleNestedChange("document_templates", "folio", "show_watermark", checked)
+                      }
+                      disabled={configuration.chainInheritance?.document_templates}
+                    />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="legal" className="space-y-4 pt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Legal Information</CardTitle>
+              <CardDescription>Legal entity and business information</CardDescription>
+              {configuration.chainInheritance?.legal && (
+                <Badge variant="outline" className="w-fit">
+                  <AlertTriangle className="mr-1 h-3 w-3" />
+                  Inherited from Chain
+                </Badge>
+              )}
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="businessType">Business Type</Label>
+                <Select
+                  value={configuration.legal?.business_type || ""}
+                  onValueChange={(value) => handleNestedChange("legal", "", "business_type", value)}
+                  disabled={configuration.chainInheritance?.legal}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select business type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="corporation">Corporation</SelectItem>
+                    <SelectItem value="llc">Limited Liability Company (LLC)</SelectItem>
+                    <SelectItem value="partnership">Partnership</SelectItem>
+                    <SelectItem value="sole_proprietorship">Sole Proprietorship</SelectItem>
+                    <SelectItem value="non_profit">Non-Profit Organization</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </CardContent>
           </Card>

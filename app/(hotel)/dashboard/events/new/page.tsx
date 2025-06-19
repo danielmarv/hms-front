@@ -52,7 +52,8 @@ export default function NewEventPage() {
   // Fetch data using hooks with proper hotel ID - all hotel-specific
   const { eventTypes, loading: loadingEventTypes, fetchEventTypes } = useEventTypes(hotelId)
   const { venues, loading: loadingVenues, fetchVenues } = useVenues(hotelId)
-  const { services, loading: loadingServices, fetchServices } = useEventServices(hotelId)
+  // const { services, loading: loadingServices, fetchServices } = useEventServices(hotelId)
+  const { services, loading: servicesLoading, error, deleteService, fetchServices } = useEventServices(hotelId)
   const { templates, loading: loadingTemplates, fetchTemplates } = useEventTemplates(hotelId)
   const { users, isLoading: loadingUsers, fetchUsers } = useUsers()
   const { createEvent } = useEvents()
@@ -89,7 +90,7 @@ export default function NewEventPage() {
     console.log("Templates:", templates?.length || 0)
     console.log("Users:", users?.length || 0)
     console.log("services for the hotel:", services)
-  }, [hotel, hotelId, hotelLoading, eventTypes, venues, services, templates, users])
+  }, [hotel, hotelId, hotelLoading, eventTypes, venues, services, templates, users, fetchServices])
 
   // Fetch data when hotel ID is available
   useEffect(() => {
