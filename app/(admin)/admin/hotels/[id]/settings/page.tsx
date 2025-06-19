@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
+import Link from "next/link"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -13,7 +14,7 @@ import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { useAuth } from "@/hooks/use-auth"
+import { useHotels } from "@/hooks/use-hotels"
 import { useHotelSettings } from "@/hooks/use-hotel-settings"
 import {
   Loader2,
@@ -25,7 +26,9 @@ import {
   CreditCard,
   Bell,
   Shield,
+  LinkIcon,
   AlertTriangle,
+  ArrowLeft,
   Building,
 } from "lucide-react"
 
@@ -139,9 +142,11 @@ interface HotelSettings {
   }
 }
 
-export default function AdminSettingsPage() {
+export default function HotelSettingsPage() {
+  const params = useParams()
   const router = useRouter()
-  const { user } = useAuth()
+  const hotelId = params.id as string
+  const { getHotelById } = useHotels()
   const {
     getEffectiveConfiguration,
     updateBranding,
@@ -152,26 +157,26 @@ export default function AdminSettingsPage() {
   } = useHotelSettings()
 
   const [settings, setSettings] = useState<HotelSettings | null>(null)
-  const [primaryHotel, setPrimaryHotel] = useState<any>(null)
+  const [hotel, setHotel] = useState<any>(null)
+  const [chainConfig, setChainConfig] = useState<any>(null)
   const [isSaving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState("general")
   const [isInitialLoading, setIsInitialLoading] = useState(true)
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!user?.primaryHotel?.id) {
-        toast.error("No primary hotel found for your account")
-        setIsInitialLoading(false)
-        return
-      }
-
       try {
-        setPrimaryHotel(user.primaryHotel)
+        // Get hotel information
+        const hotelResponse = await getHotelById(hotelId, false, true)
+        if (hotelResponse.data) {
+          setHotel(hotelResponse.data)
+        }
 
-        // Get effective configuration for primary hotel
-        const configResponse = await getEffectiveConfiguration(user.primaryHotel.id)
+        // Get effective configuration
+        const configResponse = await getEffectiveConfiguration(hotelId)
         if (configResponse.data) {
           setSettings(configResponse.data.hotelConfiguration)
+          setChainConfig(configResponse.data.chainConfiguration)
         }
       } catch (error) {
         console.error("Error fetching hotel settings:", error)
@@ -181,13 +186,13 @@ export default function AdminSettingsPage() {
       }
     }
 
-    if (user) {
+    if (hotelId) {
       fetchData()
     }
-  }, [user, getEffectiveConfiguration])
+  }, [hotelId, getHotelById, getEffectiveConfiguration])
 
   const handleSave = async (section?: string) => {
-    if (!settings || !primaryHotel?.id) return
+    if (!settings || !hotelId) return
 
     setSaving(true)
     try {
@@ -195,14 +200,14 @@ export default function AdminSettingsPage() {
 
       switch (section) {
         case "branding":
-          response = await updateBranding(primaryHotel.id, settings.branding)
+          response = await updateBranding(hotelId, settings.branding)
           break
         case "banking":
-          response = await updateBanking(primaryHotel.id, settings.banking)
+          response = await updateBanking(hotelId, settings.banking)
           break
         default:
           // Update full configuration
-          response = await updateBranding(primaryHotel.id, settings)
+          response = await updateBranding(hotelId, settings)
           break
       }
 
@@ -257,10 +262,10 @@ export default function AdminSettingsPage() {
   }
 
   const handleSyncFromChain = async () => {
-    if (!primaryHotel?.id) return
+    if (!hotel?.chainCode) return
 
     try {
-      const response = await syncFromChain(primaryHotel.id)
+      const response = await syncFromChain(hotelId)
       if (response.data) {
         setSettings(response.data.configuration)
         toast.success("Successfully synced from chain configuration")
@@ -278,14 +283,14 @@ export default function AdminSettingsPage() {
     )
   }
 
-  if (!user?.primaryHotel) {
+  if (!hotel) {
     return (
       <div className="flex h-full flex-col items-center justify-center">
         <Building className="h-16 w-16 text-muted-foreground" />
-        <h2 className="mt-4 text-2xl font-bold">No Primary Hotel</h2>
-        <p className="mt-2 text-muted-foreground">You don't have a primary hotel assigned to your account</p>
+        <h2 className="mt-4 text-2xl font-bold">Hotel Not Found</h2>
+        <p className="mt-2 text-muted-foreground">The hotel you're looking for doesn't exist</p>
         <Button className="mt-6" onClick={() => router.push("/admin/hotels")}>
-          View All Hotels
+          Back to Hotels
         </Button>
       </div>
     )
@@ -297,7 +302,7 @@ export default function AdminSettingsPage() {
         <Settings className="h-16 w-16 text-muted-foreground" />
         <h2 className="mt-4 text-2xl font-bold">Settings Not Found</h2>
         <p className="mt-2 text-muted-foreground">This hotel has not been configured yet</p>
-        <Button className="mt-6" onClick={() => router.push(`/admin/hotels/${primaryHotel.id}/setup`)}>
+        <Button className="mt-6" onClick={() => router.push(`/admin/hotels/${hotelId}/setup`)}>
           Start Setup
         </Button>
       </div>
@@ -307,18 +312,27 @@ export default function AdminSettingsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Hotel Settings</h1>
-          <p className="text-muted-foreground">
-            {primaryHotel.name} ({primaryHotel.code})
-          </p>
-          <Badge variant="outline" className="mt-2">
-            <Building className="mr-1 h-3 w-3" />
-            Primary Hotel
-          </Badge>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="icon" asChild>
+            <Link href={`/admin/hotels/${hotelId}`}>
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Hotel Settings</h1>
+            <p className="text-muted-foreground">
+              {hotel.name} ({hotel.code})
+            </p>
+            {hotel.chainCode && (
+              <Badge variant="outline" className="mt-2">
+                <LinkIcon className="mr-1 h-3 w-3" />
+                Chain: {hotel.chainCode}
+              </Badge>
+            )}
+          </div>
         </div>
         <div className="flex gap-2">
-          {primaryHotel.chainCode && (
+          {hotel.chainCode && (
             <Button variant="outline" onClick={handleSyncFromChain}>
               <Sync className="mr-2 h-4 w-4" />
               Sync from Chain
