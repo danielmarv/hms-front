@@ -1,238 +1,590 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { toast } from "sonner"
-import { useApi } from "@/hooks/use-api"
-import type { Venue } from "./use-events"
+import { useState, useCallback, useEffect } from "react"
+import { useApi } from "./use-api"
+
+export interface Venue {
+  _id: string
+  name: string
+  description?: string
+  hotel_id: string
+  type: "ballroom" | "conference_room" | "meeting_room" | "banquet_hall" | "outdoor" | "restaurant" | "other"
+  capacity: number
+  area?: {
+    value: number
+    unit: "sq_ft" | "sq_m"
+  }
+  location?: {
+    floor?: string
+    building?: string
+    directions?: string
+  }
+  amenities?: string[]
+  features?: string[]
+  pricing?: {
+    base_price: number
+    price_per_hour: number
+    price_per_person: number
+    minimum_spend: number
+    currency: string
+  }
+  availability: {
+    days_of_week: number[]
+    start_time: string
+    end_time: string
+    exceptions: Array<{
+      date: Date
+      available: boolean
+      reason: string
+    }>
+  }
+  setup_time: number
+  teardown_time: number
+  minimum_hours: number
+  cancellation_policy: "flexible" | "moderate" | "strict"
+  images?: Array<{
+    url: string
+    caption?: string
+  }>
+  floor_plan?: {
+    url: string
+    width: number
+    height: number
+  }
+  status: "active" | "inactive" | "maintenance"
+  maintenance?: {
+    start_date: Date
+    end_date: Date
+    reason: string
+    scheduled_by: string
+  }
+  is_deleted: boolean
+  createdBy?: string
+  updatedBy?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface VenueFilters {
+  hotel_id?: string
+  status?: string
+  type?: string
+  capacity_min?: number
+  capacity_max?: number
+  search?: string
+  page?: number
+  limit?: number
+}
+
+export interface VenueStatistics {
+  total_events: number
+  confirmed_events: number
+  cancelled_events: number
+  cancellation_rate: string
+  revenue: string
+  average_duration: string
+  utilization_rate: string
+  popular_event_types: Array<{
+    id: string
+    count: number
+  }>
+}
+
+export interface VenueAvailability {
+  venue: {
+    id: string
+    name: string
+    capacity: number
+  }
+  date_range: {
+    start: Date
+    end: Date
+  }
+  events: any[]
+  available_slots: Array<{
+    start: Date
+    end: Date
+    available: boolean
+  }>
+}
+
+export interface AvailabilityCheck {
+  available: boolean
+  conflicting_events?: any[]
+  venue: {
+    id: string
+    name: string
+    capacity: number
+  }
+}
+
+export interface MaintenanceSchedule {
+  id: string
+  title: string
+  description: string
+  start_date: Date
+  end_date: Date
+  status: string
+  notes?: string
+}
+
+export interface CreateVenueData {
+  name: string
+  description?: string
+  hotel_id: string
+  type: Venue["type"]
+  capacity: number
+  area?: Venue["area"]
+  location?: Venue["location"]
+  amenities?: string[]
+  features?: string[]
+  pricing?: Venue["pricing"]
+  availability?: Venue["availability"]
+  setup_time?: number
+  teardown_time?: number
+  minimum_hours?: number
+  cancellation_policy?: Venue["cancellation_policy"]
+  images?: Venue["images"]
+  floor_plan?: Venue["floor_plan"]
+  status?: Venue["status"]
+}
 
 export function useVenues(hotelId?: string) {
-  const [venues, setVenues] = useState<Venue[]>([])
-  const [loading, setLoading] = useState(true)
+  const { request, isLoading } = useApi()
   const [error, setError] = useState<string | null>(null)
-  const { request } = useApi()
+  const [venues, setVenues] = useState<Venue[]>([])
+  const [totalVenues, setTotalVenues] = useState(0)
+  const [currentPage, setCurrentPage] = useState(1)
 
-  const fetchVenues = useCallback(async () => {
-    try {
-      setLoading(true)
-      const endpoint = hotelId ? `/event-venues?hotel_id=${hotelId}` : "/event-venues"
-      const response = await request<{ venues: Venue[] }>(endpoint, "GET")
+  // Clear error helper
+  const clearError = useCallback(() => setError(null), [])
 
-      if (response.error) {
-        throw new Error(response.error)
-      }
+  // Get all venues with filters and pagination
+  const getAllVenues = useCallback(
+    async (filters: VenueFilters = {}) => {
+      clearError()
 
-      if (response.data && response.data.venues) {
-        setVenues(response.data.venues)
-      } else {
-        setVenues([])
-      }
-    } catch (err) {
-      console.error("Failed to fetch venues:", err)
-      setError(err instanceof Error ? err.message : "Failed to fetch venues")
-      // Error logged in useApi hook
-    } finally {
-      setLoading(false)
-    }
-  }, [hotelId, request])
+      const params = new URLSearchParams()
 
-  useEffect(() => {
-    fetchVenues()
-  }, [fetchVenues])
+      // Add hotel_id from hook parameter or filters
+      if (hotelId) params.append("hotel_id", hotelId)
+      else if (filters.hotel_id) params.append("hotel_id", filters.hotel_id)
 
-  // Function to create a new venue
-  const createVenue = async (venueData: Partial<Venue>, hotelId?: string) => {
-    try {
-      setLoading(true)
+      if (filters.status) params.append("status", filters.status)
+      if (filters.type) params.append("type", filters.type)
+      if (filters.capacity_min) params.append("capacity_min", filters.capacity_min.toString())
+      if (filters.capacity_max) params.append("capacity_max", filters.capacity_max.toString())
+      if (filters.search) params.append("search", filters.search)
+      if (filters.page) params.append("page", filters.page.toString())
+      if (filters.limit) params.append("limit", filters.limit.toString())
 
-      // Add hotel_id to the venue data
-      const dataWithHotelId = {
-        ...venueData,
-        hotel_id: hotelId || venueData.hotel_id,
-      }
-
-      console.log("Creating venue with data:", dataWithHotelId)
-
-      const response = await request<any>("/event-venues", "POST", dataWithHotelId)
-
-      console.log("Create venue response:", response)
+      const response = await request(`/events/venues?${params.toString()}`, "GET")
 
       if (response.error) {
-        throw new Error(response.error)
+        setError(response.error)
+        return { venues: [], pagination: null }
       }
 
-      // Check for different possible response structures
-      let createdVenue = null
       if (response.data) {
-        // Try different possible response structures
-        if (response.data.venue) {
-          createdVenue = response.data.venue
-        } else if (response.data.data) {
-          createdVenue = response.data.data
-        } else if (response.data._id) {
-          // Response data is the venue itself
-          createdVenue = response.data
-        } else {
-          console.log("Unexpected response structure:", response.data)
-        }
+        const venuesData = response.data.venues || []
+        setVenues(venuesData)
+        setTotalVenues(response.data.pagination?.total || 0)
+        setCurrentPage(response.data.pagination?.page || 1)
+        return response.data
       }
 
-      if (createdVenue) {
-        // Add the new venue to the state
-        setVenues((prevVenues) => [...prevVenues, createdVenue])
-        toast.success("Venue created successfully")
-        return createdVenue
-      } else {
-        console.error("No venue data in response:", response)
-        throw new Error("Venue was created but no data returned")
-      }
-    } catch (err) {
-      console.error("Failed to create venue:", err)
-      setError(err instanceof Error ? err.message : "Failed to create venue")
-      // Error logged in useApi hook
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }
+      return { venues: [], pagination: null }
+    },
+    [request, hotelId, clearError],
+  )
 
-  // Function to update a venue
-  const updateVenue = async (id: string, venueData: Partial<Venue>, hotelId?: string) => {
-    try {
-      setLoading(true)
+  // Get venue by ID
+  const getVenueById = useCallback(
+    async (venueId: string) => {
+      clearError()
 
-      // Add hotel_id to the venue data if provided
-      const dataWithHotelId = hotelId
-        ? {
-            ...venueData,
-            hotel_id: hotelId,
-          }
-        : venueData
-
-      const response = await request<any>(`/event-venues/${id}`, "PUT", dataWithHotelId)
+      const response = await request(`/events/venues/${venueId}`, "GET")
 
       if (response.error) {
-        throw new Error(response.error)
-      }
-
-      // Check for different possible response structures
-      let updatedVenue = null
-      if (response.data) {
-        if (response.data.venue) {
-          updatedVenue = response.data.venue
-        } else if (response.data.data) {
-          updatedVenue = response.data.data
-        } else if (response.data._id) {
-          updatedVenue = response.data
-        }
-      }
-
-      if (updatedVenue) {
-        // Update the venue in the state
-        setVenues((prevVenues) => prevVenues.map((venue) => (venue._id === id ? { ...venue, ...updatedVenue } : venue)))
-
-        toast.success("Venue updated successfully")
-        return updatedVenue
-      } else {
-        throw new Error("Venue was updated but no data returned")
-      }
-    } catch (err) {
-      console.error("Failed to update venue:", err)
-      setError(err instanceof Error ? err.message : "Failed to update venue")
-      // Error logged in useApi hook
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Function to delete a venue
-  const deleteVenue = async (id: string) => {
-    try {
-      setLoading(true)
-      const response = await request<{ success: boolean }>(`/event-venues/${id}`, "DELETE")
-
-      if (response.error) {
-        throw new Error(response.error)
-      }
-
-      // Remove the venue from the state
-      setVenues((prevVenues) => prevVenues.filter((venue) => venue._id !== id))
-      toast.success("Venue deleted successfully")
-    } catch (err) {
-      console.error("Failed to delete venue:", err)
-      setError(err instanceof Error ? err.message : "Failed to delete venue")
-      // Error logged in useApi hook
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Function to get a single venue by ID
-  const getVenue = async (id: string) => {
-    try {
-      setLoading(true)
-      const response = await request<any>(`/event-venues/${id}`, "GET")
-
-      if (response.error) {
-        throw new Error(response.error)
-      }
-
-      // Check for different possible response structures
-      if (response.data) {
-        if (response.data.venue) {
-          return response.data.venue
-        } else if (response.data.data) {
-          return response.data.data
-        } else if (response.data._id) {
-          return response.data
-        }
-      }
-
-      throw new Error(`Failed to fetch venue with ID ${id}`)
-    } catch (err) {
-      console.error(`Failed to fetch venue with ID ${id}:`, err)
-      setError(err instanceof Error ? err.message : `Failed to fetch venue with ID ${id}`)
-      // Error logged in useApi hook
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Function to check venue availability
-  const checkVenueAvailability = async (venueId: string, startDate: Date, endDate: Date) => {
-    try {
-      setLoading(true)
-      const response = await request<{ available: boolean; conflicts?: any[] }>(
-        `/event-venues/${venueId}/availability?start_date=${startDate.toISOString()}&end_date=${endDate.toISOString()}`,
-        "GET",
-      )
-
-      if (response.error) {
-        throw new Error(response.error)
+        setError(response.error)
+        return null
       }
 
       return response.data
-    } catch (err) {
-      console.error("Failed to check venue availability:", err)
-      setError(err instanceof Error ? err.message : "Failed to check venue availability")
-      // Error logged in useApi hook
-      throw err
-    } finally {
-      setLoading(false)
+    },
+    [request, clearError],
+  )
+
+  // Create new venue
+  const createVenue = useCallback(
+    async (venueData: CreateVenueData) => {
+      clearError()
+
+      const response = await request("/events/venues", "POST", venueData)
+
+      if (response.error) {
+        setError(response.error)
+        return null
+      }
+
+      if (response.data) {
+        // Refresh venues list
+        await getAllVenues({ hotel_id: hotelId })
+        return response.data
+      }
+
+      return null
+    },
+    [request, clearError, getAllVenues, hotelId],
+  )
+
+  // Update venue
+  const updateVenue = useCallback(
+    async (venueId: string, updateData: Partial<CreateVenueData>) => {
+      clearError()
+
+      const response = await request(`/events/venues/${venueId}`, "PUT", updateData)
+
+      if (response.error) {
+        setError(response.error)
+        return null
+      }
+
+      if (response.data) {
+        // Update local venues list
+        setVenues((prev) => prev.map((venue) => (venue._id === venueId ? { ...venue, ...response.data } : venue)))
+        return response.data
+      }
+
+      return null
+    },
+    [request, clearError],
+  )
+
+  // Delete venue
+  const deleteVenue = useCallback(
+    async (venueId: string) => {
+      clearError()
+
+      const response = await request(`/events/venues/${venueId}`, "DELETE")
+
+      if (response.error) {
+        setError(response.error)
+        return false
+      }
+
+      // Remove from local venues list
+      setVenues((prev) => prev.filter((venue) => venue._id !== venueId))
+      setTotalVenues((prev) => prev - 1)
+      return true
+    },
+    [request, clearError],
+  )
+
+  // Get venues statistics
+  const getVenuesStatistics = useCallback(
+    async (filters?: { hotel_id?: string; start_date?: Date; end_date?: Date }) => {
+      clearError()
+
+      const params = new URLSearchParams()
+      if (hotelId) params.append("hotel_id", hotelId)
+      else if (filters?.hotel_id) params.append("hotel_id", filters.hotel_id)
+      if (filters?.start_date) params.append("start_date", filters.start_date.toISOString())
+      if (filters?.end_date) params.append("end_date", filters.end_date.toISOString())
+
+      const response = await request(`/events/venues/statistics?${params.toString()}`, "GET")
+
+      if (response.error) {
+        setError(response.error)
+        return null
+      }
+
+      return response.data
+    },
+    [request, hotelId, clearError],
+  )
+
+  // Get venue availability
+  const getVenueAvailability = useCallback(
+    async (venueId: string, startDate: Date, endDate: Date): Promise<VenueAvailability | null> => {
+      clearError()
+
+      const params = new URLSearchParams()
+      params.append("start_date", startDate.toISOString())
+      params.append("end_date", endDate.toISOString())
+
+      const response = await request(`/events/venues/${venueId}/availability?${params.toString()}`, "GET")
+
+      if (response.error) {
+        setError(response.error)
+        return null
+      }
+
+      if (response.data) {
+        return {
+          ...response.data,
+          date_range: {
+            start: new Date(response.data.date_range.start),
+            end: new Date(response.data.date_range.end),
+          },
+          available_slots:
+            response.data.available_slots?.map((slot: any) => ({
+              ...slot,
+              start: new Date(slot.start),
+              end: new Date(slot.end),
+            })) || [],
+        }
+      }
+
+      return null
+    },
+    [request, clearError],
+  )
+
+  // Check venue availability
+  const checkVenueAvailability = useCallback(
+    async (
+      venueId: string,
+      startDate: Date,
+      endDate: Date,
+      excludeEventId?: string,
+    ): Promise<AvailabilityCheck | null> => {
+      clearError()
+
+      const requestData = {
+        start_date: startDate.toISOString(),
+        end_date: endDate.toISOString(),
+        exclude_event_id: excludeEventId,
+      }
+
+      const response = await request(`/events/venues/${venueId}/availability/check`, "POST", requestData)
+
+      if (response.error) {
+        setError(response.error)
+        return null
+      }
+
+      return response.data
+    },
+    [request, clearError],
+  )
+
+  // Get venue events
+  const getVenueEvents = useCallback(
+    async (
+      venueId: string,
+      filters?: {
+        start_date?: Date
+        end_date?: Date
+        status?: string
+        page?: number
+        limit?: number
+      },
+    ) => {
+      clearError()
+
+      const params = new URLSearchParams()
+      if (filters?.start_date) params.append("start_date", filters.start_date.toISOString())
+      if (filters?.end_date) params.append("end_date", filters.end_date.toISOString())
+      if (filters?.status) params.append("status", filters.status)
+      if (filters?.page) params.append("page", filters.page.toString())
+      if (filters?.limit) params.append("limit", filters.limit.toString())
+
+      const response = await request(`/events/venues/${venueId}/events?${params.toString()}`, "GET")
+
+      if (response.error) {
+        setError(response.error)
+        return null
+      }
+
+      return response.data
+    },
+    [request, clearError],
+  )
+
+  // Get venue statistics
+  const getVenueStatistics = useCallback(
+    async (venueId: string, startDate?: Date, endDate?: Date): Promise<VenueStatistics | null> => {
+      clearError()
+
+      const params = new URLSearchParams()
+      if (startDate) params.append("start_date", startDate.toISOString())
+      if (endDate) params.append("end_date", endDate.toISOString())
+
+      const response = await request(`/events/venues/${venueId}/statistics?${params.toString()}`, "GET")
+
+      if (response.error) {
+        setError(response.error)
+        return null
+      }
+
+      return response.data?.statistics || null
+    },
+    [request, clearError],
+  )
+
+  // Get venues by hotel
+  const getVenuesByHotel = useCallback(
+    async (targetHotelId?: string, filters?: { status?: string; type?: string }) => {
+      clearError()
+
+      const hotelIdToUse = targetHotelId || hotelId
+      if (!hotelIdToUse) {
+        setError("Hotel ID is required")
+        return []
+      }
+
+      const params = new URLSearchParams()
+      if (filters?.status) params.append("status", filters.status)
+      if (filters?.type) params.append("type", filters.type)
+
+      const response = await request(`/events/venues/hotel/${hotelIdToUse}?${params.toString()}`, "GET")
+
+      if (response.error) {
+        setError(response.error)
+        return []
+      }
+
+      return response.data || []
+    },
+    [request, hotelId, clearError],
+  )
+
+  // Add maintenance schedule
+  const addMaintenanceSchedule = useCallback(
+    async (
+      venueId: string,
+      maintenanceData: {
+        start_date: Date
+        end_date: Date
+        reason: string
+        notes?: string
+      },
+    ) => {
+      clearError()
+
+      const requestData = {
+        start_date: maintenanceData.start_date.toISOString(),
+        end_date: maintenanceData.end_date.toISOString(),
+        reason: maintenanceData.reason,
+        notes: maintenanceData.notes,
+      }
+
+      const response = await request(`/events/venues/${venueId}/maintenance`, "POST", requestData)
+
+      if (response.error) {
+        setError(response.error)
+        return null
+      }
+
+      // Update local venue status
+      setVenues((prev) =>
+        prev.map((venue) => (venue._id === venueId ? { ...venue, status: "maintenance" as const } : venue)),
+      )
+
+      return response.data
+    },
+    [request, clearError],
+  )
+
+  // Get maintenance schedule
+  const getMaintenanceSchedule = useCallback(
+    async (venueId: string): Promise<MaintenanceSchedule[]> => {
+      clearError()
+
+      const response = await request(`/events/venues/${venueId}/maintenance`, "GET")
+
+      if (response.error) {
+        setError(response.error)
+        return []
+      }
+
+      if (response.data?.maintenance_schedule) {
+        return response.data.maintenance_schedule.map((schedule: any) => ({
+          ...schedule,
+          start_date: new Date(schedule.start_date),
+          end_date: new Date(schedule.end_date),
+        }))
+      }
+
+      return []
+    },
+    [request, clearError],
+  )
+
+  // Remove maintenance schedule
+  const removeMaintenanceSchedule = useCallback(
+    async (venueId: string, maintenanceId: string) => {
+      clearError()
+
+      const response = await request(`/events/venues/${venueId}/maintenance/${maintenanceId}`, "DELETE")
+
+      if (response.error) {
+        setError(response.error)
+        return false
+      }
+
+      // Update local venue status
+      setVenues((prev) =>
+        prev.map((venue) => (venue._id === venueId ? { ...venue, status: "active" as const } : venue)),
+      )
+
+      return true
+    },
+    [request, clearError],
+  )
+
+  // Refresh venues list
+  const refreshVenues = useCallback(
+    async (filters?: VenueFilters) => {
+      return await getAllVenues(filters)
+    },
+    [getAllVenues],
+  )
+
+  // Load initial venues if hotelId is provided
+  useEffect(() => {
+    if (hotelId && venues.length === 0) {
+      getAllVenues()
     }
-  }
+  }, [hotelId, venues.length, getAllVenues])
 
   return {
+    // State
     venues,
-    loading,
+    totalVenues,
+    currentPage,
+    loading: isLoading,
     error,
+
+    // Actions
+    clearError,
+    refreshVenues,
+
+    // CRUD Operations
+    getAllVenues,
+    getVenueById,
     createVenue,
     updateVenue,
     deleteVenue,
-    getVenue,
+
+    // Statistics
+    getVenuesStatistics,
+    getVenueStatistics,
+
+    // Availability
+    getVenueAvailability,
     checkVenueAvailability,
-    refreshVenues: fetchVenues,
+
+    // Events
+    getVenueEvents,
+
+    // Hotel-specific
+    getVenuesByHotel,
+
+    // Maintenance
+    addMaintenanceSchedule,
+    getMaintenanceSchedule,
+    removeMaintenanceSchedule,
   }
 }
