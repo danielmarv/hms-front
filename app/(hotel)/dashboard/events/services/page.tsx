@@ -4,11 +4,12 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,9 +29,34 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Plus, Search, MoreHorizontal, Edit, Trash2, Eye, Loader2, BuildingIcon, StarIcon, CheckCircleIcon, RefreshCwIcon, Package, DollarSign, Tag, Filter } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  Plus,
+  Search,
+  MoreHorizontal,
+  Edit,
+  Trash2,
+  Eye,
+  Loader2,
+  BuildingIcon,
+  StarIcon,
+  CheckCircleIcon,
+  RefreshCwIcon,
+  Package,
+  DollarSign,
+  Filter,
+  BarChart3,
+  ExternalLink,
+} from "lucide-react"
 import { useHotels, type Hotel } from "@/hooks/use-hotels"
-import { useEventServices } from "@/hooks/use-event-services"
+import { useEventServices, type EventService } from "@/hooks/use-event-services"
 import { toast } from "sonner"
 
 export default function EventServicesPage() {
@@ -44,13 +70,39 @@ export default function EventServicesPage() {
   const [selectedHotel, setSelectedHotel] = useState<Hotel | null>(null)
 
   // Get services for selected hotel
-  const { services, loading: servicesLoading, error, deleteService, fetchServices } = useEventServices(selectedHotelId)
+  const {
+    services,
+    statistics,
+    loading: servicesLoading,
+    error,
+    deleteService,
+    fetchServices,
+    getServiceStatistics,
+    bulkUpdateServices,
+    checkServiceAvailability,
+  } = useEventServices(selectedHotelId)
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [categoryFilter, setCategoryFilter] = useState("all")
+  const [priceTypeFilter, setPriceTypeFilter] = useState("all")
+  const [providerFilter, setProviderFilter] = useState("all")
   const [priceSort, setPriceSort] = useState<"asc" | "desc" | null>(null)
+  const [showFilters, setShowFilters] = useState(false)
+
+  // Bulk operations state
+  const [selectedServices, setSelectedServices] = useState<string[]>([])
+  const [bulkAction, setBulkAction] = useState("")
+  const [showBulkDialog, setShowBulkDialog] = useState(false)
+
+  // Statistics state
+  const [showStatistics, setShowStatistics] = useState(false)
+  const [statisticsLoading, setStatisticsLoading] = useState(false)
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(20)
 
   // Fetch hotels on component mount
   useEffect(() => {
@@ -102,22 +154,30 @@ export default function EventServicesPage() {
     const hotel = hotels.find((h) => h._id === hotelId)
     setSelectedHotel(hotel || null)
     localStorage.setItem("selectedHotelId", hotelId)
+    setSelectedServices([]) // Clear selections when changing hotels
   }
 
-  // Get unique categories for filter
+  // Get unique categories and subcategories for filters
   const categories = Array.from(new Set(services.map((service) => service.category).filter(Boolean)))
+  const priceTypes = Array.from(new Set(services.map((service) => service.priceType).filter(Boolean)))
 
-  // Filter and sort services
+  // Apply filters and sorting
   const filteredServices = services
     .filter((service) => {
       const matchesSearch =
         service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (service.description || "").toLowerCase().includes(searchQuery.toLowerCase())
+        (service.description || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (service.subcategory || "").toLowerCase().includes(searchQuery.toLowerCase())
 
       const matchesStatus = statusFilter === "all" || service.status === statusFilter
       const matchesCategory = categoryFilter === "all" || service.category === categoryFilter
+      const matchesPriceType = priceTypeFilter === "all" || service.priceType === priceTypeFilter
+      const matchesProvider =
+        providerFilter === "all" ||
+        (providerFilter === "internal" && !service.isExternalService) ||
+        (providerFilter === "external" && service.isExternalService)
 
-      return matchesSearch && matchesStatus && matchesCategory
+      return matchesSearch && matchesStatus && matchesCategory && matchesPriceType && matchesProvider
     })
     .sort((a, b) => {
       if (priceSort === "asc") {
@@ -128,15 +188,92 @@ export default function EventServicesPage() {
       return 0
     })
 
+  // Pagination
+  const totalPages = Math.ceil(filteredServices.length / itemsPerPage)
+  const paginatedServices = filteredServices.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+
+  // Handle service deletion
   const handleDelete = async (id: string, name: string) => {
     try {
       await deleteService(id)
       toast.success(`Service "${name}" deleted successfully`)
+      setSelectedServices((prev) => prev.filter((serviceId) => serviceId !== id))
     } catch (error) {
       toast.error("Failed to delete service")
     }
   }
 
+  // Handle bulk operations
+  const handleBulkAction = async () => {
+    if (!bulkAction || selectedServices.length === 0) return
+
+    try {
+      let updateData: Partial<EventService> = {}
+
+      switch (bulkAction) {
+        case "activate":
+          updateData = { status: "active" }
+          break
+        case "deactivate":
+          updateData = { status: "inactive" }
+          break
+        case "seasonal":
+          updateData = { status: "seasonal" }
+          break
+        default:
+          return
+      }
+
+      const result = await bulkUpdateServices({
+        serviceIds: selectedServices,
+        updateData,
+      })
+
+      if (result !== null) {
+        toast.success(`Updated ${result} services successfully`)
+        setSelectedServices([])
+        setBulkAction("")
+        setShowBulkDialog(false)
+      }
+    } catch (error) {
+      toast.error("Failed to update services")
+    }
+  }
+
+  // Handle service selection
+  const handleServiceSelection = (serviceId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedServices((prev) => [...prev, serviceId])
+    } else {
+      setSelectedServices((prev) => prev.filter((id) => id !== serviceId))
+    }
+  }
+
+  // Handle select all
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedServices(paginatedServices.map((service) => service._id))
+    } else {
+      setSelectedServices([])
+    }
+  }
+
+  // Load statistics
+  const loadStatistics = async () => {
+    if (!selectedHotelId) return
+
+    try {
+      setStatisticsLoading(true)
+      await getServiceStatistics({ hotel: selectedHotelId })
+      setShowStatistics(true)
+    } catch (error) {
+      toast.error("Failed to load statistics")
+    } finally {
+      setStatisticsLoading(false)
+    }
+  }
+
+  // Get status badge
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "active":
@@ -162,6 +299,7 @@ export default function EventServicesPage() {
     }
   }
 
+  // Get category badge
   const getCategoryBadge = (category: string) => {
     const categoryColors: Record<string, string> = {
       catering: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
@@ -183,9 +321,10 @@ export default function EventServicesPage() {
     )
   }
 
+  // Format price
   const formatPrice = (price: number, priceType: string) => {
     const formattedPrice = `$${price.toFixed(2)}`
-    
+
     switch (priceType) {
       case "per_person":
         return `${formattedPrice} / person`
@@ -225,6 +364,16 @@ export default function EventServicesPage() {
             </p>
           </div>
           <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadStatistics}
+              disabled={!selectedHotelId || statisticsLoading}
+              className="border-purple-200 hover:bg-purple-50 dark:border-purple-700 dark:hover:bg-purple-900"
+            >
+              <BarChart3 className={`h-4 w-4 mr-2 ${statisticsLoading ? "animate-spin" : ""}`} />
+              Statistics
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -348,6 +497,9 @@ export default function EventServicesPage() {
                 <CardTitle className="flex items-center text-xl">
                   <Package className="mr-2 h-5 w-5" />
                   All Services ({filteredServices.length})
+                  {selectedServices.length > 0 && (
+                    <Badge className="ml-2 bg-white/20 text-white">{selectedServices.length} selected</Badge>
+                  )}
                 </CardTitle>
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <div className="relative">
@@ -360,9 +512,24 @@ export default function EventServicesPage() {
                       onChange={(e) => setSearchQuery(e.target.value)}
                     />
                   </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowFilters(!showFilters)}
+                    className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                  >
+                    <Filter className="h-4 w-4 mr-2" />
+                    Filters
+                  </Button>
+                </div>
+              </div>
+
+              {/* Advanced Filters */}
+              {showFilters && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-white/20">
                   <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                    <SelectTrigger className="w-full sm:w-[150px] bg-white/10 border-white/20 text-white">
-                      <SelectValue placeholder="Filter by category" />
+                    <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                      <SelectValue placeholder="All Categories" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Categories</SelectItem>
@@ -373,9 +540,10 @@ export default function EventServicesPage() {
                       ))}
                     </SelectContent>
                   </Select>
+
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-full sm:w-[150px] bg-white/10 border-white/20 text-white">
-                      <SelectValue placeholder="Filter by status" />
+                    <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                      <SelectValue placeholder="All Statuses" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Statuses</SelectItem>
@@ -384,31 +552,58 @@ export default function EventServicesPage() {
                       <SelectItem value="seasonal">Seasonal</SelectItem>
                     </SelectContent>
                   </Select>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" className="bg-white/10 border-white/20 text-white hover:bg-white/20">
-                        <Filter className="h-4 w-4 mr-2" />
-                        Sort
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                      <DropdownMenuLabel>Sort by Price</DropdownMenuLabel>
-                      <DropdownMenuItem onClick={() => setPriceSort("asc")}>
-                        <DollarSign className="h-4 w-4 mr-2" />
-                        Price: Low to High
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setPriceSort("desc")}>
-                        <DollarSign className="h-4 w-4 mr-2" />
-                        Price: High to Low
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setPriceSort(null)}>
-                        <RefreshCwIcon className="h-4 w-4 mr-2" />
-                        Clear Sort
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+
+                  <Select value={priceTypeFilter} onValueChange={setPriceTypeFilter}>
+                    <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                      <SelectValue placeholder="All Price Types" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Price Types</SelectItem>
+                      {priceTypes.map((priceType) => (
+                        <SelectItem key={priceType} value={priceType}>
+                          {priceType.replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={providerFilter} onValueChange={setProviderFilter}>
+                    <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                      <SelectValue placeholder="All Providers" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Providers</SelectItem>
+                      <SelectItem value="internal">In-house</SelectItem>
+                      <SelectItem value="external">External</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-              </div>
+              )}
+
+              {/* Bulk Actions */}
+              {selectedServices.length > 0 && (
+                <div className="flex items-center gap-2 pt-4 border-t border-white/20">
+                  <Select value={bulkAction} onValueChange={setBulkAction}>
+                    <SelectTrigger className="w-[200px] bg-white/10 border-white/20 text-white">
+                      <SelectValue placeholder="Bulk Actions" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="activate">Activate Services</SelectItem>
+                      <SelectItem value="deactivate">Deactivate Services</SelectItem>
+                      <SelectItem value="seasonal">Mark as Seasonal</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowBulkDialog(true)}
+                    disabled={!bulkAction}
+                    className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                  >
+                    Apply to {selectedServices.length} services
+                  </Button>
+                </div>
+              )}
             </CardHeader>
             <CardContent className="p-0">
               {servicesLoading ? (
@@ -453,6 +648,14 @@ export default function EventServicesPage() {
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600">
+                        <TableHead className="w-12">
+                          <Checkbox
+                            checked={
+                              selectedServices.length === paginatedServices.length && paginatedServices.length > 0
+                            }
+                            onCheckedChange={handleSelectAll}
+                          />
+                        </TableHead>
                         <TableHead className="font-semibold text-slate-700 dark:text-slate-200">Name</TableHead>
                         <TableHead className="hidden md:table-cell font-semibold text-slate-700 dark:text-slate-200">
                           Category
@@ -463,6 +666,9 @@ export default function EventServicesPage() {
                         <TableHead className="hidden lg:table-cell font-semibold text-slate-700 dark:text-slate-200">
                           Provider
                         </TableHead>
+                        <TableHead className="hidden lg:table-cell font-semibold text-slate-700 dark:text-slate-200">
+                          Inventory
+                        </TableHead>
                         <TableHead className="font-semibold text-slate-700 dark:text-slate-200">Status</TableHead>
                         <TableHead className="text-right font-semibold text-slate-700 dark:text-slate-200">
                           Actions
@@ -470,13 +676,19 @@ export default function EventServicesPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredServices.map((service, index) => (
+                      {paginatedServices.map((service, index) => (
                         <TableRow
                           key={service._id}
                           className={`hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors ${
                             index % 2 === 0 ? "bg-white dark:bg-slate-800" : "bg-slate-25 dark:bg-slate-750"
                           }`}
                         >
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedServices.includes(service._id)}
+                              onCheckedChange={(checked) => handleServiceSelection(service._id, checked as boolean)}
+                            />
+                          </TableCell>
                           <TableCell>
                             <div className="flex items-center space-x-3">
                               <div
@@ -496,6 +708,11 @@ export default function EventServicesPage() {
                                     {service.description}
                                   </div>
                                 )}
+                                {service.subcategory && (
+                                  <Badge variant="outline" className="text-xs mt-1">
+                                    {service.subcategory}
+                                  </Badge>
+                                )}
                               </div>
                             </div>
                           </TableCell>
@@ -507,11 +724,15 @@ export default function EventServicesPage() {
                               <DollarSign className="h-4 w-4 mr-1 text-slate-400" />
                               {formatPrice(service.price, service.priceType)}
                             </div>
+                            {service.minimumQuantity > 1 && (
+                              <div className="text-xs text-slate-500 mt-1">Min: {service.minimumQuantity}</div>
+                            )}
                           </TableCell>
                           <TableCell className="hidden lg:table-cell text-slate-700 dark:text-slate-300">
                             {service.isExternalService ? (
                               <div>
                                 <Badge variant="outline" className="font-normal">
+                                  <ExternalLink className="h-3 w-3 mr-1" />
                                   External
                                 </Badge>
                                 <div className="text-xs mt-1">{service.externalProvider?.name || "N/A"}</div>
@@ -519,6 +740,22 @@ export default function EventServicesPage() {
                             ) : (
                               <Badge variant="outline" className="bg-slate-50 font-normal">
                                 In-house
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="hidden lg:table-cell text-slate-700 dark:text-slate-300">
+                            {service.inventory?.isLimited ? (
+                              <div>
+                                <Badge variant="outline" className="text-xs">
+                                  Limited
+                                </Badge>
+                                <div className="text-xs mt-1">
+                                  {service.inventory.availableQuantity}/{service.inventory.totalQuantity}
+                                </div>
+                              </div>
+                            ) : (
+                              <Badge variant="outline" className="text-xs">
+                                Unlimited
                               </Badge>
                             )}
                           </TableCell>
@@ -586,11 +823,98 @@ export default function EventServicesPage() {
                       ))}
                     </TableBody>
                   </Table>
+
+                  {/* Pagination */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between px-6 py-4 border-t">
+                      <div className="text-sm text-slate-600 dark:text-slate-400">
+                        Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
+                        {Math.min(currentPage * itemsPerPage, filteredServices.length)} of {filteredServices.length}{" "}
+                        services
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                          disabled={currentPage === 1}
+                        >
+                          Previous
+                        </Button>
+                        <span className="text-sm text-slate-600 dark:text-slate-400">
+                          Page {currentPage} of {totalPages}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                          disabled={currentPage === totalPages}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>
           </Card>
         )}
+
+        {/* Bulk Action Dialog */}
+        <Dialog open={showBulkDialog} onOpenChange={setShowBulkDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Bulk Update Services</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to {bulkAction.replace("_", " ")} {selectedServices.length} selected services?
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowBulkDialog(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleBulkAction}>Update Services</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Statistics Dialog */}
+        <Dialog open={showStatistics} onOpenChange={setShowStatistics}>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>Service Statistics</DialogTitle>
+              <DialogDescription>Performance metrics for event services at {selectedHotel?.name}</DialogDescription>
+            </DialogHeader>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {statistics.map((stat) => {
+                const service = services.find((s) => s._id === stat._id)
+                return (
+                  <Card key={stat._id} className="p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold text-sm">{service?.name || "Unknown Service"}</h4>
+                      <Package className="h-4 w-4 text-slate-400" />
+                    </div>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span>Total Usage:</span>
+                        <span className="font-medium">{stat.totalUsage}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Total Quantity:</span>
+                        <span className="font-medium">{stat.totalQuantity}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Total Revenue:</span>
+                        <span className="font-medium">${stat.totalRevenue.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </Card>
+                )
+              })}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   )

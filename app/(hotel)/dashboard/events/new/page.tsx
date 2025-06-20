@@ -52,8 +52,7 @@ export default function NewEventPage() {
   // Fetch data using hooks with proper hotel ID - all hotel-specific
   const { eventTypes, loading: loadingEventTypes, fetchEventTypes } = useEventTypes(hotelId)
   const { venues, loading: loadingVenues, fetchVenues } = useVenues(hotelId)
-  // const { services, loading: loadingServices, fetchServices } = useEventServices(hotelId)
-  const { services, loading: servicesLoading, error, deleteService, fetchServices } = useEventServices(hotelId)
+  const { services, loading: loadingServices, fetchServices } = useEventServices(hotelId)
   const { templates, loading: loadingTemplates, fetchTemplates } = useEventTemplates(hotelId)
   const { users, isLoading: loadingUsers, fetchUsers } = useUsers()
   const { createEvent } = useEvents()
@@ -81,16 +80,30 @@ export default function NewEventPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [hotelUsers, setHotelUsers] = useState<any[]>([])
 
-  // Debug logging
-  useEffect(() => {
-    console.log("Hotel data:", { hotel, hotelId, hotelLoading })
-    console.log("Event Types:", eventTypes?.length || 0)
-    console.log("Venues:", venues?.length || 0)
-    console.log("Services:", services?.length || 0)
-    console.log("Templates:", templates?.length || 0)
-    console.log("Users:", users?.length || 0)
-    console.log("services for the hotel:", services)
-  }, [hotel, hotelId, hotelLoading, eventTypes, venues, services, templates, users, fetchServices])
+  // Filter users who have access to the current hotel
+  const getHotelUsers = useCallback(() => {
+    if (!users || !hotelId) {
+      console.log("No users or hotelId available:", { users: users?.length, hotelId })
+      return []
+    }
+
+    // Filter users who have access to this hotel
+    const filteredUsers = users.filter(
+      (user) =>
+        user.status === "active" &&
+        (user.hotelAccess === hotelId || user.role === "admin" || user.role === "super_admin"),
+    )
+
+    console.log("getHotelUsers result:", {
+      totalUsers: users.length,
+      filteredUsers: filteredUsers.length,
+      hotelId,
+    })
+
+    return filteredUsers
+  }, [users, hotelId])
+
+  // ALL useEffect hooks must be here, before any conditional returns
 
   // Fetch data when hotel ID is available
   useEffect(() => {
@@ -118,26 +131,100 @@ export default function NewEventPage() {
       // Fetch users with hotel access filtering
       if (fetchUsers) {
         console.log("Fetching users with access to hotel:", hotelId)
-        // You can add hotel-specific filtering here if your API supports it
-        fetchUsers({ hotelAccess: hotelId }).then((data) => {
-          setHotelUsers(data)
-        })
+        fetchUsers()
+          .then((userData) => {
+            if (userData && Array.isArray(userData)) {
+              // Filter users who have access to this hotel
+              const filteredUsers = userData.filter(
+                (user) =>
+                  user.status === "active" &&
+                  (user.hotelAccess === hotelId || user.role === "admin" || user.role === "super_admin"),
+              )
+              setHotelUsers(filteredUsers)
+              console.log("Filtered hotel users:", filteredUsers)
+            }
+          })
+          .catch((error) => {
+            console.error("Error fetching users:", error)
+            setHotelUsers([])
+          })
       }
     }
   }, [hotelId, hotelLoading, fetchEventTypes, fetchVenues, fetchServices, fetchTemplates, fetchUsers])
 
-  // Filter users who have access to the current hotel
-  const getHotelUsers = useCallback(() => {
-    if (!users || !hotelId) return []
+  // Debug logging
+  useEffect(() => {
+    console.log("Hotel data:", { hotel, hotelId, hotelLoading })
+    console.log("Event Types:", eventTypes?.length || 0)
+    console.log("Venues:", venues?.length || 0)
+    console.log("Services:", services?.length || 0)
+    console.log("Templates:", templates?.length || 0)
+    console.log("Users:", users?.length || 0)
+    console.log("services for the hotel:", services)
+  }, [hotel, hotelId, hotelLoading, eventTypes, venues, services, templates, users])
 
-    // Filter users who have access to this hotel
-    // This assumes users have a hotelAccess field or similar
-    return users.filter(
-      (user) =>
-        user.status === "active" &&
-        (user.hotelAccess === hotelId || user.role === "admin" || user.role === "super_admin"),
+  // Update hotel users when users data changes
+  useEffect(() => {
+    const filteredUsers = getHotelUsers()
+    setHotelUsers(filteredUsers)
+    console.log("Updated hotelUsers from users state:", filteredUsers.length)
+  }, [users, hotelId, getHotelUsers])
+
+  // Debug services loading
+  useEffect(() => {
+    console.log("Services debug:", {
+      services: services?.length || 0,
+      loadingServices,
+      hotelId,
+      servicesData: services,
+    })
+  }, [services, loadingServices, hotelId])
+
+  // NOW the conditional returns can happen after all hooks
+
+  // Loading state - wait for hotel data first
+  if (hotelLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <Skeleton className="h-8 w-64" />
+            <Skeleton className="h-4 w-48" />
+          </div>
+          <Skeleton className="h-10 w-20" />
+        </div>
+        <Skeleton className="h-96 w-full" />
+      </div>
     )
-  }, [users, hotelId])
+  }
+
+  // No hotel selected
+  if (!hotelLoading && !hotelId && !hotelError) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <h2 className="text-3xl font-bold tracking-tight">Create New Event</h2>
+            <p className="text-muted-foreground">Please select a hotel to continue</p>
+          </div>
+          <Button variant="outline" onClick={() => router.back()}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
+          </Button>
+        </div>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center py-8">
+              <h3 className="text-lg font-medium">No Hotel Selected</h3>
+              <p className="text-muted-foreground">Please select a hotel from your dashboard to create events.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // Rest of the component continues...
 
   // Handle input change
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -300,48 +387,6 @@ export default function NewEventPage() {
     } finally {
       setIsSubmitting(false)
     }
-  }
-
-  // Loading state - wait for hotel data first
-  if (hotelLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
-            <Skeleton className="h-8 w-64" />
-            <Skeleton className="h-4 w-48" />
-          </div>
-          <Skeleton className="h-10 w-20" />
-        </div>
-        <Skeleton className="h-96 w-full" />
-      </div>
-    )
-  }
-
-  // No hotel selected
-  if (!hotelLoading && !hotelId && !hotelError) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
-            <h2 className="text-3xl font-bold tracking-tight">Create New Event</h2>
-            <p className="text-muted-foreground">Please select a hotel to continue</p>
-          </div>
-          <Button variant="outline" onClick={() => router.back()}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
-          </Button>
-        </div>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center py-8">
-              <h3 className="text-lg font-medium">No Hotel Selected</h3>
-              <p className="text-muted-foreground">Please select a hotel from your dashboard to create events.</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    )
   }
 
   return (

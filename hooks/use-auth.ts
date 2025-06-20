@@ -12,6 +12,11 @@ export type User = {
   email: string
   role?: string
   permissions?: string[]
+  phone?: string
+  primaryHotel?: {
+    id: string
+    name: string
+  }
 }
 
 export type RegisterData = {
