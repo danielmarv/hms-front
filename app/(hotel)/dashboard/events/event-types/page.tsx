@@ -41,8 +41,13 @@ import {
   StarIcon,
   CheckCircleIcon,
   RefreshCwIcon,
+  BarChart3,
+  TrendingUp,
+  Calendar,
+  DollarSign,
 } from "lucide-react"
 import { useEventTypes } from "@/hooks/use-event-types"
+import { useEventReports } from "@/hooks/use-event-reports"
 import { useHotels, type Hotel } from "@/hooks/use-hotels"
 import { toast } from "sonner"
 
@@ -56,10 +61,16 @@ export default function EventTypesPage() {
   const [hotelsLoading, setHotelsLoading] = useState(true)
   const [selectedHotel, setSelectedHotel] = useState<Hotel | null>(null)
 
-  const { eventTypes, loading, deleteEventType, refreshEventTypes } = useEventTypes(selectedHotelId)
+  const { eventTypes, loading, deleteEventType, refreshEventTypes, getEventTypesByCategory, getEventTypeStatistics } =
+    useEventTypes(selectedHotelId)
+  const { getEventsSummaryReport, getRevenueAnalysisReport } = useEventReports(selectedHotelId)
+
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [categoryFilter, setCategoryFilter] = useState("all")
+  const [showAnalytics, setShowAnalytics] = useState(false)
+  const [analyticsData, setAnalyticsData] = useState<any>(null)
+  const [analyticsLoading, setAnalyticsLoading] = useState(false)
 
   // Fetch hotels on component mount
   useEffect(() => {
@@ -125,6 +136,37 @@ export default function EventTypesPage() {
     setSelectedHotel(hotel || null)
     // Save to localStorage for persistence
     localStorage.setItem("selectedHotelId", hotelId)
+    // Reset analytics when hotel changes
+    setAnalyticsData(null)
+    setShowAnalytics(false)
+  }
+
+  // Load analytics data
+  const loadAnalytics = async () => {
+    if (!selectedHotelId) return
+
+    setAnalyticsLoading(true)
+    try {
+      const endDate = new Date()
+      const startDate = new Date()
+      startDate.setMonth(startDate.getMonth() - 3) // Last 3 months
+
+      const [summaryReport, revenueReport] = await Promise.all([
+        getEventsSummaryReport(selectedHotelId, startDate, endDate),
+        getRevenueAnalysisReport(selectedHotelId, startDate, endDate, "event_type"),
+      ])
+
+      setAnalyticsData({
+        summary: summaryReport,
+        revenue: revenueReport,
+      })
+      setShowAnalytics(true)
+    } catch (error) {
+      console.error("Failed to load analytics:", error)
+      toast.error("Failed to load analytics data")
+    } finally {
+      setAnalyticsLoading(false)
+    }
   }
 
   // Filter event types based on search and filters
@@ -199,6 +241,10 @@ export default function EventTypesPage() {
             </p>
           </div>
           <div className="flex items-center space-x-2">
+            <Button variant="outline" size="sm" onClick={loadAnalytics} disabled={!selectedHotelId || analyticsLoading}>
+              <BarChart3 className={`h-4 w-4 mr-2 ${analyticsLoading ? "animate-pulse" : ""}`} />
+              Analytics
+            </Button>
             <Button variant="outline" size="sm" onClick={refreshEventTypes} disabled={!selectedHotelId || loading}>
               <RefreshCwIcon className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
               Refresh
@@ -216,6 +262,61 @@ export default function EventTypesPage() {
             </Button>
           </div>
         </div>
+
+        {/* Analytics Section */}
+        {showAnalytics && analyticsData && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-blue-100 text-sm font-medium">Total Events</p>
+                    <p className="text-3xl font-bold">{analyticsData.summary?.summary?.total_events || 0}</p>
+                  </div>
+                  <Calendar className="h-8 w-8 text-blue-200" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-r from-green-500 to-green-600 text-white">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-green-100 text-sm font-medium">Confirmed Events</p>
+                    <p className="text-3xl font-bold">{analyticsData.summary?.summary?.confirmed_events || 0}</p>
+                  </div>
+                  <CheckCircleIcon className="h-8 w-8 text-green-200" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-r from-purple-500 to-purple-600 text-white">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-purple-100 text-sm font-medium">Total Revenue</p>
+                    <p className="text-3xl font-bold">
+                      ${analyticsData.summary?.summary?.total_revenue?.toLocaleString() || 0}
+                    </p>
+                  </div>
+                  <DollarSign className="h-8 w-8 text-purple-200" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-r from-orange-500 to-orange-600 text-white">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-orange-100 text-sm font-medium">Cancellation Rate</p>
+                    <p className="text-3xl font-bold">{analyticsData.summary?.summary?.cancellation_rate || "0%"}</p>
+                  </div>
+                  <TrendingUp className="h-8 w-8 text-orange-200" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Hotel Selection Section */}
         <Card className="border-2 border-dashed border-primary/20 bg-gradient-to-r from-primary/5 to-secondary/5 shadow-lg">
@@ -401,6 +502,9 @@ export default function EventTypesPage() {
                           Category
                         </TableHead>
                         <TableHead className="hidden md:table-cell font-semibold text-slate-700 dark:text-slate-200">
+                          Price per person
+                        </TableHead>
+                        <TableHead className="hidden md:table-cell font-semibold text-slate-700 dark:text-slate-200">
                           Base Price
                         </TableHead>
                         <TableHead className="hidden lg:table-cell font-semibold text-slate-700 dark:text-slate-200">
@@ -422,10 +526,14 @@ export default function EventTypesPage() {
                         >
                           <TableCell>
                             <div className="flex items-center space-x-3">
-                              <div
-                                className="w-4 h-4 rounded-full border-2 border-white dark:border-slate-700 shadow-sm flex-shrink-0"
-                                style={{ backgroundColor: eventType.color || "#6366f1" }}
-                              />
+                              {eventType.icon ? (
+                                <span className="text-xl">{eventType.icon}</span>
+                              ) : (
+                                <div
+                                  className="w-4 h-4 rounded-full border-2 border-white dark:border-slate-700 shadow-sm flex-shrink-0"
+                                  style={{ backgroundColor: eventType.color || "#6366f1" }}
+                                />
+                              )}
                               <div>
                                 <div className="font-semibold text-slate-900 dark:text-slate-100">{eventType.name}</div>
                                 {eventType.description && (
@@ -433,11 +541,19 @@ export default function EventTypesPage() {
                                     {eventType.description.substring(0, 50)}...
                                   </div>
                                 )}
+                                {eventType.features && (
+                                  <div className="text-xs text-slate-500 dark:text-slate-400 md:hidden">
+                                    {eventType.features.join(", ")}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </TableCell>
                           <TableCell className="hidden md:table-cell text-slate-700 dark:text-slate-300">
                             {eventType.category || "General"}
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell text-slate-700 dark:text-slate-300">
+                            {formatPrice(eventType.price_per_person)}
                           </TableCell>
                           <TableCell className="hidden md:table-cell text-slate-700 dark:text-slate-300">
                             {formatPrice(eventType.base_price)}

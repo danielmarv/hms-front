@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -12,25 +12,7 @@ import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
-import {
-  ArrowLeft,
-  Save,
-  Loader2,
-  Palette,
-  Clock,
-  DollarSign,
-  Users,
-  Tag,
-  Calendar,
-  CheckCircle,
-  XCircle,
-  Flag,
-  Heart,
-  Star,
-  Home,
-  Briefcase,
-  GraduationCap,
-} from "lucide-react"
+import { ArrowLeft, Save, Loader2, Palette, Clock, DollarSign, Users, Tag } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -43,13 +25,13 @@ const eventTypeSchema = z.object({
   description: z.string().optional(),
   category: z.string().min(1, "Category is required"),
   color: z.string().min(1, "Color is required"),
-  icon: z.string().min(1, "Icon is required"),
+  icon: z.string().optional(),
   base_price: z.number().min(0, "Base price must be positive"),
   price_per_person: z.number().min(0, "Price per person must be positive").optional(),
   default_duration: z.number().min(15, "Duration must be at least 15 minutes"),
-  default_capacity: z.number().min(1, "Default capacity must be at least 1"),
   max_attendees: z.number().min(1, "Max attendees must be at least 1"),
   min_attendees: z.number().min(1, "Min attendees must be at least 1"),
+  default_capacity: z.number().min(1, "Default capacity must be at least 1").optional(),
   requires_approval: z.boolean().default(false),
   is_recurring: z.boolean().default(false),
   status: z.enum(["active", "inactive"]).default("active"),
@@ -87,37 +69,22 @@ const eventCategories = [
   "Training",
 ]
 
-const eventIcons = [
-  { name: "Calendar", value: "Calendar", icon: <Calendar className="h-4 w-4" /> },
-  { name: "CheckCircle", value: "CheckCircle", icon: <CheckCircle className="h-4 w-4" /> },
-  { name: "XCircle", value: "XCircle", icon: <XCircle className="h-4 w-4" /> },
-  { name: "Flag", value: "Flag", icon: <Flag className="h-4 w-4" /> },
-  { name: "Heart", value: "Heart", icon: <Heart className="h-4 w-4" /> },
-  { name: "Star", value: "Star", icon: <Star className="h-4 w-4" /> },
-  { name: "Home", value: "Home", icon: <Home className="h-4 w-4" /> },
-  { name: "Briefcase", value: "Briefcase", icon: <Briefcase className="h-4 w-4" /> },
-  { name: "GraduationCap", value: "GraduationCap", icon: <GraduationCap className="h-4 w-4" /> },
-]
+const eventIcons = ["Tag", "ImagePlus", "CheckCircle", "XCircle"]
 
-const eventFeatures = [
-  "Wifi",
-  "Projector",
-  "Sound System",
-  "Whiteboard",
-  "Stage",
-  "Dance Floor",
-  "Bar",
-  "Catering",
-  "Security",
-  "Parking",
-]
+interface EditEventTypePageProps {
+  params: {
+    id: string
+  }
+}
 
-export default function NewEventTypePage() {
+export default function EditEventTypePage({ params }: EditEventTypePageProps) {
   const router = useRouter()
   const { currentHotel } = useCurrentHotel()
-  const { createEventType } = useEventTypes(currentHotel?._id)
+  const { getEventTypeById, updateEventType } = useEventTypes(currentHotel?._id)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [tagInput, setTagInput] = useState("")
+  const [featureInput, setFeatureInput] = useState("")
 
   const form = useForm<EventTypeFormData>({
     resolver: zodResolver(eventTypeSchema),
@@ -126,13 +93,13 @@ export default function NewEventTypePage() {
       description: "",
       category: "",
       color: predefinedColors[0],
-      icon: "Calendar",
+      icon: eventIcons[0],
       base_price: 0,
       price_per_person: 0,
       default_duration: 60,
-      default_capacity: 1,
       max_attendees: 100,
       min_attendees: 1,
+      default_capacity: 50,
       requires_approval: false,
       is_recurring: false,
       status: "active",
@@ -145,6 +112,48 @@ export default function NewEventTypePage() {
 
   const watchedTags = form.watch("tags")
   const watchedFeatures = form.watch("features")
+
+  useEffect(() => {
+    const fetchEventType = async () => {
+      if (!currentHotel || !params.id) return
+
+      try {
+        setLoading(true)
+        const eventType = await getEventTypeById(params.id)
+
+        if (eventType) {
+          form.reset({
+            name: eventType.name || "",
+            description: eventType.description || "",
+            category: eventType.category || "",
+            color: eventType.color || predefinedColors[0],
+            icon: eventType.icon || eventIcons[0],
+            base_price: eventType.base_price || 0,
+            price_per_person: eventType.price_per_person || 0,
+            default_duration: eventType.default_duration || 60,
+            max_attendees: eventType.max_attendees || 100,
+            min_attendees: eventType.min_attendees || 1,
+            default_capacity: eventType.default_capacity || 50,
+            requires_approval: eventType.requires_approval || false,
+            is_recurring: eventType.is_recurring || false,
+            status: eventType.status || "active",
+            tags: eventType.tags || [],
+            setup_time: eventType.setup_time || 30,
+            cleanup_time: eventType.cleanup_time || 30,
+            features: eventType.features || [],
+          })
+        }
+      } catch (error) {
+        console.error("Failed to fetch event type:", error)
+        toast.error("Failed to load event type")
+        router.push("/dashboard/events/event-types")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchEventType()
+  }, [currentHotel, params.id, getEventTypeById, form, router])
 
   const handleAddTag = () => {
     if (tagInput.trim() && !watchedTags.includes(tagInput.trim())) {
@@ -160,6 +169,20 @@ export default function NewEventTypePage() {
     )
   }
 
+  const handleAddFeature = () => {
+    if (featureInput.trim() && !watchedFeatures.includes(featureInput.trim())) {
+      form.setValue("features", [...watchedFeatures, featureInput.trim()])
+      setFeatureInput("")
+    }
+  }
+
+  const handleRemoveFeature = (featureToRemove: string) => {
+    form.setValue(
+      "features",
+      watchedFeatures.filter((feature) => feature !== featureToRemove),
+    )
+  }
+
   const onSubmit = async (data: EventTypeFormData) => {
     if (!currentHotel) {
       toast.error("No hotel selected")
@@ -168,18 +191,29 @@ export default function NewEventTypePage() {
 
     setIsSubmitting(true)
     try {
-      await createEventType({
+      await updateEventType(params.id, {
         ...data,
         hotel_id: currentHotel._id,
       })
-      toast.success("Event type created successfully")
-      router.push("/dashboard/events/event-types")
+      toast.success("Event type updated successfully")
+      router.push(`/dashboard/events/event-types/${params.id}`)
     } catch (error) {
-      console.error("Failed to create event type:", error)
-      toast.error("Failed to create event type")
+      console.error("Failed to update event type:", error)
+      toast.error("Failed to update event type")
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="flex flex-col items-center space-y-4">
+          <Loader2 className="h-12 w-12 animate-spin text-indigo-600 dark:text-indigo-400" />
+          <p className="text-lg font-medium text-slate-700 dark:text-slate-300">Loading event type...</p>
+        </div>
+      </div>
+    )
   }
 
   if (!currentHotel) {
@@ -187,7 +221,7 @@ export default function NewEventTypePage() {
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
           <h2 className="text-xl font-semibold mb-2">No Hotel Selected</h2>
-          <p className="text-muted-foreground">Please select a hotel to create event types.</p>
+          <p className="text-muted-foreground">Please select a hotel to edit event types.</p>
         </div>
       </div>
     )
@@ -209,9 +243,9 @@ export default function NewEventTypePage() {
             </Button>
             <div>
               <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 dark:from-indigo-400 dark:via-purple-400 dark:to-pink-400 bg-clip-text text-transparent">
-                Create Event Type
+                Edit Event Type
               </h1>
-              <p className="text-slate-600 dark:text-slate-300 mt-1">Add a new event type for {currentHotel.name}</p>
+              <p className="text-slate-600 dark:text-slate-300 mt-1">Update event type for {currentHotel.name}</p>
             </div>
           </div>
         </div>
@@ -248,7 +282,7 @@ export default function NewEventTypePage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Category *</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select a category" />
@@ -322,7 +356,7 @@ export default function NewEventTypePage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Status</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue />
@@ -344,8 +378,8 @@ export default function NewEventTypePage() {
                   name="icon"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Icon *</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormLabel>Icon</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select an icon" />
@@ -353,11 +387,8 @@ export default function NewEventTypePage() {
                         </FormControl>
                         <SelectContent>
                           {eventIcons.map((icon) => (
-                            <SelectItem key={icon.value} value={icon.value}>
-                              <div className="flex items-center space-x-2">
-                                {icon.icon}
-                                <span>{icon.name}</span>
-                              </div>
+                            <SelectItem key={icon} value={icon}>
+                              {icon}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -423,7 +454,7 @@ export default function NewEventTypePage() {
                     name="default_capacity"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Default Capacity *</FormLabel>
+                        <FormLabel>Default Capacity</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
@@ -637,26 +668,36 @@ export default function NewEventTypePage() {
 
                 <div className="space-y-4">
                   <Label>Features</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {eventFeatures.map((feature) => (
-                      <Button
-                        key={feature}
-                        variant={watchedFeatures.includes(feature) ? "default" : "outline"}
-                        onClick={() => {
-                          if (watchedFeatures.includes(feature)) {
-                            form.setValue(
-                              "features",
-                              watchedFeatures.filter((f) => f !== feature),
-                            )
-                          } else {
-                            form.setValue("features", [...watchedFeatures, feature])
-                          }
-                        }}
-                      >
-                        {feature}
-                      </Button>
-                    ))}
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Add a feature..."
+                      value={featureInput}
+                      onChange={(e) => setFeatureInput(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault()
+                          handleAddFeature()
+                        }
+                      }}
+                    />
+                    <Button type="button" variant="outline" onClick={handleAddFeature}>
+                      Add
+                    </Button>
                   </div>
+                  {watchedFeatures.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {watchedFeatures.map((feature) => (
+                        <Badge
+                          key={feature}
+                          variant="secondary"
+                          className="cursor-pointer"
+                          onClick={() => handleRemoveFeature(feature)}
+                        >
+                          {feature} ×
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -674,12 +715,12 @@ export default function NewEventTypePage() {
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creating...
+                    Updating...
                   </>
                 ) : (
                   <>
                     <Save className="mr-2 h-4 w-4" />
-                    Create Event Type
+                    Update Event Type
                   </>
                 )}
               </Button>
