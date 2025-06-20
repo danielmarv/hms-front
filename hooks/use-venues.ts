@@ -178,7 +178,7 @@ export function useVenues(hotelId?: string) {
       if (filters.page) params.append("page", filters.page.toString())
       if (filters.limit) params.append("limit", filters.limit.toString())
 
-      const response = await request(`/events/venues?${params.toString()}`, "GET")
+      const response = await request(`/event-venues?${params.toString()}`, "GET")
 
       if (response.error) {
         setError(response.error)
@@ -203,7 +203,7 @@ export function useVenues(hotelId?: string) {
     async (venueId: string) => {
       clearError()
 
-      const response = await request(`/events/venues/${venueId}`, "GET")
+      const response = await request(`/event-venues/${venueId}`, "GET")
 
       if (response.error) {
         setError(response.error)
@@ -220,7 +220,7 @@ export function useVenues(hotelId?: string) {
     async (venueData: CreateVenueData) => {
       clearError()
 
-      const response = await request("/events/venues", "POST", venueData)
+      const response = await request("/event-venues", "POST", venueData)
 
       if (response.error) {
         setError(response.error)
@@ -243,7 +243,7 @@ export function useVenues(hotelId?: string) {
     async (venueId: string, updateData: Partial<CreateVenueData>) => {
       clearError()
 
-      const response = await request(`/events/venues/${venueId}`, "PUT", updateData)
+      const response = await request(`/event-venues/${venueId}`, "PUT", updateData)
 
       if (response.error) {
         setError(response.error)
@@ -266,7 +266,7 @@ export function useVenues(hotelId?: string) {
     async (venueId: string) => {
       clearError()
 
-      const response = await request(`/events/venues/${venueId}`, "DELETE")
+      const response = await request(`/event-venues/${venueId}`, "DELETE")
 
       if (response.error) {
         setError(response.error)
@@ -292,7 +292,7 @@ export function useVenues(hotelId?: string) {
       if (filters?.start_date) params.append("start_date", filters.start_date.toISOString())
       if (filters?.end_date) params.append("end_date", filters.end_date.toISOString())
 
-      const response = await request(`/events/venues/statistics?${params.toString()}`, "GET")
+      const response = await request(`/event-venues/statistics?${params.toString()}`, "GET")
 
       if (response.error) {
         setError(response.error)
@@ -313,7 +313,7 @@ export function useVenues(hotelId?: string) {
       params.append("start_date", startDate.toISOString())
       params.append("end_date", endDate.toISOString())
 
-      const response = await request(`/events/venues/${venueId}/availability?${params.toString()}`, "GET")
+      const response = await request(`/event-venues/${venueId}/availability?${params.toString()}`, "GET")
 
       if (response.error) {
         setError(response.error)
@@ -357,7 +357,7 @@ export function useVenues(hotelId?: string) {
         exclude_event_id: excludeEventId,
       }
 
-      const response = await request(`/events/venues/${venueId}/availability/check`, "POST", requestData)
+      const response = await request(`/event-venues/${venueId}/availability/check`, "POST", requestData)
 
       if (response.error) {
         setError(response.error)
@@ -390,7 +390,7 @@ export function useVenues(hotelId?: string) {
       if (filters?.page) params.append("page", filters.page.toString())
       if (filters?.limit) params.append("limit", filters.limit.toString())
 
-      const response = await request(`/events/venues/${venueId}/events?${params.toString()}`, "GET")
+      const response = await request(`/event-venues/${venueId}/events?${params.toString()}`, "GET")
 
       if (response.error) {
         setError(response.error)
@@ -411,7 +411,7 @@ export function useVenues(hotelId?: string) {
       if (startDate) params.append("start_date", startDate.toISOString())
       if (endDate) params.append("end_date", endDate.toISOString())
 
-      const response = await request(`/events/venues/${venueId}/statistics?${params.toString()}`, "GET")
+      const response = await request(`/event-venues/${venueId}/statistics?${params.toString()}`, "GET")
 
       if (response.error) {
         setError(response.error)
@@ -438,7 +438,7 @@ export function useVenues(hotelId?: string) {
       if (filters?.status) params.append("status", filters.status)
       if (filters?.type) params.append("type", filters.type)
 
-      const response = await request(`/events/venues/hotel/${hotelIdToUse}?${params.toString()}`, "GET")
+      const response = await request(`/event-venues/hotel/${hotelIdToUse}?${params.toString()}`, "GET")
 
       if (response.error) {
         setError(response.error)
@@ -470,7 +470,7 @@ export function useVenues(hotelId?: string) {
         notes: maintenanceData.notes,
       }
 
-      const response = await request(`/events/venues/${venueId}/maintenance`, "POST", requestData)
+      const response = await request(`/event-venues/${venueId}/maintenance`, "POST", requestData)
 
       if (response.error) {
         setError(response.error)
@@ -492,7 +492,7 @@ export function useVenues(hotelId?: string) {
     async (venueId: string): Promise<MaintenanceSchedule[]> => {
       clearError()
 
-      const response = await request(`/events/venues/${venueId}/maintenance`, "GET")
+      const response = await request(`/event-venues/${venueId}/maintenance`, "GET")
 
       if (response.error) {
         setError(response.error)
@@ -517,7 +517,7 @@ export function useVenues(hotelId?: string) {
     async (venueId: string, maintenanceId: string) => {
       clearError()
 
-      const response = await request(`/events/venues/${venueId}/maintenance/${maintenanceId}`, "DELETE")
+      const response = await request(`/event-venues/${venueId}/maintenance/${maintenanceId}`, "DELETE")
 
       if (response.error) {
         setError(response.error)

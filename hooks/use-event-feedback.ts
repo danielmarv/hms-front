@@ -207,7 +207,7 @@ export const useEventFeedback = () => {
       setLoading(true)
       setError(null)
       try {
-        const response = await request("/events/feedback", "GET")
+        const response = await request("/event-feedback", "GET")
         setFeedback(response.data.feedback || [])
         return response.data
       } catch (err: any) {
@@ -226,7 +226,7 @@ export const useEventFeedback = () => {
       setLoading(true)
       setError(null)
       try {
-        const response = await request(`/events/feedback/${id}`, "GET")
+        const response = await request(`/event-feedback/${id}`, "GET")
         setCurrentFeedback(response.data)
         return response.data
       } catch (err: any) {
@@ -245,7 +245,7 @@ export const useEventFeedback = () => {
       setLoading(true)
       setError(null)
       try {
-        const response = await request("/events/feedback", "POST", data)
+        const response = await request("/event-feedback", "POST", data)
         const newFeedback = response.data
         setFeedback((prev) => [newFeedback, ...prev])
         return newFeedback
@@ -265,7 +265,7 @@ export const useEventFeedback = () => {
       setLoading(true)
       setError(null)
       try {
-        const response = await request(`/events/feedback/${id}`, "PUT", data)
+        const response = await request(`/event-feedback/${id}`, "PUT", data)
         const updatedFeedback = response.data
         setFeedback((prev) => prev.map((item) => (item._id === id ? updatedFeedback : item)))
         if (currentFeedback?._id === id) {
@@ -288,7 +288,7 @@ export const useEventFeedback = () => {
       setLoading(true)
       setError(null)
       try {
-        await request(`/events/feedback/${id}`, "DELETE")
+        await request(`/event-feedback/${id}`, "DELETE")
         setFeedback((prev) => prev.filter((item) => item._id !== id))
         if (currentFeedback?._id === id) {
           setCurrentFeedback(null)
@@ -310,7 +310,7 @@ export const useEventFeedback = () => {
       setLoading(true)
       setError(null)
       try {
-        const response = await request(`/events/feedback/event/${eventId}`, "GET", undefined, params)
+        const response = await request(`/event-feedback/event/${eventId}`, "GET", undefined, params)
         return response.data as EventFeedbackSummary
       } catch (err: any) {
         setError(err.message || "Failed to fetch event feedback")
@@ -328,7 +328,7 @@ export const useEventFeedback = () => {
       setLoading(true)
       setError(null)
       try {
-        const response = await request(`/events/feedback/event/${eventId}`, "POST", data)
+        const response = await request(`/event-feedback/event/${eventId}`, "POST", data)
         const newFeedback = response.data
         setFeedback((prev) => [newFeedback, ...prev])
         return newFeedback
@@ -348,7 +348,7 @@ export const useEventFeedback = () => {
       setLoading(true)
       setError(null)
       try {
-        const response = await request(`/events/feedback/event/${eventId}/summary`, "GET")
+        const response = await request(`/event-feedback/event/${eventId}/summary`, "GET")
         return response.data
       } catch (err: any) {
         setError(err.message || "Failed to fetch feedback summary")
@@ -372,7 +372,7 @@ export const useEventFeedback = () => {
       setLoading(true)
       setError(null)
       try {
-        const response = await request("/events/feedback/analytics", "GET", undefined, params)
+        const response = await request("/event-feedback/analytics", "GET", undefined, params)
         setAnalytics(response.data)
         return response.data as FeedbackAnalytics
       } catch (err: any) {
@@ -391,7 +391,7 @@ export const useEventFeedback = () => {
       setLoading(true)
       setError(null)
       try {
-        const response = await request(`/events/feedback/${id}/respond`, "POST", data)
+        const response = await request(`/event-feedback/${id}/respond`, "POST", data)
         const updatedFeedback = response.data
         setFeedback((prev) => prev.map((item) => (item._id === id ? updatedFeedback : item)))
         if (currentFeedback?._id === id) {
@@ -414,7 +414,7 @@ export const useEventFeedback = () => {
       setLoading(true)
       setError(null)
       try {
-        const response = await request(`/events/feedback/${id}/responses`, "GET")
+        const response = await request(`/event-feedback/${id}/responses`, "GET")
         return response.data
       } catch (err: any) {
         setError(err.message || "Failed to fetch feedback responses")
@@ -432,7 +432,7 @@ export const useEventFeedback = () => {
       setLoading(true)
       setError(null)
       try {
-        const response = await request("/events/feedback/bulk-export",  "POST", { filters, format })
+        const response = await request("/event-feedback/bulk-export",  "POST", { filters, format })
         return response.data as BulkExportData
       } catch (err: any) {
         setError(err.message || "Failed to export feedback")
@@ -450,7 +450,7 @@ export const useEventFeedback = () => {
       setLoading(true)
       setError(null)
       try {
-        const response = await request("/events/feedback/statistics", "GET", { hotel, period })
+        const response = await request("/event-feedback/statistics", "GET", { hotel, period })
         setStatistics(response.data)
         return response.data as FeedbackStatisticsResponse
       } catch (err: any) {

@@ -199,7 +199,7 @@ export function useEventReports(hotelId?: string) {
       if (startDate) params.append("start_date", startDate.toISOString())
       if (endDate) params.append("end_date", endDate.toISOString())
 
-      const response = await request(`/events/reports/events-summary?${params.toString()}`, "GET")
+      const response = await request(`/event-report/events-summary?${params.toString()}`, "GET")
 
       if (response.error) {
         setError(response.error)
@@ -237,7 +237,7 @@ export function useEventReports(hotelId?: string) {
       params.append("group_by", groupBy)
 
       const response = await request(
-        `/events/reports/revenue-analysis?${params.toString()}`,
+        `/event-report/revenue-analysis?${params.toString()}`,
         "GET",
       )
 
@@ -276,7 +276,7 @@ export function useEventReports(hotelId?: string) {
       if (endDate) params.append("end_date", endDate.toISOString())
 
       const response = await request(
-        `/events/reports/venue-utilization?${params.toString()}`,
+        `/event-report/venue-utilization?${params.toString()}`,
         "GET",
       )
 
@@ -315,7 +315,7 @@ export function useEventReports(hotelId?: string) {
       if (endDate) params.append("end_date", endDate.toISOString())
 
       const response = await request(
-        `/events/reports/staff-performance?${params.toString()}`,
+        `/event-report/staff-performance?${params.toString()}`,
         "GET",
       )
 
@@ -353,7 +353,7 @@ export function useEventReports(hotelId?: string) {
       if (startDate) params.append("start_date", startDate.toISOString())
       if (endDate) params.append("end_date", endDate.toISOString())
 
-      const response = await request(`/events/reports/services?${params.toString()}`, "GET")
+      const response = await request(`/event-report/services?${params.toString()}`, "GET")
 
       if (response.error) {
         setError(response.error)
@@ -390,7 +390,7 @@ export function useEventReports(hotelId?: string) {
       if (endDate) params.append("end_date", endDate.toISOString())
 
       const response = await request(
-        `/events/reports/customer-satisfaction?${params.toString()}`,
+        `/event-report/customer-satisfaction?${params.toString()}`,
         "GET",
       )
 
@@ -446,7 +446,7 @@ export function useEventReports(hotelId?: string) {
         params.append(`filters[${key}]`, value.toString())
       })
 
-      const response = await request(`/events/reports/custom?${params.toString()}`, "GET")
+      const response = await request(`/event-report/custom?${params.toString()}`, "GET")
 
       if (response.error) {
         setError(response.error)
@@ -477,7 +477,7 @@ export function useEventReports(hotelId?: string) {
       }
 
       clearError()
-      const response = await request(`/events/reports/custom/${reportId}`, "GET")
+      const response = await request(`/event-report/custom/${reportId}`, "GET")
 
       if (response.error) {
         setError(response.error)
@@ -501,7 +501,7 @@ export function useEventReports(hotelId?: string) {
       const params = new URLSearchParams()
       params.append("hotel_id", reportHotelId)
 
-      const response = await request(`/events/reports/dashboard?${params.toString()}`, "GET")
+      const response = await request(`/event-report/dashboard?${params.toString()}`, "GET")
 
       if (response.error) {
         setError(response.error)
@@ -525,7 +525,7 @@ export function useEventReports(hotelId?: string) {
       const params = new URLSearchParams()
       params.append("hotel_id", reportHotelId)
 
-      const response = await request(`/events/reports/kpis?${params.toString()}`, "GET")
+      const response = await request(`/event-report/kpis?${params.toString()}`, "GET")
 
       if (response.error) {
         setError(response.error)
@@ -550,7 +550,7 @@ export function useEventReports(hotelId?: string) {
       params.append("hotel_id", reportHotelId)
 
       const response = await request(
-        `/events/reports/scheduled?${params.toString()}`,
+        `/event-report/scheduled?${params.toString()}`,
         "GET",
       )
 
@@ -580,7 +580,7 @@ export function useEventReports(hotelId?: string) {
         recipients,
       }
 
-      const response = await request(`/events/reports/schedule`, "POST", requestBody)
+      const response = await request(`/event-report/schedule`, "POST", requestBody)
 
       if (response.error) {
         setError(response.error)
@@ -601,7 +601,7 @@ export function useEventReports(hotelId?: string) {
       }
 
       clearError()
-      const response = await request(`/events/reports/schedule/${scheduleId}`, "DELETE")
+      const response = await request(`/event-report/schedule/${scheduleId}`, "DELETE")
 
       if (response.error) {
         setError(response.error)
@@ -622,7 +622,7 @@ export function useEventReports(hotelId?: string) {
       }
 
       clearError()
-      const response = await request(`/events/reports/${reportId}/export/pdf`, "GET")
+      const response = await request(`/event-report/${reportId}/export/pdf`, "GET")
 
       if (response.error) {
         setError(response.error)
@@ -643,7 +643,7 @@ export function useEventReports(hotelId?: string) {
       }
 
       clearError()
-      const response = await request(`/events/reports/${reportId}/export/excel`, "GET")
+      const response = await request(`/event-report/${reportId}/export/excel`, "GET")
 
       if (response.error) {
         setError(response.error)
@@ -664,7 +664,7 @@ export function useEventReports(hotelId?: string) {
       }
 
       clearError()
-      const response = await request(`/events/reports/${reportId}/export/csv`, "GET")
+      const response = await request(`/event-report/${reportId}/export/csv`, "GET")
 
       if (response.error) {
         setError(response.error)

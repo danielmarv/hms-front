@@ -18,8 +18,7 @@ export function useCurrentHotel(): CurrentHotelData {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Get hotel ID from user's current hotel or first hotel access
-  const hotelId = user?.currentHotel || user?.hotelAccess?.[0]?.hotelId || null
+  const hotelId = user?.primaryHotel?.id || null
 
   useEffect(() => {
     const fetchHotel = async () => {

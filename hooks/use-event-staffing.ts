@@ -166,7 +166,7 @@ export function useEventStaffing(hotelId?: string) {
           }
         })
 
-        const endpoint = `/events/staffing?${queryParams.toString()}`
+        const endpoint = `/event-staffing?${queryParams.toString()}`
         const response = await request(endpoint, "GET")
 
         if (response.error) {
@@ -205,7 +205,7 @@ export function useEventStaffing(hotelId?: string) {
   const getStaffingById = async (id: string) => {
     try {
       setLoading(true)
-      const response = await request(`/events/staffing/${id}`, "GET")
+      const response = await request(`/event-feedback/${id}`, "GET")
 
       if (response.error) {
         throw new Error(response.error)
@@ -240,7 +240,7 @@ export function useEventStaffing(hotelId?: string) {
   const createStaffing = async (staffingData: Partial<EventStaffing>) => {
     try {
       setLoading(true)
-      const response = await request("/events/staffing", "POST", staffingData)
+      const response = await request("/event-feedback", "POST", staffingData)
 
       if (response.error) {
         throw new Error(response.error)
@@ -275,7 +275,7 @@ export function useEventStaffing(hotelId?: string) {
   const updateStaffing = async (id: string, staffingData: Partial<EventStaffing>) => {
     try {
       setLoading(true)
-      const response = await request(`/events/staffing/${id}`, "PUT", staffingData)
+      const response = await request(`/event-feedback/${id}`, "PUT", staffingData)
 
       if (response.error) {
         throw new Error(response.error)
@@ -311,7 +311,7 @@ export function useEventStaffing(hotelId?: string) {
   const deleteStaffing = async (id: string) => {
     try {
       setLoading(true)
-      const response = await request(`/events/staffing/${id}`, "DELETE")
+      const response = await request(`/event-feedback/${id}`, "DELETE")
 
       if (response.error) {
         throw new Error(response.error)
@@ -334,7 +334,7 @@ export function useEventStaffing(hotelId?: string) {
   const getEventStaffing = async (eventId: string) => {
     try {
       setLoading(true)
-      const response = await request(`/events/staffing/event/${eventId}`, "GET")
+      const response = await request(`/event-feedback/event/${eventId}`, "GET")
 
       if (response.error) {
         throw new Error(response.error)
@@ -375,7 +375,7 @@ export function useEventStaffing(hotelId?: string) {
   ) => {
     try {
       setLoading(true)
-      const response = await request(`/events/staffing/event/${eventId}/assign`, "POST", assignmentData)
+      const response = await request(`/event-feedback/event/${eventId}/assign`, "POST", assignmentData)
 
       if (response.error) {
         throw new Error(response.error)
@@ -410,7 +410,7 @@ export function useEventStaffing(hotelId?: string) {
   const unassignStaffFromEvent = async (eventId: string, staffId: string) => {
     try {
       setLoading(true)
-      const response = await request(`/events/staffing/event/${eventId}/unassign/${staffId}`, "DELETE")
+      const response = await request(`/event-feedback/event/${eventId}/unassign/${staffId}`, "DELETE")
 
       if (response.error) {
         throw new Error(response.error)
@@ -437,7 +437,7 @@ export function useEventStaffing(hotelId?: string) {
         end_date: endDate,
       })
 
-      const response = await request(`/events/staffing/staff/${staffId}/availability?${queryParams.toString()}`, "GET")
+      const response = await request(`/event-feedback/staff/${staffId}/availability?${queryParams.toString()}`, "GET")
 
       if (response.error) {
         throw new Error(response.error)
@@ -487,7 +487,7 @@ export function useEventStaffing(hotelId?: string) {
         }
       })
 
-      const response = await request(`/events/staffing/staff/${staffId}/schedule?${queryParams.toString()}`, "GET")
+      const response = await request(`/event-feedback/staff/${staffId}/schedule?${queryParams.toString()}`, "GET")
 
       if (response.error) {
         throw new Error(response.error)
@@ -518,7 +518,7 @@ export function useEventStaffing(hotelId?: string) {
   const checkInStaff = async (staffingId: string, notes?: string) => {
     try {
       setLoading(true)
-      const response = await request(`/events/staffing/${staffingId}/checkin`, "POST", { notes })
+      const response = await request(`/event-feedback/${staffingId}/checkin`, "POST", { notes })
 
       if (response.error) {
         throw new Error(response.error)
@@ -554,7 +554,7 @@ export function useEventStaffing(hotelId?: string) {
   const checkOutStaff = async (staffingId: string, notes?: string) => {
     try {
       setLoading(true)
-      const response = await request(`/events/staffing/${staffingId}/checkout`, "POST", { notes })
+      const response = await request(`/event-feedback/${staffingId}/checkout`, "POST", { notes })
 
       if (response.error) {
         throw new Error(response.error)
@@ -589,7 +589,7 @@ export function useEventStaffing(hotelId?: string) {
   // Get staff timesheet
   const getStaffTimesheet = async (staffingId: string) => {
     try {
-      const response = await request(`/events/staffing/${staffingId}/timesheet`, "GET")
+      const response = await request(`/event-feedback/${staffingId}/timesheet`, "GET")
 
       if (response.error) {
         throw new Error(response.error)
@@ -639,7 +639,7 @@ export function useEventStaffing(hotelId?: string) {
   ) => {
     try {
       setLoading(true)
-      const response = await request(`/events/staffing/${staffingId}/performance`, "POST", performanceData)
+      const response = await request(`/event-feedback/${staffingId}/performance`, "POST", performanceData)
 
       if (response.error) {
         throw new Error(response.error)
@@ -674,7 +674,7 @@ export function useEventStaffing(hotelId?: string) {
   // Get performance history
   const getPerformanceHistory = async (staffingId: string) => {
     try {
-      const response = await request(`/events/staffing/${staffingId}/performance`, "GET")
+      const response = await request(`/event-feedback/${staffingId}/performance`, "GET")
 
       if (response.error) {
         throw new Error(response.error)
@@ -708,7 +708,7 @@ export function useEventStaffing(hotelId?: string) {
         }
       })
 
-      const response = await request(`/events/staffing/conflicts?${queryParams.toString()}`, "GET")
+      const response = await request(`/event-feedback/conflicts?${queryParams.toString()}`, "GET")
 
       if (response.error) {
         throw new Error(response.error)
@@ -750,7 +750,7 @@ export function useEventStaffing(hotelId?: string) {
   ) => {
     try {
       setLoading(true)
-      const response = await request(`/events/staffing/conflicts/${conflictId}/resolve`, "POST", resolution)
+      const response = await request(`/event-feedback/conflicts/${conflictId}/resolve`, "POST", resolution)
 
       if (response.error) {
         throw new Error(response.error)
