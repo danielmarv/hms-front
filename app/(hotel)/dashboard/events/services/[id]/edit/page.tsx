@@ -1,359 +1,439 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
-import { useParams, useRouter } from "next/navigation"
-import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Checkbox } from "@/components/ui/checkbox"
+import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Separator } from "@/components/ui/separator"
-import {
-  ArrowLeft,
-  Save,
-  Package,
-  DollarSign,
-  Clock,
-  Settings,
-  ExternalLink,
-  Plus,
-  Trash2,
-  Loader2,
-  AlertTriangle,
-} from "lucide-react"
+import { ArrowLeft, Save, Loader2, Package, CheckCircleIcon, Plus, X, DollarSign, Clock } from "lucide-react"
 import { useEventServices, type EventService } from "@/hooks/use-event-services"
-import { useCurrentHotel } from "@/hooks/use-current-hotel"
 import { toast } from "sonner"
 
-const CATEGORIES = [
-  "catering",
-  "decoration",
-  "equipment",
-  "entertainment",
-  "staffing",
-  "photography",
-  "transportation",
-  "security",
-  "cleaning",
-  "other",
+// Service categories
+const serviceCategories = [
+  { value: "catering", label: "Catering" },
+  { value: "decoration", label: "Decoration" },
+  { value: "equipment", label: "Equipment" },
+  { value: "entertainment", label: "Entertainment" },
+  { value: "staffing", label: "Staffing" },
+  { value: "photography", label: "Photography" },
+  { value: "transportation", label: "Transportation" },
+  { value: "security", label: "Security" },
+  { value: "cleaning", label: "Cleaning" },
+  { value: "other", label: "Other" },
 ]
 
-const PRICE_TYPES = [
-  { value: "fixed", label: "Fixed Price" },
+// Price types
+const priceTypes = [
+  { value: "flat", label: "Flat Rate" },
   { value: "per_person", label: "Per Person" },
   { value: "per_hour", label: "Per Hour" },
   { value: "per_day", label: "Per Day" },
   { value: "custom", label: "Custom" },
 ]
 
-const STATUS_OPTIONS = [
-  { value: "active", label: "Active" },
-  { value: "inactive", label: "Inactive" },
-  { value: "seasonal", label: "Seasonal" },
-]
+interface ServiceOption {
+  name: string
+  description: string
+  additionalPrice: number
+}
 
-export default function EditEventServicePage() {
-  const params = useParams()
+interface ServiceImage {
+  url: string
+  caption: string
+  isDefault: boolean
+}
+
+interface EditEventServicePageProps {
+  params: {
+    id: string
+  }
+}
+
+export default function EditEventServicePage({ params }: EditEventServicePageProps) {
   const router = useRouter()
-  const serviceId = params.id as string
+  const { getServiceById, updateService } = useEventServices()
+
+  // Loading states
+  const [loading, setLoading] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Service data
+  const [service, setService] = useState<EventService | null>(null)
 
   // Form state
-  const [formData, setFormData] = useState<Partial<EventService>>({
+  const [formData, setFormData] = useState({
     name: "",
     description: "",
     category: "",
     subcategory: "",
-    price: 0,
-    priceType: "fixed",
+    price: "",
+    priceType: "flat",
     customPriceDetails: "",
-    minimumQuantity: 1,
-    maximumQuantity: undefined,
-    leadTime: 24,
-    duration: undefined,
-    setupTime: 1,
-    cleanupTime: 1,
+    minimumQuantity: "1",
+    maximumQuantity: "",
+    leadTime: "24",
+    duration: "",
+    setupTime: "30",
+    cleanupTime: "30",
     status: "active",
     isExternalService: false,
-    externalProvider: {
-      name: "",
-      contactPerson: "",
-      phone: "",
-      email: "",
-      contractDetails: "",
-      commissionRate: undefined,
-    },
-    inventory: {
-      isLimited: false,
-      totalQuantity: undefined,
-      availableQuantity: undefined,
-      lowStockThreshold: undefined,
-    },
-    restrictions: {
-      venueTypes: [],
-      eventTypes: [],
-      minCapacity: undefined,
-      maxCapacity: undefined,
-      availableDays: {
-        monday: true,
-        tuesday: true,
-        wednesday: true,
-        thursday: true,
-        friday: true,
-        saturday: true,
-        sunday: true,
-      },
-    },
-    seasonalAvailability: {
-      isAvailable: false,
-      startDate: "",
-      endDate: "",
-      description: "",
-    },
-    options: [],
-    images: [],
   })
 
-  // Get current hotel data
-  const { hotel, hotelId, isLoading: hotelLoading } = useCurrentHotel()
-
-  // Get service data
-  const { getServiceById, updateService } = useEventServices(hotelId)
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  // Debug information
-  console.log("Edit component render:", {
-    serviceId,
-    hotelId,
-    hotelLoading,
-    loading,
-    error,
-    formData: formData.name ? "Form data loaded" : "No form data",
+  // External provider state
+  const [externalProvider, setExternalProvider] = useState({
+    name: "",
+    contactPerson: "",
+    phone: "",
+    email: "",
+    contractDetails: "",
+    commissionRate: "",
   })
 
-  // Temporary bypass for testing - remove this after debugging
-  if (!hotelLoading && !loading && !error && !formData.name && hotelId && serviceId) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-red-50 dark:from-slate-900 dark:via-purple-900 dark:to-pink-900 p-6">
-        <div className="max-w-7xl mx-auto">
-          <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border-0 shadow-xl">
-            <CardContent className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Debug Information</h3>
-              <div className="space-y-2 text-sm">
-                <p>
-                  <strong>Service ID:</strong> {serviceId}
-                </p>
-                <p>
-                  <strong>Hotel ID:</strong> {hotelId}
-                </p>
-                <p>
-                  <strong>Hotel Loading:</strong> {hotelLoading ? "Yes" : "No"}
-                </p>
-                <p>
-                  <strong>Service Loading:</strong> {loading ? "Yes" : "No"}
-                </p>
-                <p>
-                  <strong>Error:</strong> {error || "None"}
-                </p>
-                <p>
-                  <strong>Form Data:</strong> {formData.name ? "Loaded" : "Not loaded"}
-                </p>
-              </div>
-              <div className="mt-4 space-x-2">
-                <Button onClick={() => window.location.reload()}>Reload Page</Button>
-                <Button asChild variant="outline">
-                  <Link href="/dashboard/events/services">Back to Services</Link>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    )
-  }
+  // Inventory state
+  const [inventory, setInventory] = useState({
+    isLimited: false,
+    totalQuantity: "",
+    availableQuantity: "",
+    lowStockThreshold: "",
+  })
 
-  // Fetch service details
+  // Restrictions state
+  const [restrictions, setRestrictions] = useState({
+    venueTypes: [] as string[],
+    eventTypes: [] as string[],
+    minCapacity: "",
+    maxCapacity: "",
+    availableDays: {
+      monday: true,
+      tuesday: true,
+      wednesday: true,
+      thursday: true,
+      friday: true,
+      saturday: true,
+      sunday: true,
+    },
+  })
+
+  // Seasonal availability state
+  const [seasonalAvailability, setSeasonalAvailability] = useState({
+    isAvailable: true,
+    startDate: "",
+    endDate: "",
+    description: "",
+  })
+
+  // Service options state
+  const [options, setOptions] = useState<ServiceOption[]>([])
+
+  // Images state
+  const [images, setImages] = useState<ServiceImage[]>([])
+
+  const [activeTab, setActiveTab] = useState("basic")
+
+  // Load service data
   useEffect(() => {
-    const fetchService = async () => {
-      console.log("Fetch service called:", { serviceId, hotelId })
-
-      if (!serviceId) {
-        setError("Service ID is required")
-        setLoading(false)
-        return
-      }
-
-      if (!hotelId) {
-        console.log("Waiting for hotel ID...")
-        return // Wait for hotel ID to be available
-      }
-
+    const loadService = async () => {
       try {
         setLoading(true)
         setError(null)
-        console.log("Fetching service with ID:", serviceId)
-
-        const serviceData = await getServiceById(serviceId)
-        console.log("Service data received:", serviceData)
+        const serviceData = await getServiceById(params.id)
 
         if (serviceData) {
-          // Verify service belongs to current hotel
-          if (serviceData.hotel !== hotelId) {
-            setError("Service not found or access denied")
-            return
+          setService(serviceData)
+
+          // Populate form data
+          setFormData({
+            name: serviceData.name || "",
+            description: serviceData.description || "",
+            category: serviceData.category || "",
+            subcategory: serviceData.subcategory || "",
+            price: serviceData.price?.toString() || "",
+            priceType: serviceData.priceType || "flat",
+            customPriceDetails: serviceData.customPriceDetails || "",
+            minimumQuantity: serviceData.minimumQuantity?.toString() || "1",
+            maximumQuantity: serviceData.maximumQuantity?.toString() || "",
+            leadTime: serviceData.leadTime?.toString() || "24",
+            duration: serviceData.duration?.toString() || "",
+            setupTime: serviceData.setupTime?.toString() || "30",
+            cleanupTime: serviceData.cleanupTime?.toString() || "30",
+            status: serviceData.status || "active",
+            isExternalService: serviceData.isExternalService || false,
+          })
+
+          // Populate external provider
+          if (serviceData.externalProvider) {
+            setExternalProvider({
+              name: serviceData.externalProvider.name || "",
+              contactPerson: serviceData.externalProvider.contactPerson || "",
+              phone: serviceData.externalProvider.phone || "",
+              email: serviceData.externalProvider.email || "",
+              contractDetails: serviceData.externalProvider.contractDetails || "",
+              commissionRate: serviceData.externalProvider.commissionRate?.toString() || "",
+            })
           }
-          setFormData(serviceData)
+
+          // Populate inventory
+          if (serviceData.inventory) {
+            setInventory({
+              isLimited: serviceData.inventory.isLimited || false,
+              totalQuantity: serviceData.inventory.totalQuantity?.toString() || "",
+              availableQuantity: serviceData.inventory.availableQuantity?.toString() || "",
+              lowStockThreshold: serviceData.inventory.lowStockThreshold?.toString() || "",
+            })
+          }
+
+          // Populate restrictions
+          if (serviceData.restrictions) {
+            setRestrictions({
+              venueTypes: serviceData.restrictions.venueTypes || [],
+              eventTypes: serviceData.restrictions.eventTypes || [],
+              minCapacity: serviceData.restrictions.minCapacity?.toString() || "",
+              maxCapacity: serviceData.restrictions.maxCapacity?.toString() || "",
+              availableDays: serviceData.restrictions.availableDays || {
+                monday: true,
+                tuesday: true,
+                wednesday: true,
+                thursday: true,
+                friday: true,
+                saturday: true,
+                sunday: true,
+              },
+            })
+          }
+
+          // Populate seasonal availability
+          if (serviceData.seasonalAvailability) {
+            setSeasonalAvailability({
+              isAvailable: serviceData.seasonalAvailability.isAvailable ?? true,
+              startDate: serviceData.seasonalAvailability.startDate || "",
+              endDate: serviceData.seasonalAvailability.endDate || "",
+              description: serviceData.seasonalAvailability.description || "",
+            })
+          }
+
+          // Populate options
+          setOptions(serviceData.options || [])
+
+          // Populate images
+          setImages(serviceData.images || [])
         } else {
           setError("Service not found")
         }
       } catch (err) {
-        console.error("Error fetching service:", err)
-        setError("Failed to load service details")
+        setError(err instanceof Error ? err.message : "Failed to load service")
       } finally {
         setLoading(false)
       }
     }
 
-    fetchService()
-  }, [serviceId, hotelId, getServiceById])
+    if (params.id) {
+      loadService()
+    }
+  }, [params.id, getServiceById])
 
-  // Handle input changes
-  const handleInputChange = (field: string, value: any) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }))
+  // Handle form input changes
+  const handleInputChange = (field: string, value: string | boolean) => {
+    setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
-  // Handle nested object changes
-  const handleNestedChange = (parent: string, field: string, value: any) => {
-    setFormData((prev) => ({
+  // Handle external provider changes
+  const handleExternalProviderChange = (field: string, value: string) => {
+    setExternalProvider((prev) => ({ ...prev, [field]: value }))
+  }
+
+  // Handle inventory changes
+  const handleInventoryChange = (field: string, value: string | boolean) => {
+    setInventory((prev) => ({ ...prev, [field]: value }))
+  }
+
+  // Handle restrictions changes
+  const handleRestrictionsChange = (field: string, value: any) => {
+    setRestrictions((prev) => ({ ...prev, [field]: value }))
+  }
+
+  // Handle available days changes
+  const handleDayChange = (day: string, value: boolean) => {
+    setRestrictions((prev) => ({
       ...prev,
-      [parent]: {
-        ...(prev[parent as keyof typeof prev] as any),
-        [field]: value,
+      availableDays: {
+        ...prev.availableDays,
+        [day]: value,
       },
     }))
   }
 
-  // Handle array changes
-  const handleArrayChange = (field: string, value: string[]) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }))
+  // Handle seasonal availability changes
+  const handleSeasonalChange = (field: string, value: string | boolean) => {
+    setSeasonalAvailability((prev) => ({ ...prev, [field]: value }))
   }
 
-  // Add option
+  // Handle service options
   const addOption = () => {
-    setFormData((prev) => ({
-      ...prev,
-      options: [...(prev.options || []), { name: "", description: "", additionalPrice: 0 }],
-    }))
+    setOptions((prev) => [...prev, { name: "", description: "", additionalPrice: 0 }])
   }
 
-  // Remove option
   const removeOption = (index: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      options: prev.options?.filter((_, i) => i !== index) || [],
-    }))
+    setOptions((prev) => prev.filter((_, i) => i !== index))
   }
 
-  // Update option
-  const updateOption = (index: number, field: string, value: any) => {
-    setFormData((prev) => ({
-      ...prev,
-      options: prev.options?.map((option, i) => (i === index ? { ...option, [field]: value } : option)) || [],
-    }))
+  const updateOption = (index: number, field: keyof ServiceOption, value: string | number) => {
+    setOptions((prev) => prev.map((option, i) => (i === index ? { ...option, [field]: value } : option)))
   }
 
-  // Add image
+  // Handle images
   const addImage = () => {
-    setFormData((prev) => ({
-      ...prev,
-      images: [...(prev.images || []), { url: "", caption: "", isDefault: false }],
-    }))
+    setImages((prev) => [...prev, { url: "", caption: "", isDefault: false }])
   }
 
-  // Remove image
   const removeImage = (index: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      images: prev.images?.filter((_, i) => i !== index) || [],
-    }))
+    setImages((prev) => prev.filter((_, i) => i !== index))
   }
 
-  // Update image
-  const updateImage = (index: number, field: string, value: any) => {
-    setFormData((prev) => ({
-      ...prev,
-      images: prev.images?.map((image, i) => (i === index ? { ...image, [field]: value } : image)) || [],
-    }))
+  const updateImage = (index: number, field: keyof ServiceImage, value: string | boolean) => {
+    setImages((prev) =>
+      prev.map((image, i) => {
+        if (i === index) {
+          // If setting this image as default, unset others
+          if (field === "isDefault" && value === true) {
+            return { ...image, isDefault: true }
+          }
+          return { ...image, [field]: value }
+        } else {
+          // If setting another image as default, unset this one
+          if (field === "isDefault" && value === true) {
+            return { ...image, isDefault: false }
+          }
+          return image
+        }
+      }),
+    )
   }
 
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Validate required fields
-    if (!formData.name?.trim()) {
+    if (!service) {
+      toast.error("Service data not loaded")
+      return
+    }
+
+    if (!formData.name.trim()) {
       toast.error("Service name is required")
+      setActiveTab("basic")
       return
     }
 
     if (!formData.category) {
       toast.error("Category is required")
+      setActiveTab("basic")
       return
     }
 
-    if (!formData.price || formData.price < 0) {
-      toast.error("Valid price is required")
+    if (!formData.price || Number.parseFloat(formData.price) < 0) {
+      toast.error("Price must be 0 or greater")
+      setActiveTab("basic")
       return
     }
 
     try {
-      setSaving(true)
+      setIsSubmitting(true)
 
-      // Prepare data for submission
-      const updateData = {
-        ...formData,
-        hotel: hotelId, // Ensure hotel ID is set
+      // Prepare service data
+      const serviceData: Partial<EventService> = {
+        name: formData.name,
+        description: formData.description,
+        category: formData.category,
+        subcategory: formData.subcategory || undefined,
+        price: Number.parseFloat(formData.price),
+        priceType: formData.priceType,
+        customPriceDetails: formData.customPriceDetails || undefined,
+        minimumQuantity: formData.minimumQuantity ? Number.parseInt(formData.minimumQuantity) : 1,
+        maximumQuantity: formData.maximumQuantity ? Number.parseInt(formData.maximumQuantity) : undefined,
+        leadTime: formData.leadTime ? Number.parseInt(formData.leadTime) : 24,
+        duration: formData.duration ? Number.parseInt(formData.duration) : undefined,
+        setupTime: formData.setupTime ? Number.parseInt(formData.setupTime) : 30,
+        cleanupTime: formData.cleanupTime ? Number.parseInt(formData.cleanupTime) : 30,
+        status: formData.status,
+        isExternalService: formData.isExternalService,
+
+        // Only include external provider if it's an external service
+        ...(formData.isExternalService && {
+          externalProvider: {
+            name: externalProvider.name,
+            contactPerson: externalProvider.contactPerson,
+            phone: externalProvider.phone,
+            email: externalProvider.email,
+            contractDetails: externalProvider.contractDetails,
+            commissionRate: externalProvider.commissionRate
+              ? Number.parseFloat(externalProvider.commissionRate)
+              : undefined,
+          },
+        }),
+
+        // Only include inventory if it's limited
+        ...(inventory.isLimited && {
+          inventory: {
+            isLimited: true,
+            totalQuantity: inventory.totalQuantity ? Number.parseInt(inventory.totalQuantity) : undefined,
+            availableQuantity: inventory.availableQuantity ? Number.parseInt(inventory.availableQuantity) : undefined,
+            lowStockThreshold: inventory.lowStockThreshold ? Number.parseInt(inventory.lowStockThreshold) : undefined,
+          },
+        }),
+
+        // Include restrictions
+        restrictions: {
+          venueTypes: restrictions.venueTypes,
+          eventTypes: restrictions.eventTypes,
+          minCapacity: restrictions.minCapacity ? Number.parseInt(restrictions.minCapacity) : undefined,
+          maxCapacity: restrictions.maxCapacity ? Number.parseInt(restrictions.maxCapacity) : undefined,
+          availableDays: restrictions.availableDays,
+        },
+
+        // Include seasonal availability
+        seasonalAvailability: {
+          isAvailable: seasonalAvailability.isAvailable,
+          startDate: seasonalAvailability.startDate || undefined,
+          endDate: seasonalAvailability.endDate || undefined,
+          description: seasonalAvailability.description,
+        },
+
+        // Include options and images if they have values
+        options: options
+          .filter((option) => option.name.trim())
+          .map((option) => ({
+            name: option.name,
+            description: option.description,
+            additionalPrice: Number(option.additionalPrice),
+          })),
+
+        images: images.filter((image) => image.url.trim()),
       }
 
-      const result = await updateService(serviceId, updateData)
+      // Call API to update service
+      const result = await updateService(service._id, serviceData)
 
       if (result) {
-        toast.success("Service updated successfully")
-        router.push(`/dashboard/events/services/${serviceId}`)
+        toast.success("Event service updated successfully!")
+        router.push(`/dashboard/events/services/${service._id}`)
       } else {
-        toast.error("Failed to update service")
+        throw new Error("Failed to update service")
       }
     } catch (error) {
-      console.error("Error updating service:", error)
+      console.error("Failed to update service:", error)
       toast.error("Failed to update service")
     } finally {
-      setSaving(false)
+      setIsSubmitting(false)
     }
-  }
-
-  if (hotelLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-red-50 dark:from-slate-900 dark:via-purple-900 dark:to-pink-900">
-        <div className="flex flex-col items-center space-y-4">
-          <Loader2 className="h-12 w-12 animate-spin text-purple-600 dark:text-purple-400" />
-          <p className="text-lg font-medium text-slate-700 dark:text-slate-300">Loading hotel information...</p>
-          <p className="text-sm text-slate-500">Debug: Hotel loading</p>
-        </div>
-      </div>
-    )
   }
 
   if (loading) {
@@ -361,29 +441,26 @@ export default function EditEventServicePage() {
       <div className="flex items-center justify-center h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-red-50 dark:from-slate-900 dark:via-purple-900 dark:to-pink-900">
         <div className="flex flex-col items-center space-y-4">
           <Loader2 className="h-12 w-12 animate-spin text-purple-600 dark:text-purple-400" />
-          <p className="text-lg font-medium text-slate-700 dark:text-slate-300">Loading service details...</p>
-          <p className="text-sm text-slate-500">
-            Debug: Service ID: {serviceId}, Hotel ID: {hotelId}
-          </p>
+          <p className="text-lg font-medium text-slate-700 dark:text-slate-300">Loading service...</p>
         </div>
       </div>
     )
   }
 
-  if (error) {
+  if (error || !service) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-red-50 dark:from-slate-900 dark:via-purple-900 dark:to-pink-900 p-6">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-4xl mx-auto">
           <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border-0 shadow-xl">
             <CardContent className="flex flex-col items-center justify-center h-64">
-              <AlertTriangle className="h-12 w-12 text-red-500 mb-4" />
+              <Package className="h-12 w-12 text-slate-400 dark:text-slate-500 mb-4" />
               <h3 className="text-lg font-semibold mb-2 text-slate-700 dark:text-slate-300">Service Not Found</h3>
-              <p className="text-slate-500 dark:text-slate-400 text-center mb-4">{error}</p>
-              <Button asChild variant="outline">
-                <Link href="/dashboard/events/services">
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back to Services
-                </Link>
+              <p className="text-slate-500 dark:text-slate-400 text-center mb-4">
+                {error || "The requested service could not be found."}
+              </p>
+              <Button variant="outline" onClick={() => router.back()}>
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Go Back
               </Button>
             </CardContent>
           </Card>
@@ -394,106 +471,101 @@ export default function EditEventServicePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-red-50 dark:from-slate-900 dark:via-purple-900 dark:to-pink-900 p-6">
-      <div className="max-w-7xl mx-auto space-y-8">
+      <div className="max-w-4xl mx-auto space-y-8">
         {/* Header */}
-        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20 dark:border-slate-700/20">
+        <div className="flex items-center justify-between bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20 dark:border-slate-700/20">
           <div className="flex items-center space-x-4">
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/dashboard/events/services/${serviceId}`}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Service
-              </Link>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => router.back()}
+              className="border-purple-200 hover:bg-purple-50 dark:border-purple-700 dark:hover:bg-purple-900"
+            >
+              <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 via-pink-600 to-red-600 dark:from-purple-400 dark:via-pink-400 dark:to-red-400 bg-clip-text text-transparent">
-                Edit Service
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 via-pink-600 to-red-600 dark:from-purple-400 dark:via-pink-400 dark:to-red-400 bg-clip-text text-transparent">
+                Edit Event Service
               </h1>
-              <p className="text-slate-600 dark:text-slate-300 mt-2 text-lg">
-                Update service details for <span className="font-medium">{hotel?.name || "your hotel"}</span>
-              </p>
-              {hotelId && <p className="text-xs text-muted-foreground">Hotel ID: {hotelId}</p>}
+              <p className="text-slate-600 dark:text-slate-300 mt-1">Update service details and settings</p>
             </div>
           </div>
+          <Package className="h-8 w-8 text-purple-600 dark:text-purple-400" />
         </div>
 
-        <form onSubmit={handleSubmit}>
-          <Tabs defaultValue="basic" className="space-y-6">
-            <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20 dark:border-slate-700/20">
-              <TabsList className="grid w-full grid-cols-6">
-                <TabsTrigger value="basic">Basic Info</TabsTrigger>
-                <TabsTrigger value="pricing">Pricing</TabsTrigger>
-                <TabsTrigger value="timing">Timing</TabsTrigger>
-                <TabsTrigger value="restrictions">Restrictions</TabsTrigger>
-                <TabsTrigger value="provider">Provider</TabsTrigger>
-                <TabsTrigger value="extras">Extras</TabsTrigger>
-              </TabsList>
+        {/* Service Info */}
+        <Card className="border-2 border-dashed border-purple-200 dark:border-purple-800 bg-gradient-to-r from-purple-50/80 to-pink-50/80 dark:from-purple-900/20 dark:to-pink-900/20 backdrop-blur-sm">
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Package className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                <CardTitle className="text-lg text-purple-900 dark:text-purple-100">Editing Service</CardTitle>
+              </div>
+              <CheckCircleIcon className="h-5 w-5 text-green-600 dark:text-green-400" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-slate-900 dark:text-slate-100">{service.name}</h3>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  {service.category} • {service.status} • Created {new Date(service.created_at).toLocaleDateString()}
+                </p>
+              </div>
+              <Badge variant="outline" className="text-xs">
+                ID: {service._id}
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
 
-            <TabsContent value="basic" className="space-y-6">
+        {/* Main Form */}
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid grid-cols-2 md:grid-cols-4 w-full bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-lg">
+              <TabsTrigger value="basic">Basic Info</TabsTrigger>
+              <TabsTrigger value="details">Details & Options</TabsTrigger>
+              <TabsTrigger value="availability">Availability</TabsTrigger>
+              <TabsTrigger value="media">Media & Provider</TabsTrigger>
+            </TabsList>
+
+            {/* Basic Info Tab */}
+            <TabsContent value="basic">
               <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border-0 shadow-xl">
                 <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Package className="mr-2 h-5 w-5" />
-                    Basic Information
-                  </CardTitle>
+                  <CardTitle className="text-xl text-slate-800 dark:text-slate-200">Basic Information</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="name">Service Name *</Label>
+                      <Label htmlFor="name" className="text-slate-700 dark:text-slate-300">
+                        Service Name *
+                      </Label>
                       <Input
                         id="name"
-                        value={formData.name || ""}
+                        value={formData.name}
                         onChange={(e) => handleInputChange("name", e.target.value)}
                         placeholder="Enter service name"
                         required
+                        className="bg-white/80 dark:bg-slate-700/80"
                       />
                     </div>
-
                     <div className="space-y-2">
-                      <Label htmlFor="category">Category *</Label>
+                      <Label htmlFor="category" className="text-slate-700 dark:text-slate-300">
+                        Category *
+                      </Label>
                       <Select
-                        value={formData.category || ""}
+                        value={formData.category}
                         onValueChange={(value) => handleInputChange("category", value)}
+                        required
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="bg-white/80 dark:bg-slate-700/80">
                           <SelectValue placeholder="Select category" />
                         </SelectTrigger>
                         <SelectContent>
-                          {CATEGORIES.map((category) => (
-                            <SelectItem key={category} value={category}>
-                              {category.charAt(0).toUpperCase() + category.slice(1)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="subcategory">Subcategory</Label>
-                      <Input
-                        id="subcategory"
-                        value={formData.subcategory || ""}
-                        onChange={(e) => handleInputChange("subcategory", e.target.value)}
-                        placeholder="Enter subcategory (optional)"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="status">Status</Label>
-                      <Select
-                        value={formData.status || "active"}
-                        onValueChange={(value) => handleInputChange("status", value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {STATUS_OPTIONS.map((status) => (
-                            <SelectItem key={status.value} value={status.value}>
-                              {status.label}
+                          {serviceCategories.map((category) => (
+                            <SelectItem key={category.value} value={category.value}>
+                              {category.label}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -502,54 +574,65 @@ export default function EditEventServicePage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea
-                      id="description"
-                      value={formData.description || ""}
-                      onChange={(e) => handleInputChange("description", e.target.value)}
-                      placeholder="Enter service description"
-                      rows={4}
+                    <Label htmlFor="subcategory" className="text-slate-700 dark:text-slate-300">
+                      Subcategory
+                    </Label>
+                    <Input
+                      id="subcategory"
+                      value={formData.subcategory}
+                      onChange={(e) => handleInputChange("subcategory", e.target.value)}
+                      placeholder="Enter subcategory (optional)"
+                      className="bg-white/80 dark:bg-slate-700/80"
                     />
                   </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
 
-            <TabsContent value="pricing" className="space-y-6">
-              <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border-0 shadow-xl">
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <DollarSign className="mr-2 h-5 w-5" />
-                    Pricing Information
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="description" className="text-slate-700 dark:text-slate-300">
+                      Description
+                    </Label>
+                    <Textarea
+                      id="description"
+                      value={formData.description}
+                      onChange={(e) => handleInputChange("description", e.target.value)}
+                      placeholder="Enter service description"
+                      rows={3}
+                      className="bg-white/80 dark:bg-slate-700/80"
+                    />
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="price">Price *</Label>
-                      <Input
-                        id="price"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={formData.price || ""}
-                        onChange={(e) => handleInputChange("price", Number.parseFloat(e.target.value) || 0)}
-                        placeholder="0.00"
-                        required
-                      />
+                      <Label htmlFor="price" className="text-slate-700 dark:text-slate-300">
+                        Price *
+                      </Label>
+                      <div className="relative">
+                        <DollarSign className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                        <Input
+                          id="price"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={formData.price}
+                          onChange={(e) => handleInputChange("price", e.target.value)}
+                          placeholder="0.00"
+                          required
+                          className="pl-10 bg-white/80 dark:bg-slate-700/80"
+                        />
+                      </div>
                     </div>
-
                     <div className="space-y-2">
-                      <Label htmlFor="priceType">Price Type</Label>
+                      <Label htmlFor="priceType" className="text-slate-700 dark:text-slate-300">
+                        Price Type
+                      </Label>
                       <Select
-                        value={formData.priceType || "fixed"}
+                        value={formData.priceType}
                         onValueChange={(value) => handleInputChange("priceType", value)}
                       >
-                        <SelectTrigger>
-                          <SelectValue />
+                        <SelectTrigger className="bg-white/80 dark:bg-slate-700/80">
+                          <SelectValue placeholder="Select price type" />
                         </SelectTrigger>
                         <SelectContent>
-                          {PRICE_TYPES.map((type) => (
+                          {priceTypes.map((type) => (
                             <SelectItem key={type.value} value={type.value}>
                               {type.label}
                             </SelectItem>
@@ -561,466 +644,183 @@ export default function EditEventServicePage() {
 
                   {formData.priceType === "custom" && (
                     <div className="space-y-2">
-                      <Label htmlFor="customPriceDetails">Custom Price Details</Label>
+                      <Label htmlFor="customPriceDetails" className="text-slate-700 dark:text-slate-300">
+                        Custom Price Details
+                      </Label>
                       <Textarea
                         id="customPriceDetails"
-                        value={formData.customPriceDetails || ""}
+                        value={formData.customPriceDetails}
                         onChange={(e) => handleInputChange("customPriceDetails", e.target.value)}
-                        placeholder="Explain the custom pricing structure"
-                        rows={3}
+                        placeholder="Explain custom pricing structure"
+                        rows={2}
+                        className="bg-white/80 dark:bg-slate-700/80"
                       />
                     </div>
                   )}
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="minimumQuantity">Minimum Quantity</Label>
-                      <Input
-                        id="minimumQuantity"
-                        type="number"
-                        min="1"
-                        value={formData.minimumQuantity || 1}
-                        onChange={(e) => handleInputChange("minimumQuantity", Number.parseInt(e.target.value) || 1)}
-                      />
+                  <div className="flex items-center justify-between pt-4">
+                    <div className="space-y-1">
+                      <Label className="text-slate-700 dark:text-slate-300">Service Status</Label>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">Set the current availability status</p>
                     </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="maximumQuantity">Maximum Quantity</Label>
-                      <Input
-                        id="maximumQuantity"
-                        type="number"
-                        min="1"
-                        value={formData.maximumQuantity || ""}
-                        onChange={(e) =>
-                          handleInputChange(
-                            "maximumQuantity",
-                            e.target.value ? Number.parseInt(e.target.value) : undefined,
-                          )
-                        }
-                        placeholder="No limit"
-                      />
-                    </div>
+                    <Select value={formData.status} onValueChange={(value) => handleInputChange("status", value)}>
+                      <SelectTrigger className="w-[180px] bg-white/80 dark:bg-slate-700/80">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
+                        <SelectItem value="seasonal">Seasonal</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </CardContent>
               </Card>
             </TabsContent>
 
-            <TabsContent value="timing" className="space-y-6">
-              <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border-0 shadow-xl">
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Clock className="mr-2 h-5 w-5" />
-                    Timing Requirements
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="leadTime">Lead Time (hours) *</Label>
-                      <Input
-                        id="leadTime"
-                        type="number"
-                        min="0"
-                        value={formData.leadTime || 24}
-                        onChange={(e) => handleInputChange("leadTime", Number.parseInt(e.target.value) || 24)}
-                        required
-                      />
+            {/* Details & Options Tab */}
+            <TabsContent value="details">
+              <div className="space-y-6">
+                {/* Quantity & Timing */}
+                <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border-0 shadow-xl">
+                  <CardHeader>
+                    <CardTitle className="text-xl text-slate-800 dark:text-slate-200">Quantity & Timing</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="minimumQuantity" className="text-slate-700 dark:text-slate-300">
+                          Minimum Quantity
+                        </Label>
+                        <Input
+                          id="minimumQuantity"
+                          type="number"
+                          min="1"
+                          value={formData.minimumQuantity}
+                          onChange={(e) => handleInputChange("minimumQuantity", e.target.value)}
+                          className="bg-white/80 dark:bg-slate-700/80"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="maximumQuantity" className="text-slate-700 dark:text-slate-300">
+                          Maximum Quantity
+                        </Label>
+                        <Input
+                          id="maximumQuantity"
+                          type="number"
+                          min="1"
+                          value={formData.maximumQuantity}
+                          onChange={(e) => handleInputChange("maximumQuantity", e.target.value)}
+                          placeholder="No limit"
+                          className="bg-white/80 dark:bg-slate-700/80"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="leadTime" className="text-slate-700 dark:text-slate-300">
+                          Lead Time (hours)
+                        </Label>
+                        <div className="relative">
+                          <Clock className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                          <Input
+                            id="leadTime"
+                            type="number"
+                            min="0"
+                            value={formData.leadTime}
+                            onChange={(e) => handleInputChange("leadTime", e.target.value)}
+                            className="pl-10 bg-white/80 dark:bg-slate-700/80"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="setupTime" className="text-slate-700 dark:text-slate-300">
+                          Setup Time (minutes)
+                        </Label>
+                        <Input
+                          id="setupTime"
+                          type="number"
+                          min="0"
+                          value={formData.setupTime}
+                          onChange={(e) => handleInputChange("setupTime", e.target.value)}
+                          className="bg-white/80 dark:bg-slate-700/80"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="cleanupTime" className="text-slate-700 dark:text-slate-300">
+                          Cleanup Time (minutes)
+                        </Label>
+                        <Input
+                          id="cleanupTime"
+                          type="number"
+                          min="0"
+                          value={formData.cleanupTime}
+                          onChange={(e) => handleInputChange("cleanupTime", e.target.value)}
+                          className="bg-white/80 dark:bg-slate-700/80"
+                        />
+                      </div>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="duration">Duration (hours)</Label>
+                      <Label htmlFor="duration" className="text-slate-700 dark:text-slate-300">
+                        Service Duration (minutes)
+                      </Label>
                       <Input
                         id="duration"
                         type="number"
-                        min="0"
-                        value={formData.duration || ""}
-                        onChange={(e) =>
-                          handleInputChange("duration", e.target.value ? Number.parseInt(e.target.value) : undefined)
-                        }
-                        placeholder="Not specified"
+                        min="1"
+                        value={formData.duration}
+                        onChange={(e) => handleInputChange("duration", e.target.value)}
+                        placeholder="Leave empty if not applicable"
+                        className="bg-white/80 dark:bg-slate-700/80"
                       />
                     </div>
-                  </div>
+                  </CardContent>
+                </Card>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="setupTime">Setup Time (hours)</Label>
-                      <Input
-                        id="setupTime"
-                        type="number"
-                        min="0"
-                        value={formData.setupTime || 1}
-                        onChange={(e) => handleInputChange("setupTime", Number.parseInt(e.target.value) || 1)}
-                      />
+                {/* Service Options */}
+                <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border-0 shadow-xl">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-xl text-slate-800 dark:text-slate-200">Service Options</CardTitle>
+                      <Button type="button" variant="outline" size="sm" onClick={addOption}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Option
+                      </Button>
                     </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="cleanupTime">Cleanup Time (hours)</Label>
-                      <Input
-                        id="cleanupTime"
-                        type="number"
-                        min="0"
-                        value={formData.cleanupTime || 1}
-                        onChange={(e) => handleInputChange("cleanupTime", Number.parseInt(e.target.value) || 1)}
-                      />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="restrictions" className="space-y-6">
-              <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border-0 shadow-xl">
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Settings className="mr-2 h-5 w-5" />
-                    Service Restrictions
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="minCapacity">Minimum Capacity</Label>
-                      <Input
-                        id="minCapacity"
-                        type="number"
-                        min="0"
-                        value={formData.restrictions?.minCapacity || ""}
-                        onChange={(e) =>
-                          handleNestedChange(
-                            "restrictions",
-                            "minCapacity",
-                            e.target.value ? Number.parseInt(e.target.value) : undefined,
-                          )
-                        }
-                        placeholder="No minimum"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="maxCapacity">Maximum Capacity</Label>
-                      <Input
-                        id="maxCapacity"
-                        type="number"
-                        min="0"
-                        value={formData.restrictions?.maxCapacity || ""}
-                        onChange={(e) =>
-                          handleNestedChange(
-                            "restrictions",
-                            "maxCapacity",
-                            e.target.value ? Number.parseInt(e.target.value) : undefined,
-                          )
-                        }
-                        placeholder="No maximum"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label className="text-base font-medium mb-3 block">Available Days</Label>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      {Object.entries(formData.restrictions?.availableDays || {}).map(([day, available]) => (
-                        <div key={day} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={day}
-                            checked={available}
-                            onCheckedChange={(checked) =>
-                              handleNestedChange("restrictions", "availableDays", {
-                                ...formData.restrictions?.availableDays,
-                                [day]: checked,
-                              })
-                            }
-                          />
-                          <Label htmlFor={day} className="capitalize">
-                            {day}
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  <div>
-                    <div className="flex items-center space-x-2 mb-3">
-                      <Checkbox
-                        id="seasonalAvailable"
-                        checked={formData.seasonalAvailability?.isAvailable || false}
-                        onCheckedChange={(checked) =>
-                          handleNestedChange("seasonalAvailability", "isAvailable", checked)
-                        }
-                      />
-                      <Label htmlFor="seasonalAvailable" className="text-base font-medium">
-                        Seasonal Availability
-                      </Label>
-                    </div>
-
-                    {formData.seasonalAvailability?.isAvailable && (
-                      <div className="space-y-4 ml-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="seasonalStart">Start Date</Label>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {options.length === 0 ? (
+                      <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+                        No service options added yet. Click "Add Option" to create one.
+                      </div>
+                    ) : (
+                      options.map((option, index) => (
+                        <div
+                          key={index}
+                          className="flex items-start gap-4 p-4 border rounded-lg bg-slate-50 dark:bg-slate-700/50"
+                        >
+                          <div className="flex-1 space-y-2">
                             <Input
-                              id="seasonalStart"
-                              type="date"
-                              value={formData.seasonalAvailability?.startDate || ""}
-                              onChange={(e) => handleNestedChange("seasonalAvailability", "startDate", e.target.value)}
+                              value={option.name}
+                              onChange={(e) => updateOption(index, "name", e.target.value)}
+                              placeholder="Option name"
+                              className="bg-white dark:bg-slate-700"
+                            />
+                            <Textarea
+                              value={option.description}
+                              onChange={(e) => updateOption(index, "description", e.target.value)}
+                              placeholder="Option description"
+                              rows={2}
+                              className="bg-white dark:bg-slate-700"
                             />
                           </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="seasonalEnd">End Date</Label>
-                            <Input
-                              id="seasonalEnd"
-                              type="date"
-                              value={formData.seasonalAvailability?.endDate || ""}
-                              onChange={(e) => handleNestedChange("seasonalAvailability", "endDate", e.target.value)}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="seasonalDescription">Seasonal Description</Label>
-                          <Textarea
-                            id="seasonalDescription"
-                            value={formData.seasonalAvailability?.description || ""}
-                            onChange={(e) => handleNestedChange("seasonalAvailability", "description", e.target.value)}
-                            placeholder="Describe the seasonal availability"
-                            rows={2}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="provider" className="space-y-6">
-              <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border-0 shadow-xl">
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <ExternalLink className="mr-2 h-5 w-5" />
-                    Service Provider
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="isExternalService"
-                      checked={formData.isExternalService || false}
-                      onCheckedChange={(checked) => handleInputChange("isExternalService", checked)}
-                    />
-                    <Label htmlFor="isExternalService">External Service Provider</Label>
-                  </div>
-
-                  {formData.isExternalService && (
-                    <div className="space-y-4 ml-6 p-4 border rounded-lg bg-slate-50 dark:bg-slate-800">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="providerName">Provider Name</Label>
-                          <Input
-                            id="providerName"
-                            value={formData.externalProvider?.name || ""}
-                            onChange={(e) => handleNestedChange("externalProvider", "name", e.target.value)}
-                            placeholder="Enter provider name"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="contactPerson">Contact Person</Label>
-                          <Input
-                            id="contactPerson"
-                            value={formData.externalProvider?.contactPerson || ""}
-                            onChange={(e) => handleNestedChange("externalProvider", "contactPerson", e.target.value)}
-                            placeholder="Enter contact person"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="providerPhone">Phone</Label>
-                          <Input
-                            id="providerPhone"
-                            value={formData.externalProvider?.phone || ""}
-                            onChange={(e) => handleNestedChange("externalProvider", "phone", e.target.value)}
-                            placeholder="Enter phone number"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="providerEmail">Email</Label>
-                          <Input
-                            id="providerEmail"
-                            type="email"
-                            value={formData.externalProvider?.email || ""}
-                            onChange={(e) => handleNestedChange("externalProvider", "email", e.target.value)}
-                            placeholder="Enter email address"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="commissionRate">Commission Rate (%)</Label>
-                        <Input
-                          id="commissionRate"
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="0.1"
-                          value={formData.externalProvider?.commissionRate || ""}
-                          onChange={(e) =>
-                            handleNestedChange(
-                              "externalProvider",
-                              "commissionRate",
-                              e.target.value ? Number.parseFloat(e.target.value) : undefined,
-                            )
-                          }
-                          placeholder="0.0"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="contractDetails">Contract Details</Label>
-                        <Textarea
-                          id="contractDetails"
-                          value={formData.externalProvider?.contractDetails || ""}
-                          onChange={(e) => handleNestedChange("externalProvider", "contractDetails", e.target.value)}
-                          placeholder="Enter contract details and terms"
-                          rows={3}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  <Separator />
-
-                  <div>
-                    <div className="flex items-center space-x-2 mb-3">
-                      <Checkbox
-                        id="inventoryLimited"
-                        checked={formData.inventory?.isLimited || false}
-                        onCheckedChange={(checked) => handleNestedChange("inventory", "isLimited", checked)}
-                      />
-                      <Label htmlFor="inventoryLimited" className="text-base font-medium">
-                        Limited Inventory
-                      </Label>
-                    </div>
-
-                    {formData.inventory?.isLimited && (
-                      <div className="space-y-4 ml-6 p-4 border rounded-lg bg-slate-50 dark:bg-slate-800">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="totalQuantity">Total Quantity</Label>
-                            <Input
-                              id="totalQuantity"
-                              type="number"
-                              min="0"
-                              value={formData.inventory?.totalQuantity || ""}
-                              onChange={(e) =>
-                                handleNestedChange(
-                                  "inventory",
-                                  "totalQuantity",
-                                  e.target.value ? Number.parseInt(e.target.value) : undefined,
-                                )
-                              }
-                              placeholder="0"
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="availableQuantity">Available Quantity</Label>
-                            <Input
-                              id="availableQuantity"
-                              type="number"
-                              min="0"
-                              value={formData.inventory?.availableQuantity || ""}
-                              onChange={(e) =>
-                                handleNestedChange(
-                                  "inventory",
-                                  "availableQuantity",
-                                  e.target.value ? Number.parseInt(e.target.value) : undefined,
-                                )
-                              }
-                              placeholder="0"
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="lowStockThreshold">Low Stock Alert</Label>
-                            <Input
-                              id="lowStockThreshold"
-                              type="number"
-                              min="0"
-                              value={formData.inventory?.lowStockThreshold || ""}
-                              onChange={(e) =>
-                                handleNestedChange(
-                                  "inventory",
-                                  "lowStockThreshold",
-                                  e.target.value ? Number.parseInt(e.target.value) : undefined,
-                                )
-                              }
-                              placeholder="0"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="extras" className="space-y-6">
-              <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border-0 shadow-xl">
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Plus className="mr-2 h-5 w-5" />
-                    Service Options
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <Label className="text-base font-medium">Additional Options</Label>
-                    <Button type="button" variant="outline" size="sm" onClick={addOption}>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add Option
-                    </Button>
-                  </div>
-
-                  {formData.options && formData.options.length > 0 ? (
-                    <div className="space-y-4">
-                      {formData.options.map((option, index) => (
-                        <div key={index} className="p-4 border rounded-lg bg-slate-50 dark:bg-slate-800">
-                          <div className="flex justify-between items-start mb-3">
-                            <h4 className="font-medium">Option {index + 1}</h4>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => removeOption(index)}
-                              className="text-red-600 hover:text-red-700"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
-                            <div className="space-y-2">
-                              <Label htmlFor={`option-name-${index}`}>Option Name</Label>
+                          <div className="w-32">
+                            <Label className="text-xs text-slate-600 dark:text-slate-400">Additional Price</Label>
+                            <div className="relative">
+                              <DollarSign className="absolute left-2 top-2.5 h-3 w-3 text-slate-400" />
                               <Input
-                                id={`option-name-${index}`}
-                                value={option.name}
-                                onChange={(e) => updateOption(index, "name", e.target.value)}
-                                placeholder="Enter option name"
-                              />
-                            </div>
-
-                            <div className="space-y-2">
-                              <Label htmlFor={`option-price-${index}`}>Additional Price</Label>
-                              <Input
-                                id={`option-price-${index}`}
                                 type="number"
                                 min="0"
                                 step="0.01"
@@ -1028,138 +828,424 @@ export default function EditEventServicePage() {
                                 onChange={(e) =>
                                   updateOption(index, "additionalPrice", Number.parseFloat(e.target.value) || 0)
                                 }
-                                placeholder="0.00"
+                                className="pl-6 bg-white dark:bg-slate-700"
                               />
                             </div>
                           </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={() => removeOption(index)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))
+                    )}
+                  </CardContent>
+                </Card>
 
-                          <div className="space-y-2">
-                            <Label htmlFor={`option-description-${index}`}>Description</Label>
-                            <Textarea
-                              id={`option-description-${index}`}
-                              value={option.description}
-                              onChange={(e) => updateOption(index, "description", e.target.value)}
-                              placeholder="Describe this option"
-                              rows={2}
-                            />
-                          </div>
+                {/* Inventory Management */}
+                <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border-0 shadow-xl">
+                  <CardHeader>
+                    <CardTitle className="text-xl text-slate-800 dark:text-slate-200">Inventory Management</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <Label className="text-slate-700 dark:text-slate-300">Limited Inventory</Label>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">Track inventory for this service</p>
+                      </div>
+                      <Switch
+                        checked={inventory.isLimited}
+                        onCheckedChange={(checked) => handleInventoryChange("isLimited", checked)}
+                      />
+                    </div>
+
+                    {inventory.isLimited && (
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t">
+                        <div className="space-y-2">
+                          <Label htmlFor="totalQuantity" className="text-slate-700 dark:text-slate-300">
+                            Total Quantity
+                          </Label>
+                          <Input
+                            id="totalQuantity"
+                            type="number"
+                            min="0"
+                            value={inventory.totalQuantity}
+                            onChange={(e) => handleInventoryChange("totalQuantity", e.target.value)}
+                            className="bg-white/80 dark:bg-slate-700/80"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="availableQuantity" className="text-slate-700 dark:text-slate-300">
+                            Available Quantity
+                          </Label>
+                          <Input
+                            id="availableQuantity"
+                            type="number"
+                            min="0"
+                            value={inventory.availableQuantity}
+                            onChange={(e) => handleInventoryChange("availableQuantity", e.target.value)}
+                            className="bg-white/80 dark:bg-slate-700/80"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="lowStockThreshold" className="text-slate-700 dark:text-slate-300">
+                            Low Stock Alert
+                          </Label>
+                          <Input
+                            id="lowStockThreshold"
+                            type="number"
+                            min="0"
+                            value={inventory.lowStockThreshold}
+                            onChange={(e) => handleInventoryChange("lowStockThreshold", e.target.value)}
+                            className="bg-white/80 dark:bg-slate-700/80"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            {/* Availability Tab */}
+            <TabsContent value="availability">
+              <div className="space-y-6">
+                {/* Available Days */}
+                <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border-0 shadow-xl">
+                  <CardHeader>
+                    <CardTitle className="text-xl text-slate-800 dark:text-slate-200">Available Days</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {Object.entries(restrictions.availableDays).map(([day, isAvailable]) => (
+                        <div key={day} className="flex items-center space-x-2">
+                          <Switch checked={isAvailable} onCheckedChange={(checked) => handleDayChange(day, checked)} />
+                          <Label className="capitalize text-slate-700 dark:text-slate-300">{day}</Label>
                         </div>
                       ))}
                     </div>
-                  ) : (
-                    <div className="text-center py-8 text-slate-500 dark:text-slate-400">
-                      <Package className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                      <p>No options added yet</p>
-                      <p className="text-sm">Click "Add Option" to create additional service options</p>
+                  </CardContent>
+                </Card>
+
+                {/* Seasonal Availability */}
+                <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border-0 shadow-xl">
+                  <CardHeader>
+                    <CardTitle className="text-xl text-slate-800 dark:text-slate-200">Seasonal Availability</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <Label className="text-slate-700 dark:text-slate-300">Available Year Round</Label>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                          Service is available throughout the year
+                        </p>
+                      </div>
+                      <Switch
+                        checked={seasonalAvailability.isAvailable}
+                        onCheckedChange={(checked) => handleSeasonalChange("isAvailable", checked)}
+                      />
                     </div>
-                  )}
 
-                  <Separator />
+                    {!seasonalAvailability.isAvailable && (
+                      <div className="space-y-4 pt-4 border-t">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="startDate" className="text-slate-700 dark:text-slate-300">
+                              Available From
+                            </Label>
+                            <Input
+                              id="startDate"
+                              type="date"
+                              value={seasonalAvailability.startDate}
+                              onChange={(e) => handleSeasonalChange("startDate", e.target.value)}
+                              className="bg-white/80 dark:bg-slate-700/80"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="endDate" className="text-slate-700 dark:text-slate-300">
+                              Available Until
+                            </Label>
+                            <Input
+                              id="endDate"
+                              type="date"
+                              value={seasonalAvailability.endDate}
+                              onChange={(e) => handleSeasonalChange("endDate", e.target.value)}
+                              className="bg-white/80 dark:bg-slate-700/80"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="seasonalDescription" className="text-slate-700 dark:text-slate-300">
+                            Seasonal Description
+                          </Label>
+                          <Textarea
+                            id="seasonalDescription"
+                            value={seasonalAvailability.description}
+                            onChange={(e) => handleSeasonalChange("description", e.target.value)}
+                            placeholder="Explain seasonal availability"
+                            rows={2}
+                            className="bg-white/80 dark:bg-slate-700/80"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
 
-                  <div>
-                    <div className="flex justify-between items-center mb-4">
-                      <Label className="text-base font-medium">Service Images</Label>
+                {/* Capacity Restrictions */}
+                <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border-0 shadow-xl">
+                  <CardHeader>
+                    <CardTitle className="text-xl text-slate-800 dark:text-slate-200">
+                      Event Capacity Requirements
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="minCapacity" className="text-slate-700 dark:text-slate-300">
+                          Minimum Event Capacity
+                        </Label>
+                        <Input
+                          id="minCapacity"
+                          type="number"
+                          min="1"
+                          value={restrictions.minCapacity}
+                          onChange={(e) => handleRestrictionsChange("minCapacity", e.target.value)}
+                          placeholder="No minimum"
+                          className="bg-white/80 dark:bg-slate-700/80"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="maxCapacity" className="text-slate-700 dark:text-slate-300">
+                          Maximum Event Capacity
+                        </Label>
+                        <Input
+                          id="maxCapacity"
+                          type="number"
+                          min="1"
+                          value={restrictions.maxCapacity}
+                          onChange={(e) => handleRestrictionsChange("maxCapacity", e.target.value)}
+                          placeholder="No maximum"
+                          className="bg-white/80 dark:bg-slate-700/80"
+                        />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            {/* Media & Provider Tab */}
+            <TabsContent value="media">
+              <div className="space-y-6">
+                {/* External Service Provider */}
+                <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border-0 shadow-xl">
+                  <CardHeader>
+                    <CardTitle className="text-xl text-slate-800 dark:text-slate-200">Service Provider</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <Label className="text-slate-700 dark:text-slate-300">External Service Provider</Label>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                          This service is provided by an external vendor
+                        </p>
+                      </div>
+                      <Switch
+                        checked={formData.isExternalService}
+                        onCheckedChange={(checked) => handleInputChange("isExternalService", checked)}
+                      />
+                    </div>
+
+                    {formData.isExternalService && (
+                      <div className="space-y-4 pt-4 border-t">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="providerName" className="text-slate-700 dark:text-slate-300">
+                              Provider Name
+                            </Label>
+                            <Input
+                              id="providerName"
+                              value={externalProvider.name}
+                              onChange={(e) => handleExternalProviderChange("name", e.target.value)}
+                              placeholder="Provider company name"
+                              className="bg-white/80 dark:bg-slate-700/80"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="contactPerson" className="text-slate-700 dark:text-slate-300">
+                              Contact Person
+                            </Label>
+                            <Input
+                              id="contactPerson"
+                              value={externalProvider.contactPerson}
+                              onChange={(e) => handleExternalProviderChange("contactPerson", e.target.value)}
+                              placeholder="Contact person name"
+                              className="bg-white/80 dark:bg-slate-700/80"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="providerPhone" className="text-slate-700 dark:text-slate-300">
+                              Phone Number
+                            </Label>
+                            <Input
+                              id="providerPhone"
+                              value={externalProvider.phone}
+                              onChange={(e) => handleExternalProviderChange("phone", e.target.value)}
+                              placeholder="Provider phone number"
+                              className="bg-white/80 dark:bg-slate-700/80"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="providerEmail" className="text-slate-700 dark:text-slate-300">
+                              Email Address
+                            </Label>
+                            <Input
+                              id="providerEmail"
+                              type="email"
+                              value={externalProvider.email}
+                              onChange={(e) => handleExternalProviderChange("email", e.target.value)}
+                              placeholder="Provider email address"
+                              className="bg-white/80 dark:bg-slate-700/80"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="commissionRate" className="text-slate-700 dark:text-slate-300">
+                            Commission Rate (%)
+                          </Label>
+                          <Input
+                            id="commissionRate"
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            value={externalProvider.commissionRate}
+                            onChange={(e) => handleExternalProviderChange("commissionRate", e.target.value)}
+                            placeholder="0.0"
+                            className="bg-white/80 dark:bg-slate-700/80"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="contractDetails" className="text-slate-700 dark:text-slate-300">
+                            Contract Details
+                          </Label>
+                          <Textarea
+                            id="contractDetails"
+                            value={externalProvider.contractDetails}
+                            onChange={(e) => handleExternalProviderChange("contractDetails", e.target.value)}
+                            placeholder="Contract terms and details"
+                            rows={3}
+                            className="bg-white/80 dark:bg-slate-700/80"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Service Images */}
+                <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border-0 shadow-xl">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-xl text-slate-800 dark:text-slate-200">Service Images</CardTitle>
                       <Button type="button" variant="outline" size="sm" onClick={addImage}>
-                        <Plus className="mr-2 h-4 w-4" />
+                        <Plus className="h-4 w-4 mr-2" />
                         Add Image
                       </Button>
                     </div>
-
-                    {formData.images && formData.images.length > 0 ? (
-                      <div className="space-y-4">
-                        {formData.images.map((image, index) => (
-                          <div key={index} className="p-4 border rounded-lg bg-slate-50 dark:bg-slate-800">
-                            <div className="flex justify-between items-start mb-3">
-                              <h4 className="font-medium">Image {index + 1}</h4>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => removeImage(index)}
-                                className="text-red-600 hover:text-red-700"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
-                              <div className="space-y-2">
-                                <Label htmlFor={`image-url-${index}`}>Image URL</Label>
-                                <Input
-                                  id={`image-url-${index}`}
-                                  type="url"
-                                  value={image.url}
-                                  onChange={(e) => updateImage(index, "url", e.target.value)}
-                                  placeholder="https://example.com/image.jpg"
-                                />
-                              </div>
-
-                              <div className="space-y-2">
-                                <Label htmlFor={`image-caption-${index}`}>Caption</Label>
-                                <Input
-                                  id={`image-caption-${index}`}
-                                  value={image.caption}
-                                  onChange={(e) => updateImage(index, "caption", e.target.value)}
-                                  placeholder="Enter image caption"
-                                />
-                              </div>
-                            </div>
-
-                            <div className="flex items-center space-x-2">
-                              <Checkbox
-                                id={`image-default-${index}`}
-                                checked={image.isDefault}
-                                onCheckedChange={(checked) => {
-                                  // If setting as default, unset all others
-                                  if (checked) {
-                                    const updatedImages =
-                                      formData.images?.map((img, i) => ({
-                                        ...img,
-                                        isDefault: i === index,
-                                      })) || []
-                                    handleInputChange("images", updatedImages)
-                                  } else {
-                                    updateImage(index, "isDefault", false)
-                                  }
-                                }}
-                              />
-                              <Label htmlFor={`image-default-${index}`}>Default Image</Label>
-                            </div>
-                          </div>
-                        ))}
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {images.length === 0 ? (
+                      <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+                        No images added yet. Click "Add Image" to upload service photos.
                       </div>
                     ) : (
-                      <div className="text-center py-8 text-slate-500 dark:text-slate-400">
-                        <Package className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                        <p>No images added yet</p>
-                        <p className="text-sm">Click "Add Image" to upload service images</p>
-                      </div>
+                      images.map((image, index) => (
+                        <div
+                          key={index}
+                          className="flex items-start gap-4 p-4 border rounded-lg bg-slate-50 dark:bg-slate-700/50"
+                        >
+                          <div className="flex-1 space-y-2">
+                            <Input
+                              value={image.url}
+                              onChange={(e) => updateImage(index, "url", e.target.value)}
+                              placeholder="Image URL"
+                              className="bg-white dark:bg-slate-700"
+                            />
+                            <Input
+                              value={image.caption}
+                              onChange={(e) => updateImage(index, "caption", e.target.value)}
+                              placeholder="Image caption"
+                              className="bg-white dark:bg-slate-700"
+                            />
+                          </div>
+                          <div className="flex flex-col items-center gap-2">
+                            <div className="flex items-center space-x-2">
+                              <Switch
+                                checked={image.isDefault}
+                                onCheckedChange={(checked) => updateImage(index, "isDefault", checked)}
+                              />
+                              <Label className="text-xs">Default</Label>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              onClick={() => removeImage(index)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))
                     )}
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </div>
             </TabsContent>
-
-            {/* Action Buttons */}
-            <div className="flex justify-end space-x-4 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-white/20 dark:border-slate-700/20">
-              <Button type="button" variant="outline" asChild>
-                <Link href={`/dashboard/events/services/${serviceId}`}>Cancel</Link>
-              </Button>
-              <Button type="submit" disabled={saving}>
-                {saving ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="mr-2 h-4 w-4" />
-                    Save Changes
-                  </>
-                )}
-              </Button>
-            </div>
           </Tabs>
+
+          {/* Submit Button */}
+          <div className="flex justify-end space-x-4 pt-6">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.back()}
+              disabled={isSubmitting}
+              className="border-slate-200 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 dark:from-purple-600 dark:to-pink-700 dark:hover:from-purple-700 dark:hover:to-pink-800 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Updating Service...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  Update Service
+                </>
+              )}
+            </Button>
+          </div>
         </form>
       </div>
     </div>
