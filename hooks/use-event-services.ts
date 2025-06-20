@@ -70,7 +70,7 @@ export interface EventService {
   updated_at: string
 }
 
-export function useEventServices(hotelId?: string) {
+export function useEventServices(hotelId: string) {
   const { request, isLoading } = useApi()
   const [services, setServices] = useState<EventService[]>([])
   const [error, setError] = useState<string | null>(null)
