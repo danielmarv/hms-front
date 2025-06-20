@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -13,71 +13,54 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
-import { ArrowLeft, Save, Plus, Trash2, Star, Loader2 } from "lucide-react"
-import { useEventPackages, type UpdatePackageData } from "@/hooks/use-event-packages"
+import { ArrowLeft, Save, Plus, Trash2, Star } from "lucide-react"
+import { useEventPackages, type CreatePackageData } from "@/hooks/use-event-packages"
 import { useEventTypes } from "@/hooks/use-event-types"
 import { useEventServices } from "@/hooks/use-event-services"
 import { useVenues } from "@/hooks/use-venues"
 
-interface EditPackagePageProps {
-  params: {
-    id: string
-  }
-}
-
-export default function EditPackagePage({ params }: EditPackagePageProps) {
+export default function NewPackagePage() {
   const router = useRouter()
-  const { currentPackage, isLoading, error, getPackageById, updatePackage } = useEventPackages()
+  const { createPackage, isLoading } = useEventPackages()
   const { eventTypes } = useEventTypes()
   const { services } = useEventServices()
   const { venues } = useVenues()
 
   const [activeTab, setActiveTab] = useState("basic")
-  const [saving, setSaving] = useState(false)
-  const [packageData, setPackageData] = useState<UpdatePackageData>({})
+  const [packageData, setPackageData] = useState<CreatePackageData>({
+    name: "",
+    description: "",
+    hotel: "", // This should be set from current hotel context
+    eventTypes: [],
+    venueTypes: [],
+    duration: 4,
+    minCapacity: 10,
+    maxCapacity: 100,
+    basePrice: 0,
+    pricePerPerson: 0,
+    includedServices: [],
+    includedAmenities: [],
+    additionalOptions: [],
+    images: [],
+    terms: "",
+    cancellationPolicy: "moderate",
+    isActive: true,
+    isPromoted: false,
+    promotionDetails: {
+      startDate: "",
+      endDate: "",
+      discountPercentage: 0,
+      discountAmount: 0,
+      promotionCode: "",
+      description: "",
+    },
+  })
+
   const [selectedServices, setSelectedServices] = useState<string[]>([])
   const [selectedEventTypes, setSelectedEventTypes] = useState<string[]>([])
   const [selectedVenueTypes, setSelectedVenueTypes] = useState<string[]>([])
 
-  useEffect(() => {
-    const fetchPackage = async () => {
-      try {
-        await getPackageById(params.id)
-      } catch (error) {
-        console.error("Failed to fetch package:", error)
-        toast.error("Failed to load package details")
-      }
-    }
-
-    fetchPackage()
-  }, [params.id, getPackageById])
-
-  useEffect(() => {
-    if (currentPackage) {
-      setPackageData({
-        name: currentPackage.name,
-        description: currentPackage.description,
-        duration: currentPackage.duration,
-        minCapacity: currentPackage.minCapacity,
-        maxCapacity: currentPackage.maxCapacity,
-        basePrice: currentPackage.basePrice,
-        pricePerPerson: currentPackage.pricePerPerson,
-        includedAmenities: currentPackage.includedAmenities,
-        additionalOptions: currentPackage.additionalOptions,
-        terms: currentPackage.terms,
-        cancellationPolicy: currentPackage.cancellationPolicy,
-        isActive: currentPackage.isActive,
-        isPromoted: currentPackage.isPromoted,
-        promotionDetails: currentPackage.promotionDetails,
-      })
-
-      setSelectedEventTypes(currentPackage.eventTypes || [])
-      setSelectedVenueTypes(currentPackage.venueTypes || [])
-      setSelectedServices(currentPackage.includedServices?.map((s) => s.service) || [])
-    }
-  }, [currentPackage])
-
-  const handleInputChange = (field: keyof UpdatePackageData, value: any) => {
+  const handleInputChange = (field: keyof CreatePackageData, value: any) => {
     setPackageData((prev) => ({
       ...prev,
       [field]: value,
@@ -97,7 +80,7 @@ export default function EditPackagePage({ params }: EditPackagePageProps) {
   const addAmenity = () => {
     setPackageData((prev) => ({
       ...prev,
-      includedAmenities: [...(prev.includedAmenities || []), { name: "", description: "" }],
+      includedAmenities: [...prev.includedAmenities!, { name: "", description: "" }],
     }))
   }
 
@@ -120,7 +103,7 @@ export default function EditPackagePage({ params }: EditPackagePageProps) {
   const addOption = () => {
     setPackageData((prev) => ({
       ...prev,
-      additionalOptions: [...(prev.additionalOptions || []), { name: "", description: "", price: 0 }],
+      additionalOptions: [...prev.additionalOptions!, { name: "", description: "", price: 0 }],
     }))
   }
 
@@ -165,11 +148,7 @@ export default function EditPackagePage({ params }: EditPackagePageProps) {
   }
 
   const handleSave = async () => {
-    if (!currentPackage) return
-
     try {
-      setSaving(true)
-
       // Prepare services data
       const servicesData = selectedServices.map((serviceId) => {
         const service = services.find((s) => s._id === serviceId)
@@ -180,45 +159,21 @@ export default function EditPackagePage({ params }: EditPackagePageProps) {
         }
       })
 
-      const finalData: UpdatePackageData = {
+      const finalData: CreatePackageData = {
         ...packageData,
         eventTypes: selectedEventTypes,
         venueTypes: selectedVenueTypes,
         includedServices: servicesData,
+        hotel: "current-hotel-id", // This should come from context
       }
 
-      await updatePackage(currentPackage._id, finalData)
-      toast.success("Package updated successfully")
-      router.push(`/dashboard/events/packages/${currentPackage._id}`)
+      const newPackage = await createPackage(finalData)
+      toast.success("Package created successfully")
+      router.push(`/dashboard/events/packages/${newPackage._id}`)
     } catch (error) {
-      console.error("Failed to update package:", error)
-      toast.error("Failed to update package")
-    } finally {
-      setSaving(false)
+      console.error("Failed to create package:", error)
+      toast.error("Failed to create package")
     }
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
-        <div className="flex flex-col items-center space-y-4">
-          <Loader2 className="h-12 w-12 animate-spin text-blue-600 dark:text-blue-400" />
-          <p className="text-lg font-medium text-slate-700 dark:text-slate-300">Loading package...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (error || !currentPackage) {
-    return (
-      <div className="flex flex-col items-center justify-center h-64 space-y-4">
-        <div className="text-red-500 text-center">
-          <p className="text-lg font-semibold">Package not found</p>
-          <p className="text-sm">{error || "The requested package could not be found."}</p>
-        </div>
-        <Button onClick={() => router.push("/dashboard/events/packages")}>Back to Packages</Button>
-      </div>
-    )
   }
 
   return (
@@ -232,14 +187,16 @@ export default function EditPackagePage({ params }: EditPackagePageProps) {
             </Button>
             <div>
               <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 dark:from-blue-400 dark:via-purple-400 dark:to-indigo-400 bg-clip-text text-transparent">
-                Edit Package
+                Create Event Package
               </h1>
-              <p className="text-slate-600 dark:text-slate-300 mt-1">Modify package details and settings</p>
+              <p className="text-slate-600 dark:text-slate-300 mt-1">
+                Set up a new event package with services and pricing
+              </p>
             </div>
           </div>
-          <Button onClick={handleSave} disabled={saving} size="lg">
+          <Button onClick={handleSave} disabled={isLoading} size="lg">
             <Save className="mr-2 h-4 w-4" />
-            {saving ? "Saving..." : "Save Changes"}
+            {isLoading ? "Creating..." : "Create Package"}
           </Button>
         </div>
 
@@ -265,7 +222,7 @@ export default function EditPackagePage({ params }: EditPackagePageProps) {
                     <Label htmlFor="name">Package Name</Label>
                     <Input
                       id="name"
-                      value={packageData.name || ""}
+                      value={packageData.name}
                       onChange={(e) => handleInputChange("name", e.target.value)}
                       placeholder="Enter package name"
                     />
@@ -277,7 +234,7 @@ export default function EditPackagePage({ params }: EditPackagePageProps) {
                       id="duration"
                       type="number"
                       min="1"
-                      value={packageData.duration || ""}
+                      value={packageData.duration}
                       onChange={(e) => handleInputChange("duration", Number.parseInt(e.target.value) || 1)}
                     />
                   </div>
@@ -287,7 +244,7 @@ export default function EditPackagePage({ params }: EditPackagePageProps) {
                   <Label htmlFor="description">Description</Label>
                   <Textarea
                     id="description"
-                    value={packageData.description || ""}
+                    value={packageData.description}
                     onChange={(e) => handleInputChange("description", e.target.value)}
                     placeholder="Describe the package"
                     rows={3}
@@ -301,7 +258,7 @@ export default function EditPackagePage({ params }: EditPackagePageProps) {
                       id="minCapacity"
                       type="number"
                       min="1"
-                      value={packageData.minCapacity || ""}
+                      value={packageData.minCapacity}
                       onChange={(e) => handleInputChange("minCapacity", Number.parseInt(e.target.value) || 1)}
                     />
                   </div>
@@ -312,7 +269,7 @@ export default function EditPackagePage({ params }: EditPackagePageProps) {
                       id="maxCapacity"
                       type="number"
                       min="1"
-                      value={packageData.maxCapacity || ""}
+                      value={packageData.maxCapacity}
                       onChange={(e) => handleInputChange("maxCapacity", Number.parseInt(e.target.value) || 1)}
                     />
                   </div>
@@ -326,7 +283,7 @@ export default function EditPackagePage({ params }: EditPackagePageProps) {
                       type="number"
                       min="0"
                       step="0.01"
-                      value={packageData.basePrice || ""}
+                      value={packageData.basePrice}
                       onChange={(e) => handleInputChange("basePrice", Number.parseFloat(e.target.value) || 0)}
                     />
                   </div>
@@ -338,7 +295,7 @@ export default function EditPackagePage({ params }: EditPackagePageProps) {
                       type="number"
                       min="0"
                       step="0.01"
-                      value={packageData.pricePerPerson || ""}
+                      value={packageData.pricePerPerson}
                       onChange={(e) => handleInputChange("pricePerPerson", Number.parseFloat(e.target.value) || 0)}
                     />
                   </div>
@@ -347,7 +304,7 @@ export default function EditPackagePage({ params }: EditPackagePageProps) {
                 <div className="space-y-2">
                   <Label htmlFor="cancellationPolicy">Cancellation Policy</Label>
                   <Select
-                    value={packageData.cancellationPolicy || "moderate"}
+                    value={packageData.cancellationPolicy}
                     onValueChange={(value) => handleInputChange("cancellationPolicy", value)}
                   >
                     <SelectTrigger id="cancellationPolicy">
@@ -365,7 +322,7 @@ export default function EditPackagePage({ params }: EditPackagePageProps) {
                   <Label htmlFor="terms">Terms & Conditions</Label>
                   <Textarea
                     id="terms"
-                    value={packageData.terms || ""}
+                    value={packageData.terms}
                     onChange={(e) => handleInputChange("terms", e.target.value)}
                     placeholder="Enter terms and conditions"
                     rows={4}
@@ -375,7 +332,7 @@ export default function EditPackagePage({ params }: EditPackagePageProps) {
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id="isActive"
-                    checked={packageData.isActive || false}
+                    checked={packageData.isActive}
                     onCheckedChange={(checked) => handleInputChange("isActive", !!checked)}
                   />
                   <Label htmlFor="isActive">Package is active</Label>
@@ -560,7 +517,7 @@ export default function EditPackagePage({ params }: EditPackagePageProps) {
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id="isPromoted"
-                    checked={packageData.isPromoted || false}
+                    checked={packageData.isPromoted}
                     onCheckedChange={(checked) => handleInputChange("isPromoted", !!checked)}
                   />
                   <Label htmlFor="isPromoted" className="flex items-center">
