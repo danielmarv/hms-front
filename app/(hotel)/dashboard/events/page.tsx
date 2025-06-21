@@ -32,6 +32,7 @@ import {
   Package,
   BarChart3,
   Tag,
+  AlertTriangle,
 } from "lucide-react"
 import { format } from "date-fns"
 import { useEvents } from "@/hooks/use-events"
@@ -50,6 +51,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
+import { useCurrentHotel } from "@/hooks/use-current-hotel"
+import HotelDetailedAnalyticsPage from "../analytics/detailed/page"
 
 export default function EventsPage() {
   const router = useRouter()
@@ -62,10 +65,13 @@ export default function EventsPage() {
   const [selectedEvents, setSelectedEvents] = useState<string[]>([])
   const [showBulkActions, setShowBulkActions] = useState(false)
 
+  // Add hotel context
+  const { hotel } = useCurrentHotel()
+
   // Fetch data using custom hooks
-  const { events, loading: eventsLoading } = useEvents()
-  const { venues, loading: venuesLoading } = useVenues()
-  const { eventTypes, loading: eventTypesLoading } = useEventTypes()
+  const { events, loading: eventsLoading, error: eventsError } = useEvents(hotel?._id)
+  const { venues, loading: venuesLoading, error: venuesError } = useVenues(hotel?._id)
+  const { eventTypes, loading: eventTypesLoading, error: eventTypesError } = useEventTypes(hotel?._id)
 
   // Filter events based on search query and filters
   const filteredEvents = events.filter((event) => {
@@ -184,7 +190,7 @@ export default function EventsPage() {
   }
 
   // Loading state
-  const isLoading = eventsLoading || venuesLoading || eventTypesLoading
+  const isLoading = eventsLoading || venuesLoading || eventTypesLoading || !hotel
 
   // Bulk action functions
   const handleSelectAll = (checked: boolean) => {
@@ -223,6 +229,23 @@ export default function EventsPage() {
     } catch (error) {
       toast.error("Failed to delete events")
     }
+  }
+
+  if (eventsError || venuesError || eventTypesError) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="bg-red-100 dark:bg-red-900 rounded-full p-6 mb-4">
+            <AlertTriangle className="h-12 w-12 text-red-600 dark:text-red-400" />
+          </div>
+          <p className="text-lg font-medium text-red-700 dark:text-red-300">Failed to load events data</p>
+          <p className="text-sm text-red-600 dark:text-red-400">{eventsError || venuesError || eventTypesError}</p>
+          <Button onClick={() => window.location.reload()} variant="outline">
+            Retry
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   if (isLoading) {
