@@ -14,7 +14,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "sonner"
 import { Search, UserCheck, Phone, Mail, Calendar, Users } from "lucide-react"
-import { triggerCheckIn } from "@/lib/workflow-coordinator"
+import { RegistrationDocumentDialog } from "@/components/frontdesk/registration-document-dialog"
+import { useCheckInApi } from "@/hooks/use-checkin-api"
 
 export default function CheckInPage() {
   const router = useRouter()
@@ -28,6 +29,9 @@ export default function CheckInPage() {
     paymentMethod: "",
     depositAmount: 0,
   })
+
+  const [showRegistrationDialog, setShowRegistrationDialog] = useState(false)
+  const [registrationData, setRegistrationData] = useState<any>(null)
 
   const [bookings, setBookings] = useState([
     {
@@ -91,42 +95,33 @@ export default function CheckInPage() {
     }
   }
 
+  const { checkInGuest } = useCheckInApi()
+
   const handleCheckIn = async () => {
     if (!selectedBooking || !checkInData.roomNumber) {
       toast.error("Please select a booking and room")
       return
     }
 
-    try {
-      // Trigger check-in workflow
-      await triggerCheckIn({
-        bookingId: selectedBooking.id,
-        guestId: selectedBooking.guest.id,
-        roomId: checkInData.roomNumber,
-        keyCards: checkInData.keyCards,
-        specialRequests: checkInData.specialRequests,
-        arrivalNotes: checkInData.arrivalNotes,
-        paymentMethod: checkInData.paymentMethod,
-        depositAmount: checkInData.depositAmount,
-      })
-
-      toast.success("Check-in completed successfully!")
-
-      // Reset form
-      setSelectedBooking(null)
-      setCheckInData({
-        roomNumber: "",
-        keyCards: 2,
-        specialRequests: "",
-        arrivalNotes: "",
-        paymentMethod: "",
-        depositAmount: 0,
-      })
-      setSearchQuery("")
-    } catch (error) {
-      console.error("Check-in error:", error)
-      toast.error("Failed to complete check-in")
+    // Prepare registration data
+    const regData = {
+      booking: selectedBooking,
+      checkInData,
+      hotel: {
+        name: "Grand Hotel", // This should come from hotel configuration
+        address: "123 Main Street, City, State 12345",
+        phone: "+1-555-0100",
+        email: "info@grandhotel.com",
+      },
+      checkInDate: new Date().toISOString(),
+      staff: {
+        name: "Front Desk Agent", // This should come from current user
+        id: "FD001",
+      },
     }
+
+    setRegistrationData(regData)
+    setShowRegistrationDialog(true)
   }
 
   const getStatusBadge = (status: string) => {
@@ -428,6 +423,35 @@ export default function CheckInPage() {
           </CardContent>
         </Card>
       </div>
+      {/* Registration Document Dialog */}
+      <RegistrationDocumentDialog
+        open={showRegistrationDialog}
+        onOpenChange={setShowRegistrationDialog}
+        registrationData={registrationData}
+        onConfirm={async (completeCheckInData) => {
+          try {
+            // Use the actual API to check in the guest
+            await checkInGuest(completeCheckInData)
+
+            // Reset form
+            setSelectedBooking(null)
+            setCheckInData({
+              roomNumber: "",
+              keyCards: 2,
+              specialRequests: "",
+              arrivalNotes: "",
+              paymentMethod: "",
+              depositAmount: 0,
+            })
+            setSearchQuery("")
+            setShowRegistrationDialog(false)
+            setRegistrationData(null)
+          } catch (error) {
+            console.error("Check-in error:", error)
+            // Error is already handled in the hook
+          }
+        }}
+      />
     </div>
   )
 }
