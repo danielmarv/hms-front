@@ -33,9 +33,6 @@ export function BookingSearchPanel({
     vip: "",
   })
 
-  // Debug log to see if guests are being passed
-  console.log("BookingSearchPanel - guests:", guests)
-  console.log("BookingSearchPanel - bookings:", bookings)
 
   const filteredBookings = bookings.filter((booking) => {
     const matchesSearch =
