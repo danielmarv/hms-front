@@ -113,7 +113,6 @@ export default function CheckInPage() {
     try {
       const rooms = await fetchAvailableRooms(params.check_in, params.check_out, {
         room_type: params.room_type,
-        guests: params.guests,
       })
       return rooms
     } catch (error) {
