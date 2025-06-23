@@ -3,15 +3,11 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { LoadingSkeleton } from "@/components/ui/loading-skeleton"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { EmptyState } from "@/components/ui/empty-state"
-import { FilterBar } from "@/components/ui/filter-bar"
-import { Bed, Users, Wifi, Car, Coffee, Tv, Bath, Wind, Search, MapPin, DollarSign } from "lucide-react"
-import { format } from "date-fns"
+import { Bed, Users, DollarSign, MapPin, Wifi, Car, Coffee, Tv } from "lucide-react"
 
 interface RoomSelectionPanelProps {
   rooms: any[]
@@ -30,70 +26,68 @@ export function RoomSelectionPanel({
   onSearchRooms,
   isLoading,
 }: RoomSelectionPanelProps) {
-  const [searchParams, setSearchParams] = useState({
-    check_in: selectedBooking?.check_in || format(new Date(), "yyyy-MM-dd"),
-    check_out: selectedBooking?.check_out || format(new Date(Date.now() + 86400000), "yyyy-MM-dd"),
-    guests: selectedBooking?.number_of_guests || 1,
-    room_type: selectedBooking?.room_type_id || "",
-  })
-  const [filters, setFilters] = useState({
-    floor: "",
-    status: "",
-    amenities: "",
-    priceRange: "",
-  })
   const [availableRooms, setAvailableRooms] = useState<any[]>([])
-  const [searchLoading, setSearchLoading] = useState(false)
+  const [filters, setFilters] = useState({
+    floor: "all",
+    priceRange: "all",
+    amenities: "",
+    view: "all",
+  })
+  const [searchParams, setSearchParams] = useState({
+    checkIn: selectedBooking?.check_in || new Date().toISOString().split("T")[0],
+    checkOut: selectedBooking?.check_out || new Date(Date.now() + 86400000).toISOString().split("T")[0],
+    guests: selectedBooking?.number_of_guests || 1,
+  })
 
   useEffect(() => {
-    if (selectedBooking || selectedGuest) {
-      handleSearchRooms()
+    if (selectedGuest || selectedBooking) {
+      searchForRooms()
     }
-  }, [selectedBooking, selectedGuest])
+  }, [selectedGuest, selectedBooking])
 
-  const handleSearchRooms = async () => {
-    setSearchLoading(true)
+  const searchForRooms = async () => {
     try {
-      const results = await onSearchRooms(searchParams)
-      setAvailableRooms(results)
+      const searchResults = await onSearchRooms({
+        check_in: searchParams.checkIn,
+        check_out: searchParams.checkOut,
+        guests: searchParams.guests,
+        room_type: selectedBooking?.room_type_id,
+      })
+      setAvailableRooms(searchResults || [])
     } catch (error) {
       console.error("Failed to search rooms:", error)
-    } finally {
-      setSearchLoading(false)
+      setAvailableRooms([])
     }
   }
 
   const filteredRooms = availableRooms.filter((room) => {
-    const matchesFloor = !filters.floor || room.floor.toString() === filters.floor
-    const matchesStatus = !filters.status || room.status === filters.status
-    const matchesAmenities = !filters.amenities || room.amenities?.includes(filters.amenities)
-    const matchesPrice = !filters.priceRange || checkPriceRange(room.roomType?.basePrice, filters.priceRange)
+    const matchesFloor = filters.floor === "all" || room.floor.toString() === filters.floor
+    const matchesPrice =
+      filters.priceRange === "all" || checkPriceRange(room.roomType?.basePrice || 0, filters.priceRange)
+    const matchesView = filters.view === "all" || room.view === filters.view
 
-    return matchesFloor && matchesStatus && matchesAmenities && matchesPrice
+    return matchesFloor && matchesPrice && matchesView
   })
 
   const checkPriceRange = (price: number, range: string) => {
     switch (range) {
-      case "0-100":
-        return price <= 100
-      case "100-200":
-        return price > 100 && price <= 200
-      case "200-300":
-        return price > 200 && price <= 300
-      case "300+":
-        return price > 300
+      case "budget":
+        return price < 100
+      case "mid":
+        return price >= 100 && price < 200
+      case "luxury":
+        return price >= 200
       default:
         return true
     }
   }
 
-  const getStatusBadge = (status: string) => {
+  const getRoomStatusBadge = (status: string) => {
     const statusConfig = {
       available: { label: "Available", className: "bg-green-100 text-green-800" },
-      occupied: { label: "Occupied", className: "bg-red-100 text-red-800" },
-      cleaning: { label: "Cleaning", className: "bg-yellow-100 text-yellow-800" },
-      maintenance: { label: "Maintenance", className: "bg-orange-100 text-orange-800" },
-      out_of_order: { label: "Out of Order", className: "bg-red-100 text-red-800" },
+      cleaning: { label: "Being Cleaned", className: "bg-yellow-100 text-yellow-800" },
+      maintenance: { label: "Maintenance", className: "bg-red-100 text-red-800" },
+      occupied: { label: "Occupied", className: "bg-blue-100 text-blue-800" },
     }
 
     const config = statusConfig[status as keyof typeof statusConfig] || { label: status, className: "" }
@@ -101,53 +95,29 @@ export function RoomSelectionPanel({
   }
 
   const getAmenityIcon = (amenity: string) => {
-    const icons = {
+    const icons: { [key: string]: any } = {
       wifi: Wifi,
       parking: Car,
       minibar: Coffee,
       tv: Tv,
-      bathtub: Bath,
-      ac: Wind,
     }
-    const Icon = icons[amenity as keyof typeof icons]
-    return Icon ? <Icon className="h-4 w-4" /> : null
+    const Icon = icons[amenity.toLowerCase()] || Coffee
+    return <Icon className="h-4 w-4" />
   }
 
-  const filterOptions = [
-    {
-      key: "floor",
-      label: "Floor",
-      options: [
-        { value: "", label: "All Floors" },
-        { value: "1", label: "1st Floor" },
-        { value: "2", label: "2nd Floor" },
-        { value: "3", label: "3rd Floor" },
-        { value: "4", label: "4th Floor" },
-        { value: "5", label: "5th Floor" },
-      ],
-    },
-    {
-      key: "priceRange",
-      label: "Price Range",
-      options: [
-        { value: "", label: "All Prices" },
-        { value: "0-100", label: "$0 - $100" },
-        { value: "100-200", label: "$100 - $200" },
-        { value: "200-300", label: "$200 - $300" },
-        { value: "300+", label: "$300+" },
-      ],
-    },
-  ]
-
-  if (isLoading) {
+  if (!selectedGuest && !selectedBooking) {
     return (
       <Card>
         <CardHeader>
           <CardTitle>Select Room</CardTitle>
-          <CardDescription>Choose an available room for the guest</CardDescription>
+          <CardDescription>Please select a guest or booking first</CardDescription>
         </CardHeader>
         <CardContent>
-          <LoadingSkeleton rows={5} />
+          <EmptyState
+            icon={Bed}
+            title="No guest selected"
+            description="Select a guest or booking to view available rooms"
+          />
         </CardContent>
       </Card>
     )
@@ -157,136 +127,160 @@ export function RoomSelectionPanel({
     <Card>
       <CardHeader>
         <CardTitle>Select Room</CardTitle>
-        <CardDescription>{selectedGuest && `Selecting room for ${selectedGuest.full_name}`}</CardDescription>
+        <CardDescription>
+          Choose an available room for {selectedGuest?.full_name || selectedBooking?.guest?.full_name}
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Search Parameters */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-muted/50 rounded-lg">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/50 rounded-lg">
           <div>
-            <Label htmlFor="checkIn">Check-in Date</Label>
+            <label className="text-sm font-medium">Check-in Date</label>
             <Input
-              id="checkIn"
               type="date"
-              value={searchParams.check_in}
-              onChange={(e) => setSearchParams((prev) => ({ ...prev, check_in: e.target.value }))}
+              value={searchParams.checkIn}
+              onChange={(e) => setSearchParams((prev) => ({ ...prev, checkIn: e.target.value }))}
             />
           </div>
           <div>
-            <Label htmlFor="checkOut">Check-out Date</Label>
+            <label className="text-sm font-medium">Check-out Date</label>
             <Input
-              id="checkOut"
               type="date"
-              value={searchParams.check_out}
-              onChange={(e) => setSearchParams((prev) => ({ ...prev, check_out: e.target.value }))}
+              value={searchParams.checkOut}
+              onChange={(e) => setSearchParams((prev) => ({ ...prev, checkOut: e.target.value }))}
             />
           </div>
           <div>
-            <Label htmlFor="guests">Number of Guests</Label>
-            <Select
-              value={searchParams.guests.toString()}
-              onValueChange={(value) => setSearchParams((prev) => ({ ...prev, guests: Number.parseInt(value) }))}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {[1, 2, 3, 4, 5, 6].map((num) => (
-                  <SelectItem key={num} value={num.toString()}>
-                    {num} Guest{num > 1 ? "s" : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-end">
-            <Button onClick={handleSearchRooms} disabled={searchLoading} className="w-full">
-              <Search className="mr-2 h-4 w-4" />
-              {searchLoading ? "Searching..." : "Search Rooms"}
-            </Button>
+            <label className="text-sm font-medium">Number of Guests</label>
+            <Input
+              type="number"
+              min="1"
+              value={searchParams.guests}
+              onChange={(e) => setSearchParams((prev) => ({ ...prev, guests: Number.parseInt(e.target.value) || 1 }))}
+            />
           </div>
         </div>
 
-        {/* Filters */}
-        <FilterBar filters={filters} onFiltersChange={setFilters} filterOptions={filterOptions} />
+        <Button onClick={searchForRooms} className="w-full">
+          Search Available Rooms
+        </Button>
 
-        {/* Room Results */}
-        <div className="space-y-3 max-h-[600px] overflow-y-auto">
-          {filteredRooms.length === 0 ? (
-            <EmptyState
-              icon={Bed}
-              title="No rooms available"
-              description="Try adjusting your search criteria or dates"
-            />
+        {/* Filters */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Select value={filters.floor} onValueChange={(value) => setFilters((prev) => ({ ...prev, floor: value }))}>
+            <SelectTrigger>
+              <SelectValue placeholder="Floor" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Floors</SelectItem>
+              <SelectItem value="1">Floor 1</SelectItem>
+              <SelectItem value="2">Floor 2</SelectItem>
+              <SelectItem value="3">Floor 3</SelectItem>
+              <SelectItem value="4">Floor 4</SelectItem>
+              <SelectItem value="5">Floor 5</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={filters.priceRange}
+            onValueChange={(value) => setFilters((prev) => ({ ...prev, priceRange: value }))}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Price Range" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Prices</SelectItem>
+              <SelectItem value="budget">Budget (&lt; $100)</SelectItem>
+              <SelectItem value="mid">Mid-range ($100-200)</SelectItem>
+              <SelectItem value="luxury">Luxury ($200+)</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={filters.view} onValueChange={(value) => setFilters((prev) => ({ ...prev, view: value }))}>
+            <SelectTrigger>
+              <SelectValue placeholder="View" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Views</SelectItem>
+              <SelectItem value="city">City View</SelectItem>
+              <SelectItem value="ocean">Ocean View</SelectItem>
+              <SelectItem value="garden">Garden View</SelectItem>
+              <SelectItem value="pool">Pool View</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Room Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[600px] overflow-y-auto">
+          {isLoading ? (
+            Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-48 bg-muted animate-pulse rounded-lg" />)
+          ) : filteredRooms.length === 0 ? (
+            <div className="col-span-full">
+              <EmptyState
+                icon={Bed}
+                title="No rooms available"
+                description="Try adjusting your search criteria or dates"
+              />
+            </div>
           ) : (
             filteredRooms.map((room) => (
-              <div
-                key={room.id}
-                className="p-4 border rounded-lg cursor-pointer transition-colors hover:bg-muted/50"
+              <Card
+                key={room._id}
+                className="cursor-pointer transition-all hover:shadow-md hover:scale-105"
                 onClick={() => onRoomSelect(room)}
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-lg font-semibold">Room {room.roomNumber}</h3>
-                      {getStatusBadge(room.status)}
-                      <Badge variant="outline" className="flex items-center gap-1">
-                        <MapPin className="h-3 w-3" />
-                        Floor {room.floor}
-                      </Badge>
+                <CardHeader className="pb-2">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle className="text-lg">Room {room.roomNumber}</CardTitle>
+                      <CardDescription>{room.roomType?.name}</CardDescription>
                     </div>
-
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Bed className="h-4 w-4" />
-                          {room.roomType?.name}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Users className="h-4 w-4" />
-                          Max {room.roomType?.maxOccupancy} guests
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <DollarSign className="h-4 w-4" />${room.roomType?.basePrice}/night
-                        </span>
-                      </div>
-
-                      {room.roomType?.description && (
-                        <p className="text-sm text-muted-foreground">{room.roomType.description}</p>
-                      )}
-
-                      {room.amenities && room.amenities.length > 0 && (
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {room.amenities.map((amenity: string) => (
-                            <Badge key={amenity} variant="secondary" className="flex items-center gap-1">
-                              {getAmenityIcon(amenity)}
-                              {amenity}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
+                    {getRoomStatusBadge(room.status)}
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-1">
+                      <MapPin className="h-4 w-4" />
+                      Floor {room.floor}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Users className="h-4 w-4" />
+                      Max {room.roomType?.maxOccupancy || 2}
                     </div>
                   </div>
 
-                  <div className="text-right">
-                    <div className="text-2xl font-bold text-primary">${room.roomType?.basePrice}</div>
-                    <div className="text-sm text-muted-foreground">per night</div>
-                    {selectedBooking && (
-                      <div className="mt-2 text-sm">
-                        <div className="font-medium">
-                          Total: ${(room.roomType?.basePrice * selectedBooking.duration).toFixed(2)}
-                        </div>
-                        <div className="text-muted-foreground">{selectedBooking.duration} nights</div>
-                      </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1">
+                      <DollarSign className="h-4 w-4" />
+                      <span className="font-semibold">${room.roomType?.basePrice}/night</span>
+                    </div>
+                    {room.view && (
+                      <Badge variant="outline" className="text-xs">
+                        {room.view} view
+                      </Badge>
                     )}
                   </div>
-                </div>
 
-                {room.notes && (
-                  <div className="mt-3 pt-3 border-t">
-                    <p className="text-xs text-muted-foreground">{room.notes}</p>
-                  </div>
-                )}
-              </div>
+                  {room.amenities && room.amenities.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {room.amenities.slice(0, 4).map((amenity: string, index: number) => (
+                        <div key={index} className="flex items-center gap-1 text-xs text-muted-foreground">
+                          {getAmenityIcon(amenity)}
+                          <span>{amenity}</span>
+                        </div>
+                      ))}
+                      {room.amenities.length > 4 && (
+                        <span className="text-xs text-muted-foreground">+{room.amenities.length - 4} more</span>
+                      )}
+                    </div>
+                  )}
+
+                  <Button className="w-full" size="sm">
+                    Select Room
+                  </Button>
+                </CardContent>
+              </Card>
             ))
           )}
         </div>

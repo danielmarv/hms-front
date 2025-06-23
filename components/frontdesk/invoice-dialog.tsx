@@ -1,11 +1,10 @@
 "use client"
 
-import { useRef } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
-import { Badge } from "@/components/ui/badge"
-import { Printer } from "lucide-react"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Printer, Download, Mail } from "lucide-react"
 import { format } from "date-fns"
 
 interface InvoiceDialogProps {
@@ -15,44 +14,36 @@ interface InvoiceDialogProps {
 }
 
 export function InvoiceDialog({ open, onOpenChange, invoiceData }: InvoiceDialogProps) {
-  const printRef = useRef<HTMLDivElement>(null)
-
   if (!invoiceData) return null
 
   const handlePrint = () => {
-    if (printRef.current) {
-      const printContent = printRef.current.innerHTML
-      const printWindow = window.open("", "_blank")
-      if (printWindow) {
-        printWindow.document.write(`
-          <html>
-            <head>
-              <title>Invoice</title>
-              <style>
-                body { font-family: Arial, sans-serif; margin: 20px; }
-                .header { text-align: center; margin-bottom: 30px; }
-                .invoice-header { display: flex; justify-content: space-between; margin-bottom: 30px; }
-                .section { margin-bottom: 20px; }
-                .table { width: 100%; border-collapse: collapse; }
-                .table th, .table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                .table th { background-color: #f5f5f5; }
-                .total-row { font-weight: bold; background-color: #f9f9f9; }
-                @media print {
-                  body { margin: 0; }
-                  .no-print { display: none; }
-                }
-              </style>
-            </head>
-            <body>
-              ${printContent}
-            </body>
-          </html>
-        `)
-        printWindow.document.close()
-        printWindow.print()
-      }
-    }
+    window.print()
   }
+
+  const handleDownload = () => {
+    // In a real app, this would generate and download a PDF
+    console.log("Download invoice as PDF")
+  }
+
+  const handleEmail = () => {
+    // In a real app, this would send the invoice via email
+    console.log("Email invoice to guest")
+  }
+
+  // Calculate totals
+  const subtotal = (invoiceData.room?.roomType?.basePrice || 0) * (invoiceData.number_of_nights || 1)
+  const taxRate = 0.1 // 10% tax
+  const taxAmount = subtotal * taxRate
+  const total = subtotal + taxAmount
+
+  const invoiceItems = [
+    {
+      description: `Room ${invoiceData.room?.roomNumber} - ${invoiceData.room?.roomType?.name}`,
+      quantity: invoiceData.number_of_nights || 1,
+      rate: invoiceData.room?.roomType?.basePrice || 0,
+      amount: subtotal,
+    },
+  ]
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -61,205 +52,179 @@ export function InvoiceDialog({ open, onOpenChange, invoiceData }: InvoiceDialog
           <DialogTitle>Guest Invoice</DialogTitle>
         </DialogHeader>
 
-        <div ref={printRef} className="space-y-6">
+        <div className="space-y-6 print:text-black">
           {/* Hotel Header */}
-          <div className="text-center">
-            <h1 className="text-2xl font-bold">Grand Hotel</h1>
+          <div className="text-center border-b pb-4">
+            <h1 className="text-3xl font-bold">Grand Hotel</h1>
             <p className="text-muted-foreground">123 Main Street, City, State 12345</p>
             <p className="text-muted-foreground">Phone: +1-555-0100 | Email: info@grandhotel.com</p>
+            <p className="text-muted-foreground">Tax ID: 123-456-789</p>
           </div>
 
           {/* Invoice Header */}
-          <div className="flex justify-between items-start">
-            <div>
-              <h2 className="text-xl font-semibold">INVOICE</h2>
-              <p className="text-sm text-muted-foreground">Date: {format(new Date(), "MMMM dd, yyyy")}</p>
-              <p className="text-sm text-muted-foreground">
-                Invoice #: INV-{format(new Date(), "yyyyMMdd")}-{Math.random().toString(36).substr(2, 6).toUpperCase()}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="font-semibold">Folio Number:</p>
-              <p className="font-mono text-lg">{invoiceData.selectedBooking?.confirmation_number || "WALK-IN"}</p>
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Bill To */}
           <div className="grid grid-cols-2 gap-8">
+            <div>
+              <h2 className="text-xl font-bold mb-4">INVOICE</h2>
+              <div className="space-y-1">
+                <p>
+                  <strong>Invoice #:</strong> INV-{Date.now()}
+                </p>
+                <p>
+                  <strong>Date:</strong> {format(new Date(), "MMM dd, yyyy")}
+                </p>
+                <p>
+                  <strong>Due Date:</strong> {format(new Date(), "MMM dd, yyyy")}
+                </p>
+                <p>
+                  <strong>Folio #:</strong> {invoiceData.folio_number || "F-" + Date.now()}
+                </p>
+              </div>
+            </div>
             <div>
               <h3 className="font-semibold mb-2">Bill To:</h3>
               <div className="space-y-1">
-                <p className="font-medium">{invoiceData.selectedGuest?.full_name}</p>
-                <p>{invoiceData.selectedGuest?.email}</p>
-                <p>{invoiceData.selectedGuest?.phone}</p>
-                {invoiceData.selectedGuest?.address && (
+                <p className="font-medium">{invoiceData.guest?.full_name}</p>
+                <p>{invoiceData.guest?.email}</p>
+                <p>{invoiceData.guest?.phone}</p>
+                {invoiceData.guest?.address && (
                   <>
-                    <p>{invoiceData.selectedGuest.address.street}</p>
+                    <p>{invoiceData.guest.address.street}</p>
                     <p>
-                      {invoiceData.selectedGuest.address.city}, {invoiceData.selectedGuest.address.state}{" "}
-                      {invoiceData.selectedGuest.address.postal_code}
+                      {invoiceData.guest.address.city}, {invoiceData.guest.address.state}{" "}
+                      {invoiceData.guest.address.zip}
                     </p>
-                    <p>{invoiceData.selectedGuest.address.country}</p>
+                    <p>{invoiceData.guest.address.country}</p>
                   </>
                 )}
               </div>
             </div>
-            <div>
-              <h3 className="font-semibold mb-2">Stay Details:</h3>
-              <div className="space-y-1">
-                <p>Room: {invoiceData.selectedRoom?.roomNumber}</p>
-                <p>Room Type: {invoiceData.selectedRoom?.roomType?.name}</p>
-                <p>
-                  Check-in:{" "}
-                  {invoiceData.selectedBooking
-                    ? format(new Date(invoiceData.selectedBooking.check_in), "MMM dd, yyyy")
-                    : format(new Date(), "MMM dd, yyyy")}
-                </p>
-                <p>
-                  Check-out:{" "}
-                  {invoiceData.selectedBooking
-                    ? format(new Date(invoiceData.selectedBooking.check_out), "MMM dd, yyyy")
+          </div>
+
+          {/* Stay Details */}
+          <div className="bg-muted/50 p-4 rounded-lg">
+            <h3 className="font-semibold mb-2">Stay Details</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div>
+                <p className="text-muted-foreground">Room</p>
+                <p className="font-medium">{invoiceData.room?.roomNumber}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Check-in</p>
+                <p className="font-medium">{format(new Date(), "MMM dd, yyyy")}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Check-out</p>
+                <p className="font-medium">
+                  {invoiceData.expected_check_out
+                    ? format(new Date(invoiceData.expected_check_out), "MMM dd, yyyy")
                     : "TBD"}
                 </p>
-                <p>Nights: {invoiceData.selectedBooking?.duration || 1}</p>
-                <p>Guests: {invoiceData.selectedBooking?.number_of_guests || 1}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Guests</p>
+                <p className="font-medium">{invoiceData.number_of_guests || 1}</p>
               </div>
             </div>
           </div>
-
-          <Separator />
 
           {/* Invoice Items */}
           <div>
-            <h3 className="font-semibold mb-4">Charges</h3>
-            <table className="w-full border-collapse border border-gray-300">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="border border-gray-300 p-3 text-left">Description</th>
-                  <th className="border border-gray-300 p-3 text-center">Quantity</th>
-                  <th className="border border-gray-300 p-3 text-right">Rate</th>
-                  <th className="border border-gray-300 p-3 text-right">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className="border border-gray-300 p-3">
-                    Room Charges - {invoiceData.selectedRoom?.roomType?.name}
-                  </td>
-                  <td className="border border-gray-300 p-3 text-center">
-                    {invoiceData.selectedBooking?.duration || 1} nights
-                  </td>
-                  <td className="border border-gray-300 p-3 text-right">
-                    ${invoiceData.selectedRoom?.roomType?.basePrice}
-                  </td>
-                  <td className="border border-gray-300 p-3 text-right">
-                    $
-                    {(
-                      invoiceData.selectedRoom?.roomType?.basePrice * (invoiceData.selectedBooking?.duration || 1)
-                    ).toFixed(2)}
-                  </td>
-                </tr>
-
-                {/* Additional charges would go here */}
-
-                <tr>
-                  <td className="border border-gray-300 p-3" colSpan={3}>
-                    <strong>Subtotal</strong>
-                  </td>
-                  <td className="border border-gray-300 p-3 text-right">
-                    <strong>
-                      $
-                      {(
-                        invoiceData.selectedRoom?.roomType?.basePrice * (invoiceData.selectedBooking?.duration || 1)
-                      ).toFixed(2)}
-                    </strong>
-                  </td>
-                </tr>
-
-                <tr>
-                  <td className="border border-gray-300 p-3" colSpan={3}>
-                    Tax (10%)
-                  </td>
-                  <td className="border border-gray-300 p-3 text-right">
-                    $
-                    {(
-                      invoiceData.selectedRoom?.roomType?.basePrice *
-                      (invoiceData.selectedBooking?.duration || 1) *
-                      0.1
-                    ).toFixed(2)}
-                  </td>
-                </tr>
-
-                {invoiceData.checkInData?.depositAmount > 0 && (
-                  <tr>
-                    <td className="border border-gray-300 p-3" colSpan={3}>
-                      Additional Deposit
-                    </td>
-                    <td className="border border-gray-300 p-3 text-right">
-                      ${invoiceData.checkInData.depositAmount.toFixed(2)}
-                    </td>
-                  </tr>
-                )}
-
-                <tr className="bg-gray-100">
-                  <td className="border border-gray-300 p-3" colSpan={3}>
-                    <strong>TOTAL AMOUNT</strong>
-                  </td>
-                  <td className="border border-gray-300 p-3 text-right">
-                    <strong className="text-lg">
-                      $
-                      {(
-                        invoiceData.selectedRoom?.roomType?.basePrice *
-                          (invoiceData.selectedBooking?.duration || 1) *
-                          1.1 +
-                        (invoiceData.checkInData?.depositAmount || 0)
-                      ).toFixed(2)}
-                    </strong>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Description</TableHead>
+                  <TableHead className="text-center">Quantity</TableHead>
+                  <TableHead className="text-right">Rate</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {invoiceItems.map((item, index) => (
+                  <TableRow key={index}>
+                    <TableCell>{item.description}</TableCell>
+                    <TableCell className="text-center">{item.quantity}</TableCell>
+                    <TableCell className="text-right">${item.rate.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">${item.amount.toFixed(2)}</TableCell>
+                  </TableRow>
+                ))}
+                {invoiceData.additional_charges?.map((charge: any, index: number) => (
+                  <TableRow key={`charge-${index}`}>
+                    <TableCell>{charge.description}</TableCell>
+                    <TableCell className="text-center">1</TableCell>
+                    <TableCell className="text-right">${charge.amount.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">${charge.amount.toFixed(2)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
 
-          {/* Payment Information */}
-          <div className="grid grid-cols-2 gap-8">
-            <div>
-              <h3 className="font-semibold mb-2">Payment Information:</h3>
-              <div className="space-y-1 text-sm">
-                <p>
-                  Payment Status: <Badge className="ml-2">Pending</Badge>
-                </p>
-                <p>Payment Due: Upon Check-out</p>
-                <p>Accepted Methods: Cash, Credit Card, Debit Card</p>
+          {/* Totals */}
+          <div className="flex justify-end">
+            <div className="w-80 space-y-2">
+              <div className="flex justify-between">
+                <span>Subtotal:</span>
+                <span>${subtotal.toFixed(2)}</span>
               </div>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-2">Hotel Policies:</h3>
-              <div className="space-y-1 text-sm text-muted-foreground">
-                <p>• Check-out time: 11:00 AM</p>
-                <p>• Late check-out charges may apply</p>
-                <p>• Damage charges will be added if applicable</p>
-                <p>• No smoking policy in effect</p>
+              {invoiceData.discounts?.map((discount: any, index: number) => (
+                <div key={index} className="flex justify-between text-green-600">
+                  <span>Discount ({discount.description}):</span>
+                  <span>-${discount.amount.toFixed(2)}</span>
+                </div>
+              ))}
+              <div className="flex justify-between">
+                <span>Tax ({(taxRate * 100).toFixed(0)}%):</span>
+                <span>${taxAmount.toFixed(2)}</span>
               </div>
+              <Separator />
+              <div className="flex justify-between text-lg font-bold">
+                <span>Total:</span>
+                <span>${total.toFixed(2)}</span>
+              </div>
+              {invoiceData.deposit_amount > 0 && (
+                <>
+                  <div className="flex justify-between text-green-600">
+                    <span>Paid (Deposit):</span>
+                    <span>-${invoiceData.deposit_amount.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-lg font-bold text-red-600">
+                    <span>Balance Due:</span>
+                    <span>${(total - invoiceData.deposit_amount).toFixed(2)}</span>
+                  </div>
+                </>
+              )}
             </div>
+          </div>
+
+          {/* Payment Terms */}
+          <div className="bg-muted/50 p-4 rounded-lg">
+            <h3 className="font-semibold mb-2">Payment Terms</h3>
+            <p className="text-sm text-muted-foreground">
+              Payment is due upon check-out. We accept cash, credit cards, and bank transfers. Late checkout fees may
+              apply for departures after 12:00 PM.
+            </p>
           </div>
 
           {/* Footer */}
           <div className="text-center text-sm text-muted-foreground border-t pt-4">
             <p>Thank you for choosing Grand Hotel!</p>
-            <p>For questions about this invoice, please contact us at +1-555-0100</p>
+            <p>For questions about this invoice, please contact our front desk.</p>
           </div>
         </div>
 
-        <div className="flex gap-2 no-print">
-          <Button onClick={handlePrint} className="flex-1">
-            <Printer className="mr-2 h-4 w-4" />
-            Print Invoice
+        {/* Action Buttons */}
+        <div className="flex justify-end space-x-2 print:hidden">
+          <Button variant="outline" onClick={handleEmail}>
+            <Mail className="mr-2 h-4 w-4" />
+            Email
           </Button>
-          <Button onClick={() => onOpenChange(false)} variant="outline">
-            Close
+          <Button variant="outline" onClick={handleDownload}>
+            <Download className="mr-2 h-4 w-4" />
+            Download PDF
+          </Button>
+          <Button onClick={handlePrint}>
+            <Printer className="mr-2 h-4 w-4" />
+            Print
           </Button>
         </div>
       </DialogContent>

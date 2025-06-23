@@ -6,9 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { LoadingSkeleton } from "@/components/ui/loading-skeleton"
 import { EmptyState } from "@/components/ui/empty-state"
-import { FilterBar } from "@/components/ui/filter-bar"
 import { Search, Calendar, Users, Phone, Mail, MapPin } from "lucide-react"
 import { format } from "date-fns"
 
@@ -102,7 +100,11 @@ export function BookingSearchPanel({
           <CardDescription>Search for existing bookings or guests</CardDescription>
         </CardHeader>
         <CardContent>
-          <LoadingSkeleton rows={5} />
+          <div className="space-y-4">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-20 bg-muted animate-pulse rounded-lg" />
+            ))}
+          </div>
         </CardContent>
       </Card>
     )
@@ -127,7 +129,28 @@ export function BookingSearchPanel({
         </div>
 
         {/* Filters */}
-        <FilterBar filters={filters} onFiltersChange={setFilters} filterOptions={filterOptions} />
+        <div className="flex gap-2 flex-wrap">
+          <select
+            value={filters.status}
+            onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}
+            className="px-3 py-2 border rounded-md"
+          >
+            <option value="">All Statuses</option>
+            <option value="confirmed">Confirmed</option>
+            <option value="pending">Pending</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+
+          <select
+            value={filters.vip}
+            onChange={(e) => setFilters((prev) => ({ ...prev, vip: e.target.value }))}
+            className="px-3 py-2 border rounded-md"
+          >
+            <option value="">All Guests</option>
+            <option value="true">VIP Only</option>
+            <option value="false">Regular Guests</option>
+          </select>
+        </div>
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>

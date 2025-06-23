@@ -85,7 +85,7 @@ export function useCheckInApi() {
         })
       }
 
-      const endpoint = `/checkins${queryParams.toString() ? `?${queryParams.toString()}` : ""}`
+      const endpoint = `/check-ins${queryParams.toString() ? `?${queryParams.toString()}` : ""}`
       const response = await request(endpoint, "GET")
 
       if (response.data) {
@@ -106,7 +106,7 @@ export function useCheckInApi() {
   // Check-in a guest
   const checkInGuest = async (checkInData: CheckInData) => {
     try {
-      const response = await request("/checkins", "POST", checkInData)
+      const response = await request("/check-ins", "POST", checkInData)
       if (response.data) {
         setCheckIns((prev) => [response.data, ...prev])
         toast.success("Guest checked in successfully!")
@@ -122,7 +122,7 @@ export function useCheckInApi() {
   // Get check-in by ID
   const getCheckInById = async (checkInId: string) => {
     try {
-      const response = await request(`/checkins/${checkInId}`, "GET")
+      const response = await request(`/check-ins/${checkInId}`, "GET")
       return response.data
     } catch (error) {
       toast.error("Failed to fetch check-in details")
@@ -150,7 +150,7 @@ export function useCheckInApi() {
     },
   ) => {
     try {
-      const response = await request(`/checkins/${checkInId}/checkout`, "PATCH", checkOutData)
+      const response = await request(`/check-ins/${checkInId}/checkout`, "PATCH", checkOutData)
       if (response.data) {
         setCheckIns((prev) => prev.map((checkIn) => (checkIn.id === checkInId ? response.data : checkIn)))
         toast.success("Guest checked out successfully!")
@@ -173,7 +173,7 @@ export function useCheckInApi() {
     }>,
   ) => {
     try {
-      const response = await request(`/checkins/${checkInId}/charges`, "POST", { charges })
+      const response = await request(`/check-ins/${checkInId}/charges`, "POST", { charges })
       if (response.data) {
         setCheckIns((prev) => prev.map((checkIn) => (checkIn.id === checkInId ? response.data : checkIn)))
         toast.success("Charges added successfully!")
@@ -196,7 +196,7 @@ export function useCheckInApi() {
     },
   ) => {
     try {
-      const response = await request(`/checkins/${checkInId}/discount`, "POST", discount)
+      const response = await request(`/check-ins/${checkInId}/discount`, "POST", discount)
       if (response.data) {
         setCheckIns((prev) => prev.map((checkIn) => (checkIn.id === checkInId ? response.data : checkIn)))
         toast.success("Discount added successfully!")
@@ -212,7 +212,7 @@ export function useCheckInApi() {
   // Get guest folio
   const getGuestFolio = async (checkInId: string) => {
     try {
-      const response = await request(`/checkins/${checkInId}/folio`, "GET")
+      const response = await request(`/check-ins/${checkInId}/folio`, "GET")
       return response.data
     } catch (error) {
       toast.error("Failed to fetch guest folio")
@@ -223,7 +223,7 @@ export function useCheckInApi() {
   // Get current occupancy
   const getCurrentOccupancy = async () => {
     try {
-      const response = await request("/checkins/occupancy", "GET")
+      const response = await request("/check-ins/occupancy", "GET")
       return response.data
     } catch (error) {
       toast.error("Failed to fetch occupancy data")
@@ -246,7 +246,7 @@ export function useCheckInApi() {
         }
       })
 
-      const response = await request(`/checkins/available-rooms?${queryParams.toString()}`, "GET")
+      const response = await request(`/check-ins/available-rooms?${queryParams.toString()}`, "GET")
       return response.data || []
     } catch (error) {
       toast.error("Failed to search available rooms")

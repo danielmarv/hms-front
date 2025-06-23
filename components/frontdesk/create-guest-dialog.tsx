@@ -1,22 +1,22 @@
 "use client"
 
+import type React from "react"
+
 import { useState } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Switch } from "@/components/ui/switch"
 import { toast } from "sonner"
-import { User, MapPin, Phone, CreditCard, Heart } from "lucide-react"
 
 interface CreateGuestDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onCreateGuest: (guestData: any) => Promise<void>
+  onCreateGuest: (guestData: any) => void
 }
 
 export function CreateGuestDialog({ open, onOpenChange, onCreateGuest }: CreateGuestDialogProps) {
@@ -27,167 +27,137 @@ export function CreateGuestDialog({ open, onOpenChange, onCreateGuest }: CreateG
     gender: "",
     dob: "",
     nationality: "",
-    id_type: "passport",
+    id_type: "",
     id_number: "",
     id_expiry: "",
     address: {
       street: "",
       city: "",
       state: "",
-      postal_code: "",
       country: "",
+      zip: "",
+    },
+    preferences: {
+      bed_type: "",
+      smoking: false,
+      floor_preference: "",
+      room_location: "",
+      dietary_requirements: [],
+      special_requests: "",
+      amenities: [],
+    },
+    loyalty_program: {
+      member: false,
+      points: 0,
+      tier: "standard",
+      membership_number: "",
+    },
+    marketing_preferences: {
+      email_opt_in: true,
+      sms_opt_in: false,
+      mail_opt_in: false,
+    },
+    notes: "",
+    tags: [],
+    vip: false,
+    company: {
+      name: "",
+      position: "",
+      address: "",
+      tax_id: "",
     },
     emergency_contact: {
       name: "",
-      phone: "",
       relationship: "",
+      phone: "",
+      email: "",
     },
-    preferences: {
-      room_type: "",
-      floor_preference: "",
-      bed_type: "",
-      smoking: false,
-      dietary_restrictions: "",
-    },
-    marketing_preferences: {
-      email_marketing: false,
-      sms_marketing: false,
-      promotional_offers: false,
-    },
-    notes: "",
-    vip: false,
   })
 
-  const updateGuestData = (field: string, value: any) => {
-    if (field.includes(".")) {
-      const [parent, child] = field.split(".")
-      setGuestData((prev) => ({
-        ...prev,
-        [parent]: {
-          ...prev[parent as keyof typeof prev],
-          [child]: value,
-        },
-      }))
-    } else {
-      setGuestData((prev) => ({ ...prev, [field]: value }))
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+
+    // Basic validation
+    if (!guestData.full_name || !guestData.phone) {
+      toast.error("Name and phone number are required")
+      return
     }
+
+    onCreateGuest(guestData)
   }
 
-  const handleSubmit = async () => {
-    // Validate required fields
-    if (!guestData.full_name.trim()) {
-      toast.error("Full name is required")
-      return
-    }
+  const handleInputChange = (field: string, value: any) => {
+    setGuestData((prev) => ({
+      ...prev,
+      [field]: value,
+    }))
+  }
 
-    if (!guestData.email.trim() && !guestData.phone.trim()) {
-      toast.error("Either email or phone number is required")
-      return
-    }
-
-    try {
-      await onCreateGuest(guestData)
-      // Reset form
-      setGuestData({
-        full_name: "",
-        email: "",
-        phone: "",
-        gender: "",
-        dob: "",
-        nationality: "",
-        id_type: "passport",
-        id_number: "",
-        id_expiry: "",
-        address: {
-          street: "",
-          city: "",
-          state: "",
-          postal_code: "",
-          country: "",
-        },
-        emergency_contact: {
-          name: "",
-          phone: "",
-          relationship: "",
-        },
-        preferences: {
-          room_type: "",
-          floor_preference: "",
-          bed_type: "",
-          smoking: false,
-          dietary_restrictions: "",
-        },
-        marketing_preferences: {
-          email_marketing: false,
-          sms_marketing: false,
-          promotional_offers: false,
-        },
-        notes: "",
-        vip: false,
-      })
-    } catch (error) {
-      // Error handling is done in the parent component
-    }
+  const handleNestedInputChange = (parent: string, field: string, value: any) => {
+    setGuestData((prev) => ({
+      ...prev,
+      [parent]: {
+        ...prev[parent as keyof typeof prev],
+        [field]: value,
+      },
+    }))
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <User className="h-5 w-5" />
-            Create New Guest
-          </DialogTitle>
+          <DialogTitle>Create New Guest</DialogTitle>
+          <DialogDescription>Add a new guest to the system for walk-in check-ins</DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="basic" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="basic">Basic Info</TabsTrigger>
-            <TabsTrigger value="address">Address</TabsTrigger>
-            <TabsTrigger value="preferences">Preferences</TabsTrigger>
-            <TabsTrigger value="additional">Additional</TabsTrigger>
-          </TabsList>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <Tabs defaultValue="basic" className="w-full">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="basic">Basic Info</TabsTrigger>
+              <TabsTrigger value="address">Address</TabsTrigger>
+              <TabsTrigger value="preferences">Preferences</TabsTrigger>
+              <TabsTrigger value="additional">Additional</TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="basic" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="h-4 w-4" />
-                  Personal Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <Label htmlFor="fullName">Full Name *</Label>
+            <TabsContent value="basic" className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="full_name">Full Name *</Label>
                   <Input
-                    id="fullName"
+                    id="full_name"
                     value={guestData.full_name}
-                    onChange={(e) => updateGuestData("full_name", e.target.value)}
+                    onChange={(e) => handleInputChange("full_name", e.target.value)}
                     placeholder="Enter full name"
+                    required
                   />
                 </div>
-                <div>
-                  <Label htmlFor="email">Email Address</Label>
+
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
                   <Input
                     id="email"
                     type="email"
                     value={guestData.email}
-                    onChange={(e) => updateGuestData("email", e.target.value)}
-                    placeholder="guest@example.com"
+                    onChange={(e) => handleInputChange("email", e.target.value)}
+                    placeholder="Enter email address"
                   />
                 </div>
-                <div>
-                  <Label htmlFor="phone">Phone Number</Label>
+
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number *</Label>
                   <Input
                     id="phone"
                     value={guestData.phone}
-                    onChange={(e) => updateGuestData("phone", e.target.value)}
-                    placeholder="+1-555-0123"
+                    onChange={(e) => handleInputChange("phone", e.target.value)}
+                    placeholder="Enter phone number"
+                    required
                   />
                 </div>
-                <div>
+
+                <div className="space-y-2">
                   <Label htmlFor="gender">Gender</Label>
-                  <Select value={guestData.gender} onValueChange={(value) => updateGuestData("gender", value)}>
+                  <Select value={guestData.gender} onValueChange={(value) => handleInputChange("gender", value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select gender" />
                     </SelectTrigger>
@@ -195,223 +165,118 @@ export function CreateGuestDialog({ open, onOpenChange, onCreateGuest }: CreateG
                       <SelectItem value="male">Male</SelectItem>
                       <SelectItem value="female">Female</SelectItem>
                       <SelectItem value="other">Other</SelectItem>
-                      <SelectItem value="prefer_not_to_say">Prefer not to say</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
+
+                <div className="space-y-2">
                   <Label htmlFor="dob">Date of Birth</Label>
                   <Input
                     id="dob"
                     type="date"
                     value={guestData.dob}
-                    onChange={(e) => updateGuestData("dob", e.target.value)}
+                    onChange={(e) => handleInputChange("dob", e.target.value)}
                   />
                 </div>
-                <div>
+
+                <div className="space-y-2">
                   <Label htmlFor="nationality">Nationality</Label>
                   <Input
                     id="nationality"
                     value={guestData.nationality}
-                    onChange={(e) => updateGuestData("nationality", e.target.value)}
-                    placeholder="e.g., American, British"
+                    onChange={(e) => handleInputChange("nationality", e.target.value)}
+                    placeholder="Enter nationality"
                   />
                 </div>
-              </CardContent>
-            </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CreditCard className="h-4 w-4" />
-                  Identification
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="idType">ID Type</Label>
-                  <Select value={guestData.id_type} onValueChange={(value) => updateGuestData("id_type", value)}>
+                <div className="space-y-2">
+                  <Label htmlFor="id_type">ID Type</Label>
+                  <Select value={guestData.id_type} onValueChange={(value) => handleInputChange("id_type", value)}>
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Select ID type" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="passport">Passport</SelectItem>
-                      <SelectItem value="drivers_license">Driver's License</SelectItem>
                       <SelectItem value="national_id">National ID</SelectItem>
+                      <SelectItem value="driver_license">Driver's License</SelectItem>
                       <SelectItem value="other">Other</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <Label htmlFor="idNumber">ID Number</Label>
+
+                <div className="space-y-2">
+                  <Label htmlFor="id_number">ID Number</Label>
                   <Input
-                    id="idNumber"
+                    id="id_number"
                     value={guestData.id_number}
-                    onChange={(e) => updateGuestData("id_number", e.target.value)}
+                    onChange={(e) => handleInputChange("id_number", e.target.value)}
                     placeholder="Enter ID number"
                   />
                 </div>
-                <div>
-                  <Label htmlFor="idExpiry">ID Expiry Date</Label>
-                  <Input
-                    id="idExpiry"
-                    type="date"
-                    value={guestData.id_expiry}
-                    onChange={(e) => updateGuestData("id_expiry", e.target.value)}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+              </div>
+            </TabsContent>
 
-          <TabsContent value="address" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4" />
-                  Address Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
+            <TabsContent value="address" className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
                   <Label htmlFor="street">Street Address</Label>
                   <Input
                     id="street"
                     value={guestData.address.street}
-                    onChange={(e) => updateGuestData("address.street", e.target.value)}
-                    placeholder="123 Main Street"
+                    onChange={(e) => handleNestedInputChange("address", "street", e.target.value)}
+                    placeholder="Enter street address"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="city">City</Label>
-                    <Input
-                      id="city"
-                      value={guestData.address.city}
-                      onChange={(e) => updateGuestData("address.city", e.target.value)}
-                      placeholder="New York"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="state">State/Province</Label>
-                    <Input
-                      id="state"
-                      value={guestData.address.state}
-                      onChange={(e) => updateGuestData("address.state", e.target.value)}
-                      placeholder="NY"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="postalCode">Postal Code</Label>
-                    <Input
-                      id="postalCode"
-                      value={guestData.address.postal_code}
-                      onChange={(e) => updateGuestData("address.postal_code", e.target.value)}
-                      placeholder="10001"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="country">Country</Label>
-                    <Input
-                      id="country"
-                      value={guestData.address.country}
-                      onChange={(e) => updateGuestData("address.country", e.target.value)}
-                      placeholder="United States"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Phone className="h-4 w-4" />
-                  Emergency Contact
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="emergencyName">Contact Name</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="city">City</Label>
                   <Input
-                    id="emergencyName"
-                    value={guestData.emergency_contact.name}
-                    onChange={(e) => updateGuestData("emergency_contact.name", e.target.value)}
-                    placeholder="Full name"
+                    id="city"
+                    value={guestData.address.city}
+                    onChange={(e) => handleNestedInputChange("address", "city", e.target.value)}
+                    placeholder="Enter city"
                   />
                 </div>
-                <div>
-                  <Label htmlFor="emergencyPhone">Contact Phone</Label>
-                  <Input
-                    id="emergencyPhone"
-                    value={guestData.emergency_contact.phone}
-                    onChange={(e) => updateGuestData("emergency_contact.phone", e.target.value)}
-                    placeholder="+1-555-0123"
-                  />
-                </div>
-                <div className="col-span-2">
-                  <Label htmlFor="emergencyRelationship">Relationship</Label>
-                  <Input
-                    id="emergencyRelationship"
-                    value={guestData.emergency_contact.relationship}
-                    onChange={(e) => updateGuestData("emergency_contact.relationship", e.target.value)}
-                    placeholder="e.g., Spouse, Parent, Friend"
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
 
-          <TabsContent value="preferences" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Heart className="h-4 w-4" />
-                  Room Preferences
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="roomType">Preferred Room Type</Label>
-                  <Select
-                    value={guestData.preferences.room_type}
-                    onValueChange={(value) => updateGuestData("preferences.room_type", value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select room type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="standard">Standard</SelectItem>
-                      <SelectItem value="deluxe">Deluxe</SelectItem>
-                      <SelectItem value="suite">Suite</SelectItem>
-                      <SelectItem value="presidential">Presidential Suite</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="space-y-2">
+                  <Label htmlFor="state">State/Province</Label>
+                  <Input
+                    id="state"
+                    value={guestData.address.state}
+                    onChange={(e) => handleNestedInputChange("address", "state", e.target.value)}
+                    placeholder="Enter state or province"
+                  />
                 </div>
-                <div>
-                  <Label htmlFor="floorPreference">Floor Preference</Label>
-                  <Select
-                    value={guestData.preferences.floor_preference}
-                    onValueChange={(value) => updateGuestData("preferences.floor_preference", value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select floor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Low Floor (1-3)</SelectItem>
-                      <SelectItem value="mid">Mid Floor (4-7)</SelectItem>
-                      <SelectItem value="high">High Floor (8+)</SelectItem>
-                      <SelectItem value="no_preference">No Preference</SelectItem>
-                    </SelectContent>
-                  </Select>
+
+                <div className="space-y-2">
+                  <Label htmlFor="country">Country</Label>
+                  <Input
+                    id="country"
+                    value={guestData.address.country}
+                    onChange={(e) => handleNestedInputChange("address", "country", e.target.value)}
+                    placeholder="Enter country"
+                  />
                 </div>
-                <div>
-                  <Label htmlFor="bedType">Bed Type Preference</Label>
+
+                <div className="space-y-2">
+                  <Label htmlFor="zip">ZIP/Postal Code</Label>
+                  <Input
+                    id="zip"
+                    value={guestData.address.zip}
+                    onChange={(e) => handleNestedInputChange("address", "zip", e.target.value)}
+                    placeholder="Enter ZIP or postal code"
+                  />
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="preferences" className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="bed_type">Bed Type Preference</Label>
                   <Select
                     value={guestData.preferences.bed_type}
-                    onValueChange={(value) => updateGuestData("preferences.bed_type", value)}
+                    onValueChange={(value) => handleNestedInputChange("preferences", "bed_type", value)}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select bed type" />
@@ -421,101 +286,139 @@ export function CreateGuestDialog({ open, onOpenChange, onCreateGuest }: CreateG
                       <SelectItem value="double">Double</SelectItem>
                       <SelectItem value="queen">Queen</SelectItem>
                       <SelectItem value="king">King</SelectItem>
-                      <SelectItem value="twin">Twin Beds</SelectItem>
+                      <SelectItem value="twin">Twin</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="floor_preference">Floor Preference</Label>
+                  <Input
+                    id="floor_preference"
+                    value={guestData.preferences.floor_preference}
+                    onChange={(e) => handleNestedInputChange("preferences", "floor_preference", e.target.value)}
+                    placeholder="e.g., High floor, Ground floor"
+                  />
+                </div>
+
                 <div className="flex items-center space-x-2">
-                  <Checkbox
+                  <Switch
                     id="smoking"
                     checked={guestData.preferences.smoking}
-                    onCheckedChange={(checked) => updateGuestData("preferences.smoking", checked)}
+                    onCheckedChange={(checked) => handleNestedInputChange("preferences", "smoking", checked)}
                   />
                   <Label htmlFor="smoking">Smoking Room</Label>
                 </div>
-                <div className="col-span-2">
-                  <Label htmlFor="dietaryRestrictions">Dietary Restrictions</Label>
-                  <Textarea
-                    id="dietaryRestrictions"
-                    value={guestData.preferences.dietary_restrictions}
-                    onChange={(e) => updateGuestData("preferences.dietary_restrictions", e.target.value)}
-                    placeholder="Any dietary restrictions or allergies..."
-                    rows={2}
-                  />
-                </div>
-              </CardContent>
-            </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Marketing Preferences</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
                 <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="emailMarketing"
-                    checked={guestData.marketing_preferences.email_marketing}
-                    onCheckedChange={(checked) => updateGuestData("marketing_preferences.email_marketing", checked)}
-                  />
-                  <Label htmlFor="emailMarketing">Email Marketing</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="smsMarketing"
-                    checked={guestData.marketing_preferences.sms_marketing}
-                    onCheckedChange={(checked) => updateGuestData("marketing_preferences.sms_marketing", checked)}
-                  />
-                  <Label htmlFor="smsMarketing">SMS Marketing</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="promotionalOffers"
-                    checked={guestData.marketing_preferences.promotional_offers}
-                    onCheckedChange={(checked) => updateGuestData("marketing_preferences.promotional_offers", checked)}
-                  />
-                  <Label htmlFor="promotionalOffers">Promotional Offers</Label>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="additional" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Additional Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
+                  <Switch
                     id="vip"
                     checked={guestData.vip}
-                    onCheckedChange={(checked) => updateGuestData("vip", checked)}
+                    onCheckedChange={(checked) => handleInputChange("vip", checked)}
                   />
                   <Label htmlFor="vip">VIP Guest</Label>
                 </div>
-                <div>
-                  <Label htmlFor="notes">Notes</Label>
-                  <Textarea
-                    id="notes"
-                    value={guestData.notes}
-                    onChange={(e) => updateGuestData("notes", e.target.value)}
-                    placeholder="Any additional notes about the guest..."
-                    rows={4}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="special_requests">Special Requests</Label>
+                <Textarea
+                  id="special_requests"
+                  value={guestData.preferences.special_requests}
+                  onChange={(e) => handleNestedInputChange("preferences", "special_requests", e.target.value)}
+                  placeholder="Any special requests or preferences"
+                />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="additional" className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="emergency_name">Emergency Contact Name</Label>
+                  <Input
+                    id="emergency_name"
+                    value={guestData.emergency_contact.name}
+                    onChange={(e) => handleNestedInputChange("emergency_contact", "name", e.target.value)}
+                    placeholder="Emergency contact name"
                   />
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
 
-        <div className="flex gap-3 pt-4">
-          <Button onClick={handleSubmit} className="flex-1">
-            Create Guest
-          </Button>
-          <Button onClick={() => onOpenChange(false)} variant="outline">
-            Cancel
-          </Button>
-        </div>
+                <div className="space-y-2">
+                  <Label htmlFor="emergency_phone">Emergency Contact Phone</Label>
+                  <Input
+                    id="emergency_phone"
+                    value={guestData.emergency_contact.phone}
+                    onChange={(e) => handleNestedInputChange("emergency_contact", "phone", e.target.value)}
+                    placeholder="Emergency contact phone"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="emergency_relationship">Relationship</Label>
+                  <Input
+                    id="emergency_relationship"
+                    value={guestData.emergency_contact.relationship}
+                    onChange={(e) => handleNestedInputChange("emergency_contact", "relationship", e.target.value)}
+                    placeholder="Relationship to guest"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="company_name">Company Name</Label>
+                  <Input
+                    id="company_name"
+                    value={guestData.company.name}
+                    onChange={(e) => handleNestedInputChange("company", "name", e.target.value)}
+                    placeholder="Company name (if business traveler)"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h4 className="font-medium">Marketing Preferences</h4>
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="email_opt_in"
+                      checked={guestData.marketing_preferences.email_opt_in}
+                      onCheckedChange={(checked) =>
+                        handleNestedInputChange("marketing_preferences", "email_opt_in", checked)
+                      }
+                    />
+                    <Label htmlFor="email_opt_in">Email Marketing</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="sms_opt_in"
+                      checked={guestData.marketing_preferences.sms_opt_in}
+                      onCheckedChange={(checked) =>
+                        handleNestedInputChange("marketing_preferences", "sms_opt_in", checked)
+                      }
+                    />
+                    <Label htmlFor="sms_opt_in">SMS Marketing</Label>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="notes">Additional Notes</Label>
+                <Textarea
+                  id="notes"
+                  value={guestData.notes}
+                  onChange={(e) => handleInputChange("notes", e.target.value)}
+                  placeholder="Any additional notes about the guest"
+                />
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          <div className="flex justify-end space-x-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit">Create Guest</Button>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
   )
