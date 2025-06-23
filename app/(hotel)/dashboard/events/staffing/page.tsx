@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -38,21 +38,28 @@ export default function EventStaffingPage() {
   const [conflicts, setConflicts] = useState([])
   const [activeTab, setActiveTab] = useState("all")
 
-  // Fetch conflicts on component mount
-  useEffect(() => {
-    const loadConflicts = async () => {
-      try {
-        const conflictData = await getStaffingConflicts()
-        setConflicts(conflictData)
-      } catch (error) {
-        console.error("Failed to load conflicts:", error)
-      }
-    }
+  // Remove the useEffect for loading conflicts and replace with:
+  const [conflictsLoaded, setConflictsLoaded] = useState(false)
 
-    if (hotel?._id) {
-      loadConflicts()
+  const loadConflicts = useCallback(async () => {
+    if (!hotel?._id || conflictsLoaded) return
+
+    try {
+      const conflictData = await getStaffingConflicts()
+      setConflicts(conflictData)
+      setConflictsLoaded(true)
+    } catch (error) {
+      console.error("Failed to load conflicts:", error)
+      // Set empty conflicts array on error
+      setConflicts([])
+      setConflictsLoaded(true)
     }
-  }, [hotel?._id, getStaffingConflicts])
+  }, [hotel?._id, getStaffingConflicts, conflictsLoaded])
+
+  // Call loadConflicts when component mounts
+  useEffect(() => {
+    loadConflicts()
+  }, [loadConflicts])
 
   // Filter staffing assignments
   const filteredStaffing = staffing.filter((assignment) => {
@@ -174,12 +181,14 @@ export default function EventStaffingPage() {
           <p className="text-muted-foreground">Manage event staff assignments and schedules</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" asChild>
-            <Link href="/dashboard/events/staffing/conflicts">
-              <AlertTriangle className="mr-2 h-4 w-4" />
-              Conflicts ({conflicts.length})
-            </Link>
-          </Button>
+          {conflicts.length > 0 && (
+            <Button variant="outline" asChild>
+              <Link href="/dashboard/events/staffing/conflicts">
+                <AlertTriangle className="mr-2 h-4 w-4" />
+                Conflicts ({conflicts.length})
+              </Link>
+            </Button>
+          )}
           <Button asChild>
             <Link href="/dashboard/events/staffing/new">
               <Plus className="mr-2 h-4 w-4" />
