@@ -50,7 +50,6 @@ export default function CheckInPage() {
   const { rooms, fetchRooms, fetchAvailableRooms, isLoading: roomsLoading } = useRooms()
   const { bookings, getBookings, isLoading: bookingsLoading } = useBookings()
 
-  // State for bookings and guests data
   const [guests, setGuests] = useState<any[]>([])
 
   // Real-time updates
@@ -70,19 +69,53 @@ export default function CheckInPage() {
       // Load bookings using the hook
       await getBookings({ status: "confirmed" })
 
-      // Load guests
-      const guestsResponse = await getGuests({ limit: 100 })
-      if (guestsResponse.data) {
-        setGuests(guestsResponse.data.data || [])
+      // Load guests - fix the data extraction
+      const guestsResponse = await getGuests()
+      console.log("Guests response:", guestsResponse) // Debug log
+
+      if (guestsResponse.data && Array.isArray(guestsResponse.data)) {
+        console.log("Setting guests:", guestsResponse.data) // Debug log
+        setGuests(guestsResponse.data)
+      } else {
+        console.log("No guests data found in response")
+        setGuests([])
       }
 
       // Load rooms
       await fetchRooms()
       await getCurrentOccupancy()
     } catch (error) {
+      console.error("Error loading initial data:", error)
       toast.error("Failed to load initial data")
     }
   }
+  // const loadGuests = async () => {
+  //   try {
+  //     const response = await getGuests({
+  //       ...filters,
+  //       search: searchQuery,
+  //     })
+  //     console.log("API Response:", response)
+
+  //     if (response.data && Array.isArray(response.data)) {
+  //       console.log("Setting guests:", response.data)
+  //       setGuests(response.data)
+  //       // Since the hook doesn't return pagination info, set basic pagination
+  //       setPagination({
+  //         page: filters.page || 1,
+  //         limit: filters.limit || 10,
+  //         totalPages: Math.ceil(response.data.length / (filters.limit || 10)),
+  //         total: response.data.length,
+  //       })
+  //     } else {
+  //       console.error("Unexpected API response structure:", response)
+  //       setGuests([])
+  //     }
+  //   } catch (error) {
+  //     console.error("Failed to load guests:", error)
+  //     setGuests([]) // Ensure guests is an array even on error
+  //   }
+  // }
 
   const handleBookingSelect = (booking: any) => {
     setSelectedBooking(booking)
@@ -113,6 +146,7 @@ export default function CheckInPage() {
     try {
       const rooms = await fetchAvailableRooms(params.check_in, params.check_out, {
         room_type: params.room_type,
+        guests: params.guests,
       })
       return rooms
     } catch (error) {

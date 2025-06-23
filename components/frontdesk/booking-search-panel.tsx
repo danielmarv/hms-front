@@ -33,6 +33,10 @@ export function BookingSearchPanel({
     vip: "",
   })
 
+  // Debug log to see if guests are being passed
+  console.log("BookingSearchPanel - guests:", guests)
+  console.log("BookingSearchPanel - bookings:", bookings)
+
   const filteredBookings = bookings.filter((booking) => {
     const matchesSearch =
       booking.guest?.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -230,14 +234,14 @@ export function BookingSearchPanel({
             ) : (
               filteredGuests.map((guest) => (
                 <div
-                  key={guest.id}
+                  key={guest._id} // Use _id instead of id
                   className="p-4 border rounded-lg cursor-pointer transition-colors hover:bg-muted/50"
                   onClick={() => onGuestSelect(guest)}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex items-center space-x-3">
                       <Avatar>
-                        <AvatarImage src={guest.avatar || "/placeholder.svg"} />
+                        <AvatarImage src="/placeholder.svg" />
                         <AvatarFallback>
                           {guest.full_name
                             ?.split(" ")
@@ -283,7 +287,9 @@ export function BookingSearchPanel({
                     <div className="mt-3 pt-3 border-t">
                       <div className="flex justify-between items-center text-xs text-muted-foreground">
                         <span>{guest.stay_history.total_stays} previous stays</span>
-                        <span>Last visit: {format(new Date(guest.stay_history.last_stay), "MMM yyyy")}</span>
+                        {guest.stay_history.last_stay && (
+                          <span>Last visit: {format(new Date(guest.stay_history.last_stay), "MMM yyyy")}</span>
+                        )}
                       </div>
                     </div>
                   )}
