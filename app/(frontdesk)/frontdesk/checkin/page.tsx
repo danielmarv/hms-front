@@ -66,18 +66,14 @@ export default function CheckInPage() {
 
   const loadInitialData = async () => {
     try {
-      // Load bookings using the hook
+
       await getBookings({ status: "confirmed" })
 
-      // Load guests - fix the data extraction
       const guestsResponse = await getGuests()
-      console.log("Guests response:", guestsResponse) // Debug log
 
       if (guestsResponse.data && Array.isArray(guestsResponse.data)) {
-        console.log("Setting guests:", guestsResponse.data) // Debug log
         setGuests(guestsResponse.data)
       } else {
-        console.log("No guests data found in response")
         setGuests([])
       }
 
@@ -85,7 +81,7 @@ export default function CheckInPage() {
       await fetchRooms()
       await getCurrentOccupancy()
     } catch (error) {
-      console.error("Error loading initial data:", error)
+
       toast.error("Failed to load initial data")
     }
   }
