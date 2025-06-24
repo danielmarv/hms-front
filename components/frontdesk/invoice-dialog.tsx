@@ -10,6 +10,7 @@ import { format } from "date-fns"
 import { useCurrentHotel } from "@/hooks/use-current-hotel"
 import { useHotelConfiguration } from "@/hooks/use-hotel-configuration"
 import { useState, useEffect } from "react"
+import { useAuth } from "@/hooks/use-auth"
 
 interface InvoiceDialogProps {
   open: boolean
@@ -18,10 +19,12 @@ interface InvoiceDialogProps {
 }
 
 export function InvoiceDialog({ open, onOpenChange, invoiceData }: InvoiceDialogProps) {
-  const { hotel, hotelId } = useCurrentHotel()
+  const { hotel } = useCurrentHotel()
   const { getHotelConfiguration, generateDocumentNumber } = useHotelConfiguration()
   const [hotelConfig, setHotelConfig] = useState<any>(null)
   const [isLoadingConfig, setIsLoadingConfig] = useState(false)
+  const { user }: { user: any } = useAuth()
+    const hotelId = user?.primaryHotel?.id
 
   // Load hotel configuration when dialog opens
   useEffect(() => {

@@ -19,7 +19,6 @@ import { useRealtimeUpdates } from "@/hooks/use-realtime-updates"
 import { useBookings } from "@/hooks/use-bookings"
 import { useHotelConfiguration } from "@/hooks/use-hotel-configuration"
 import { useAuth } from "@/hooks/use-auth"
-import { useCurrentHotel } from "@/hooks/use-current-hotel"
 
 export default function CheckInPage() {
   const [activeTab, setActiveTab] = useState("search")
