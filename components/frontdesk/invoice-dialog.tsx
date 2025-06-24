@@ -4,7 +4,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Printer, Download, Mail } from "lucide-react"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Printer, Download, Mail, MapPin, Phone, Globe, FileText } from "lucide-react"
 import { format } from "date-fns"
 
 interface InvoiceDialogProps {
@@ -17,214 +18,368 @@ export function InvoiceDialog({ open, onOpenChange, invoiceData }: InvoiceDialog
   if (!invoiceData) return null
 
   const handlePrint = () => {
-    window.print()
+    const printContent = document.getElementById("invoice-content")
+    if (printContent) {
+      const printWindow = window.open("", "_blank")
+      if (printWindow) {
+        printWindow.document.write(`
+          <html>
+            <head>
+              <title>Guest Invoice</title>
+              <style>
+                body { 
+                  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+                  margin: 0; 
+                  padding: 20px; 
+                  font-size: 12px; 
+                  line-height: 1.4;
+                  color: #1a1a1a;
+                }
+                .header { text-align: center; margin-bottom: 30px; }
+                .hotel-name { font-size: 28px; font-weight: bold; color: #1e40af; margin-bottom: 8px; }
+                .hotel-info { color: #6b7280; font-size: 11px; }
+                .invoice-header { display: flex; justify-content: space-between; margin: 30px 0; }
+                .invoice-title { font-size: 24px; font-weight: bold; color: #1e40af; }
+                .invoice-details { text-align: right; }
+                .section { margin-bottom: 25px; }
+                .section-title { font-weight: bold; margin-bottom: 10px; color: #374151; font-size: 14px; }
+                .bill-to { background-color: #f8fafc; padding: 15px; border-radius: 8px; }
+                .table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+                .table th, .table td { 
+                  padding: 12px; 
+                  text-align: left; 
+                  border-bottom: 1px solid #e5e7eb; 
+                }
+                .table th { 
+                  background-color: #1e40af; 
+                  color: white; 
+                  font-weight: 600; 
+                  font-size: 11px;
+                  text-transform: uppercase;
+                }
+                .table .amount { text-align: right; }
+                .total-section { background-color: #f1f5f9; padding: 20px; border-radius: 8px; }
+                .total-row { font-weight: bold; font-size: 16px; color: #1e40af; }
+                .footer { text-align: center; margin-top: 40px; color: #6b7280; font-size: 10px; }
+                @media print {
+                  body { margin: 0; padding: 15px; font-size: 11px; }
+                  .no-print { display: none; }
+                }
+              </style>
+            </head>
+            <body>
+              ${printContent.innerHTML}
+            </body>
+          </html>
+        `)
+        printWindow.document.close()
+        printWindow.print()
+      }
+    }
   }
 
   const handleDownload = () => {
-    // In a real app, this would generate and download a PDF
     console.log("Download invoice as PDF")
   }
 
   const handleEmail = () => {
-    // In a real app, this would send the invoice via email
     console.log("Email invoice to guest")
   }
 
-  // Calculate totals
-  const subtotal = (invoiceData.room?.roomType?.basePrice || 0) * (invoiceData.number_of_nights || 1)
-  const taxRate = 0.1 // 10% tax
-  const taxAmount = subtotal * taxRate
-  const total = subtotal + taxAmount
+  // Calculate invoice totals
+  const calculateTotals = () => {
+    const roomRate = invoiceData.room?.roomType?.basePrice || 0
+    const nights = invoiceData.number_of_nights || 1
+    const subtotal = roomRate * nights
+
+    const additionalCharges =
+      invoiceData.additional_charges?.reduce((sum: number, charge: any) => sum + charge.amount, 0) || 0
+    const discounts = invoiceData.discounts?.reduce((sum: number, discount: any) => sum + discount.amount, 0) || 0
+
+    const beforeTax = subtotal + additionalCharges - discounts
+    const taxRate = 0.1 // 10%
+    const taxAmount = beforeTax * taxRate
+    const total = beforeTax + taxAmount
+    const deposit = invoiceData.deposit_amount || 0
+    const balanceDue = total - deposit
+
+    return {
+      subtotal,
+      additionalCharges,
+      discounts,
+      beforeTax,
+      taxRate,
+      taxAmount,
+      total,
+      deposit,
+      balanceDue,
+    }
+  }
+
+  const totals = calculateTotals()
+  const invoiceNumber = `INV-${format(new Date(), "yyyyMMdd")}-${Date.now().toString().slice(-6)}`
 
   const invoiceItems = [
     {
-      description: `Room ${invoiceData.room?.roomNumber} - ${invoiceData.room?.roomType?.name}`,
+      description: `${invoiceData.room?.roomType?.name} - Room ${invoiceData.room?.roomNumber}`,
+      period: `${format(new Date(), "MMM dd")} - ${invoiceData.expected_check_out ? format(new Date(invoiceData.expected_check_out), "MMM dd, yyyy") : "TBD"}`,
       quantity: invoiceData.number_of_nights || 1,
       rate: invoiceData.room?.roomType?.basePrice || 0,
-      amount: subtotal,
+      amount: totals.subtotal,
     },
   ]
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Guest Invoice</DialogTitle>
+      <DialogContent className="max-w-5xl max-h-[95vh] p-0">
+        <DialogHeader className="px-6 py-4 border-b bg-gradient-to-r from-blue-600 to-blue-700 text-white">
+          <DialogTitle className="text-xl font-semibold flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            Guest Invoice
+          </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6 print:text-black">
-          {/* Hotel Header */}
-          <div className="text-center border-b pb-4">
-            <h1 className="text-3xl font-bold">Grand Hotel</h1>
-            <p className="text-muted-foreground">123 Main Street, City, State 12345</p>
-            <p className="text-muted-foreground">Phone: +1-555-0100 | Email: info@grandhotel.com</p>
-            <p className="text-muted-foreground">Tax ID: 123-456-789</p>
-          </div>
-
-          {/* Invoice Header */}
-          <div className="grid grid-cols-2 gap-8">
-            <div>
-              <h2 className="text-xl font-bold mb-4">INVOICE</h2>
-              <div className="space-y-1">
-                <p>
-                  <strong>Invoice #:</strong> INV-{Date.now()}
-                </p>
-                <p>
-                  <strong>Date:</strong> {format(new Date(), "MMM dd, yyyy")}
-                </p>
-                <p>
-                  <strong>Due Date:</strong> {format(new Date(), "MMM dd, yyyy")}
-                </p>
-                <p>
-                  <strong>Folio #:</strong> {invoiceData.folio_number || "F-" + Date.now()}
-                </p>
-              </div>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-2">Bill To:</h3>
-              <div className="space-y-1">
-                <p className="font-medium">{invoiceData.guest?.full_name}</p>
-                <p>{invoiceData.guest?.email}</p>
-                <p>{invoiceData.guest?.phone}</p>
-                {invoiceData.guest?.address && (
-                  <>
-                    <p>{invoiceData.guest.address.street}</p>
-                    <p>
-                      {invoiceData.guest.address.city}, {invoiceData.guest.address.state}{" "}
-                      {invoiceData.guest.address.zip}
-                    </p>
-                    <p>{invoiceData.guest.address.country}</p>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Stay Details */}
-          <div className="bg-muted/50 p-4 rounded-lg">
-            <h3 className="font-semibold mb-2">Stay Details</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-              <div>
-                <p className="text-muted-foreground">Room</p>
-                <p className="font-medium">{invoiceData.room?.roomNumber}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Check-in</p>
-                <p className="font-medium">{format(new Date(), "MMM dd, yyyy")}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Check-out</p>
-                <p className="font-medium">
-                  {invoiceData.expected_check_out
-                    ? format(new Date(invoiceData.expected_check_out), "MMM dd, yyyy")
-                    : "TBD"}
-                </p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Guests</p>
-                <p className="font-medium">{invoiceData.number_of_guests || 1}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Invoice Items */}
-          <div>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Description</TableHead>
-                  <TableHead className="text-center">Quantity</TableHead>
-                  <TableHead className="text-right">Rate</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {invoiceItems.map((item, index) => (
-                  <TableRow key={index}>
-                    <TableCell>{item.description}</TableCell>
-                    <TableCell className="text-center">{item.quantity}</TableCell>
-                    <TableCell className="text-right">${item.rate.toFixed(2)}</TableCell>
-                    <TableCell className="text-right">${item.amount.toFixed(2)}</TableCell>
-                  </TableRow>
-                ))}
-                {invoiceData.additional_charges?.map((charge: any, index: number) => (
-                  <TableRow key={`charge-${index}`}>
-                    <TableCell>{charge.description}</TableCell>
-                    <TableCell className="text-center">1</TableCell>
-                    <TableCell className="text-right">${charge.amount.toFixed(2)}</TableCell>
-                    <TableCell className="text-right">${charge.amount.toFixed(2)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-
-          {/* Totals */}
-          <div className="flex justify-end">
-            <div className="w-80 space-y-2">
-              <div className="flex justify-between">
-                <span>Subtotal:</span>
-                <span>${subtotal.toFixed(2)}</span>
-              </div>
-              {invoiceData.discounts?.map((discount: any, index: number) => (
-                <div key={index} className="flex justify-between text-green-600">
-                  <span>Discount ({discount.description}):</span>
-                  <span>-${discount.amount.toFixed(2)}</span>
+        <ScrollArea className="max-h-[calc(95vh-140px)]">
+          <div id="invoice-content" className="p-8 space-y-8">
+            {/* Hotel Header */}
+            <div className="text-center border-b-2 border-blue-600 pb-6">
+              <h1 className="text-4xl font-bold text-blue-700 mb-3">Grand Hotel</h1>
+              <div className="space-y-2 text-sm text-slate-600">
+                <div className="flex items-center justify-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  <span>123 Main Street, City, State 12345, Country</span>
                 </div>
-              ))}
-              <div className="flex justify-between">
-                <span>Tax ({(taxRate * 100).toFixed(0)}%):</span>
-                <span>${taxAmount.toFixed(2)}</span>
-              </div>
-              <Separator />
-              <div className="flex justify-between text-lg font-bold">
-                <span>Total:</span>
-                <span>${total.toFixed(2)}</span>
-              </div>
-              {invoiceData.deposit_amount > 0 && (
-                <>
-                  <div className="flex justify-between text-green-600">
-                    <span>Paid (Deposit):</span>
-                    <span>-${invoiceData.deposit_amount.toFixed(2)}</span>
+                <div className="flex items-center justify-center gap-6">
+                  <div className="flex items-center gap-1">
+                    <Phone className="h-4 w-4" />
+                    <span>+1-555-0100</span>
                   </div>
-                  <div className="flex justify-between text-lg font-bold text-red-600">
-                    <span>Balance Due:</span>
-                    <span>${(total - invoiceData.deposit_amount).toFixed(2)}</span>
+                  <div className="flex items-center gap-1">
+                    <Globe className="h-4 w-4" />
+                    <span>www.grandhotel.com</span>
                   </div>
-                </>
-              )}
+                  <span>Tax ID: 123-456-789</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Invoice Header */}
+            <div className="grid grid-cols-2 gap-8">
+              <div>
+                <h2 className="text-3xl font-bold text-blue-700 mb-4">INVOICE</h2>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-slate-600">Invoice Number:</span>
+                    <span className="font-mono font-semibold">{invoiceNumber}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-600">Issue Date:</span>
+                    <span className="font-semibold">{format(new Date(), "MMM dd, yyyy")}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-600">Due Date:</span>
+                    <span className="font-semibold">{format(new Date(), "MMM dd, yyyy")}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-600">Folio Number:</span>
+                    <span className="font-mono font-semibold">
+                      {invoiceData.folio_number || `F-${Date.now().toString().slice(-6)}`}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-slate-50 p-6 rounded-lg">
+                <h3 className="font-semibold text-slate-800 mb-3">Bill To:</h3>
+                <div className="space-y-1">
+                  <p className="font-semibold text-lg">{invoiceData.guest?.full_name}</p>
+                  <p className="text-slate-600">{invoiceData.guest?.email}</p>
+                  <p className="text-slate-600">{invoiceData.guest?.phone}</p>
+                  {invoiceData.guest?.address && (
+                    <>
+                      <p className="text-slate-600">{invoiceData.guest.address.street}</p>
+                      <p className="text-slate-600">
+                        {invoiceData.guest.address.city}, {invoiceData.guest.address.state}{" "}
+                        {invoiceData.guest.address.zip}
+                      </p>
+                      <p className="text-slate-600">{invoiceData.guest.address.country}</p>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Stay Summary */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+              <h3 className="font-semibold text-blue-800 mb-4">Stay Summary</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                <div className="text-center">
+                  <p className="text-blue-600 text-sm font-medium">Room</p>
+                  <p className="text-2xl font-bold text-blue-800">{invoiceData.room?.roomNumber}</p>
+                  <p className="text-xs text-blue-600">{invoiceData.room?.roomType?.name}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-blue-600 text-sm font-medium">Check-in</p>
+                  <p className="text-lg font-semibold text-blue-800">{format(new Date(), "MMM dd")}</p>
+                  <p className="text-xs text-blue-600">{format(new Date(), "yyyy")}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-blue-600 text-sm font-medium">Check-out</p>
+                  <p className="text-lg font-semibold text-blue-800">
+                    {invoiceData.expected_check_out
+                      ? format(new Date(invoiceData.expected_check_out), "MMM dd")
+                      : "TBD"}
+                  </p>
+                  <p className="text-xs text-blue-600">
+                    {invoiceData.expected_check_out ? format(new Date(invoiceData.expected_check_out), "yyyy") : ""}
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className="text-blue-600 text-sm font-medium">Guests</p>
+                  <p className="text-2xl font-bold text-blue-800">{invoiceData.number_of_guests || 1}</p>
+                  <p className="text-xs text-blue-600">person(s)</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Invoice Items */}
+            <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-blue-600 hover:bg-blue-600">
+                    <TableHead className="text-white font-semibold">Description</TableHead>
+                    <TableHead className="text-white font-semibold text-center">Period</TableHead>
+                    <TableHead className="text-white font-semibold text-center">Qty</TableHead>
+                    <TableHead className="text-white font-semibold text-right">Rate</TableHead>
+                    <TableHead className="text-white font-semibold text-right">Amount</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {invoiceItems.map((item, index) => (
+                    <TableRow key={index} className="hover:bg-slate-50">
+                      <TableCell className="font-medium">
+                        <div>
+                          <p>{item.description}</p>
+                          <p className="text-xs text-slate-500">{item.period}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center text-sm">{item.period}</TableCell>
+                      <TableCell className="text-center font-medium">{item.quantity}</TableCell>
+                      <TableCell className="text-right font-medium">${item.rate.toFixed(2)}</TableCell>
+                      <TableCell className="text-right font-semibold">${item.amount.toFixed(2)}</TableCell>
+                    </TableRow>
+                  ))}
+
+                  {invoiceData.additional_charges?.map((charge: any, index: number) => (
+                    <TableRow key={`charge-${index}`} className="hover:bg-slate-50">
+                      <TableCell className="font-medium">{charge.description}</TableCell>
+                      <TableCell className="text-center text-sm">-</TableCell>
+                      <TableCell className="text-center">1</TableCell>
+                      <TableCell className="text-right font-medium">${charge.amount.toFixed(2)}</TableCell>
+                      <TableCell className="text-right font-semibold">${charge.amount.toFixed(2)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Totals Section */}
+            <div className="flex justify-end">
+              <div className="w-96 bg-slate-50 border border-slate-200 rounded-lg p-6">
+                <div className="space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">Subtotal:</span>
+                    <span className="font-medium">${totals.subtotal.toFixed(2)}</span>
+                  </div>
+
+                  {totals.additionalCharges > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-600">Additional Charges:</span>
+                      <span className="font-medium">${totals.additionalCharges.toFixed(2)}</span>
+                    </div>
+                  )}
+
+                  {totals.discounts > 0 && (
+                    <div className="flex justify-between text-sm text-green-600">
+                      <span>Discounts:</span>
+                      <span className="font-medium">-${totals.discounts.toFixed(2)}</span>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">Tax ({(totals.taxRate * 100).toFixed(0)}%):</span>
+                    <span className="font-medium">${totals.taxAmount.toFixed(2)}</span>
+                  </div>
+
+                  <Separator />
+
+                  <div className="flex justify-between text-lg font-bold text-blue-700">
+                    <span>Total Amount:</span>
+                    <span>${totals.total.toFixed(2)}</span>
+                  </div>
+
+                  {totals.deposit > 0 && (
+                    <>
+                      <div className="flex justify-between text-sm text-green-600">
+                        <span>Paid (Deposit):</span>
+                        <span className="font-medium">-${totals.deposit.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-lg font-bold text-red-600">
+                        <span>Balance Due:</span>
+                        <span>${totals.balanceDue.toFixed(2)}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Payment Terms */}
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-6">
+              <h3 className="font-semibold text-amber-800 mb-3">Payment Terms & Conditions</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-amber-700">
+                <div>
+                  <p className="font-medium mb-2">Payment Information:</p>
+                  <ul className="space-y-1">
+                    <li>• Payment due upon check-out</li>
+                    <li>• We accept cash, credit cards, and bank transfers</li>
+                    <li>• Late payment fees may apply</li>
+                  </ul>
+                </div>
+                <div>
+                  <p className="font-medium mb-2">Hotel Policies:</p>
+                  <ul className="space-y-1">
+                    <li>• Check-out time: 12:00 PM</li>
+                    <li>• Late check-out fees: $50/hour after 12:00 PM</li>
+                    <li>• Damage charges will be added if applicable</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="text-center border-t-2 border-blue-600 pt-6">
+              <p className="text-xl font-semibold text-blue-700 mb-2">Thank you for choosing Grand Hotel!</p>
+              <p className="text-slate-600 mb-1">We appreciate your business and hope you enjoy your stay.</p>
+              <p className="text-sm text-slate-500">
+                For questions about this invoice, please contact our accounting department at +1-555-0100 ext. 123
+              </p>
             </div>
           </div>
-
-          {/* Payment Terms */}
-          <div className="bg-muted/50 p-4 rounded-lg">
-            <h3 className="font-semibold mb-2">Payment Terms</h3>
-            <p className="text-sm text-muted-foreground">
-              Payment is due upon check-out. We accept cash, credit cards, and bank transfers. Late checkout fees may
-              apply for departures after 12:00 PM.
-            </p>
-          </div>
-
-          {/* Footer */}
-          <div className="text-center text-sm text-muted-foreground border-t pt-4">
-            <p>Thank you for choosing Grand Hotel!</p>
-            <p>For questions about this invoice, please contact our front desk.</p>
-          </div>
-        </div>
+        </ScrollArea>
 
         {/* Action Buttons */}
-        <div className="flex justify-end space-x-2 print:hidden">
-          <Button variant="outline" onClick={handleEmail}>
+        <div className="flex justify-end space-x-3 p-6 border-t bg-slate-50">
+          <Button variant="outline" onClick={handleEmail} className="text-slate-600 hover:text-slate-800">
             <Mail className="mr-2 h-4 w-4" />
-            Email
+            Email Invoice
           </Button>
-          <Button variant="outline" onClick={handleDownload}>
+          <Button variant="outline" onClick={handleDownload} className="text-slate-600 hover:text-slate-800">
             <Download className="mr-2 h-4 w-4" />
             Download PDF
           </Button>
-          <Button onClick={handlePrint}>
+          <Button onClick={handlePrint} className="bg-blue-600 hover:bg-blue-700">
             <Printer className="mr-2 h-4 w-4" />
-            Print
+            Print Invoice
           </Button>
         </div>
       </DialogContent>

@@ -59,6 +59,7 @@ export function RoomSelectionPanel({
       setAvailableRooms([])
     }
   }
+  console.log("Available Rooms:", availableRooms)
 
   const filteredRooms = availableRooms.filter((room) => {
     const matchesFloor = filters.floor === "all" || room.floor.toString() === filters.floor
@@ -68,6 +69,7 @@ export function RoomSelectionPanel({
 
     return matchesFloor && matchesPrice && matchesView
   })
+  console.log("Filtered Rooms:", filteredRooms)
 
   const checkPriceRange = (price: number, range: string) => {
     switch (range) {
@@ -253,7 +255,7 @@ export function RoomSelectionPanel({
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1">
                       <DollarSign className="h-4 w-4" />
-                      <span className="font-semibold">${room.roomType?.basePrice}/night</span>
+                      <span className="font-semibold">{room.roomType.basePrice}/night</span>
                     </div>
                     {room.view && (
                       <Badge variant="outline" className="text-xs">
