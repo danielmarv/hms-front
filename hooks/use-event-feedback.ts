@@ -6,7 +6,7 @@ import { useApi } from "./use-api"
 // Types
 export interface EventFeedback {
   _id: string
-  booking: string
+  event: string // Changed from booking to event to match backend
   customer: {
     _id: string
     firstName: string
@@ -19,6 +19,11 @@ export interface EventFeedback {
     _id: string
     name: string
     category: string
+  }
+  venue?: {
+    _id: string
+    name: string
+    type: string
   }
   rating: number
   comments?: string
@@ -207,7 +212,7 @@ export const useEventFeedback = () => {
       setLoading(true)
       setError(null)
       try {
-        const response = await request("/event-feedback", "GET")
+        const response = await request("/event-feedback", "GET", undefined, filters)
         setFeedback(response.data.feedback || [])
         return response.data
       } catch (err: any) {
@@ -432,7 +437,7 @@ export const useEventFeedback = () => {
       setLoading(true)
       setError(null)
       try {
-        const response = await request("/event-feedback/bulk-export",  "POST", { filters, format })
+        const response = await request("/event-feedback/bulk-export", "POST", { filters, format })
         return response.data as BulkExportData
       } catch (err: any) {
         setError(err.message || "Failed to export feedback")
@@ -450,7 +455,7 @@ export const useEventFeedback = () => {
       setLoading(true)
       setError(null)
       try {
-        const response = await request("/event-feedback/statistics", "GET", { hotel, period })
+        const response = await request("/event-feedback/statistics", "GET", undefined, { hotel, period })
         setStatistics(response.data)
         return response.data as FeedbackStatisticsResponse
       } catch (err: any) {

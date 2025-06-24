@@ -405,8 +405,8 @@ export default function FeedbackDetailPage({ params }: FeedbackDetailPageProps) 
               </div>
 
               <div>
-                <div className="text-sm font-medium text-muted-foreground">Booking ID</div>
-                <div className="text-sm font-mono">{currentFeedback.booking}</div>
+                <div className="text-sm font-medium text-muted-foreground">Event ID</div>
+                <div className="text-sm font-mono">{currentFeedback.event}</div>
               </div>
             </CardContent>
           </Card>
