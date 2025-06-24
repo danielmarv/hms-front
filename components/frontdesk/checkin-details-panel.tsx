@@ -53,7 +53,7 @@ export function CheckInDetailsPanel({
     const roomRate = selectedRoom.roomType?.basePrice || 0
     const nights = checkInData.numberOfNights || selectedBooking?.duration || 1
     const roomCharges = roomRate * nights
-    const taxRate = 10 // This should come from configuration
+    const taxRate = 0 // This should come from configuration
     const taxAmount = (roomCharges * taxRate) / 100
     const totalCharges = roomCharges + taxAmount
 
@@ -449,7 +449,7 @@ export function CheckInDetailsPanel({
                 <span>${totals.roomCharges.toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
-                <span>Tax (10%):</span>
+                <span>Tax:</span>
                 <span>${totals.taxAmount.toFixed(2)}</span>
               </div>
               <Separator />

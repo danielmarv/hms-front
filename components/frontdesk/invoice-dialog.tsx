@@ -211,7 +211,7 @@ export function InvoiceDialog({ open, onOpenChange, invoiceData, configuration }
     const discounts = invoiceData.discounts?.reduce((sum: number, discount: any) => sum + discount.amount, 0) || 0
 
     const beforeTax = subtotal + additionalCharges - discounts
-    const defaultTaxRate = configuration?.financial?.taxRates?.[0]?.rate || 10
+    const defaultTaxRate = configuration?.financial?.taxRates?.[0]?.rate || 0
     const taxRate = defaultTaxRate / 100
     const taxAmount = beforeTax * taxRate
     const totalCharges = beforeTax + taxAmount

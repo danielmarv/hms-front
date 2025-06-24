@@ -249,7 +249,7 @@ export function ReceiptDialog({ open, onOpenChange, receiptData, configuration }
     const nights = receiptData.number_of_nights || 1
     const subtotal = roomRate * nights
 
-    const taxRate = configuration?.financial?.taxRates?.[0]?.rate || 10
+    const taxRate = configuration?.financial?.taxRates?.[0]?.rate || 0
     const taxAmount = subtotal * (taxRate / 100)
     const totalCharges = subtotal + taxAmount
 
