@@ -23,6 +23,7 @@ export function Sidebar({ className, defaultHotel, ...props }: SidebarProps) {
   const pathname = usePathname()
   const { user, logout } = useAuth()
   const [open, setOpen] = useState(false)
+  console.log("Sidebar rendered with defaultHotel:", user)
 
   const routes = [
     {

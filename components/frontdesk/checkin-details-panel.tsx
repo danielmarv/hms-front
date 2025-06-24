@@ -50,9 +50,14 @@ export function CheckInDetailsPanel({
   }
 
   const calculateTotal = () => {
-    const baseAmount = selectedBooking?.total_amount || selectedRoom.roomType?.basePrice || 0
+    const roomRate = selectedRoom.roomType?.basePrice || 0
+    const nights = checkInData.numberOfNights || selectedBooking?.duration || 1
+    const roomCharges = roomRate * nights
     const deposit = checkInData.depositAmount || 0
-    return baseAmount + deposit
+    const taxRate = 10 // This should come from configuration
+    const taxAmount = (roomCharges * taxRate) / 100
+
+    return roomCharges + taxAmount + deposit
   }
 
   return (
@@ -188,6 +193,116 @@ export function CheckInDetailsPanel({
               />
             </div>
           </div>
+
+          {/* Number of Nights */}
+          <div className="space-y-2">
+            <Label htmlFor="numberOfNights">Number of Nights</Label>
+            <Input
+              id="numberOfNights"
+              type="number"
+              min="1"
+              value={checkInData.numberOfNights || selectedBooking?.duration || 1}
+              onChange={(e) =>
+                onCheckInDataChange({
+                  ...checkInData,
+                  numberOfNights: Number.parseInt(e.target.value) || 1,
+                })
+              }
+            />
+          </div>
+
+          {/* Parking Space */}
+          <div className="space-y-2">
+            <Label htmlFor="parkingSpace">Parking Space (Optional)</Label>
+            <Input
+              id="parkingSpace"
+              placeholder="e.g., P-101"
+              value={checkInData.parkingSpace || ""}
+              onChange={(e) =>
+                onCheckInDataChange({
+                  ...checkInData,
+                  parkingSpace: e.target.value,
+                })
+              }
+            />
+          </div>
+
+          {/* Vehicle Details */}
+          {checkInData.parkingSpace && (
+            <div className="space-y-4">
+              <h4 className="font-medium">Vehicle Details</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="licensePlate">License Plate</Label>
+                  <Input
+                    id="licensePlate"
+                    placeholder="License plate number"
+                    value={checkInData.vehicleDetails?.license_plate || ""}
+                    onChange={(e) =>
+                      onCheckInDataChange({
+                        ...checkInData,
+                        vehicleDetails: {
+                          ...checkInData.vehicleDetails,
+                          license_plate: e.target.value,
+                        },
+                      })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="vehicleMake">Make</Label>
+                  <Input
+                    id="vehicleMake"
+                    placeholder="Vehicle make"
+                    value={checkInData.vehicleDetails?.make || ""}
+                    onChange={(e) =>
+                      onCheckInDataChange({
+                        ...checkInData,
+                        vehicleDetails: {
+                          ...checkInData.vehicleDetails,
+                          make: e.target.value,
+                        },
+                      })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="vehicleModel">Model</Label>
+                  <Input
+                    id="vehicleModel"
+                    placeholder="Vehicle model"
+                    value={checkInData.vehicleDetails?.model || ""}
+                    onChange={(e) =>
+                      onCheckInDataChange({
+                        ...checkInData,
+                        vehicleDetails: {
+                          ...checkInData.vehicleDetails,
+                          model: e.target.value,
+                        },
+                      })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="vehicleColor">Color</Label>
+                  <Input
+                    id="vehicleColor"
+                    placeholder="Vehicle color"
+                    value={checkInData.vehicleDetails?.color || ""}
+                    onChange={(e) =>
+                      onCheckInDataChange({
+                        ...checkInData,
+                        vehicleDetails: {
+                          ...checkInData.vehicleDetails,
+                          color: e.target.value,
+                        },
+                      })
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Emergency Contact */}
           <div className="space-y-4">
