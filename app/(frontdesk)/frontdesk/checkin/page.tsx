@@ -30,6 +30,7 @@ export default function CheckInPage() {
     specialRequests: "",
     arrivalNotes: "",
     depositAmount: 0,
+    depositPaymentMethod: "",
     numberOfGuests: 1,
     numberOfNights: 1,
     parkingSpace: "",
@@ -89,6 +90,8 @@ export default function CheckInPage() {
     try {
       // Load bookings
       await getBookings({ status: "confirmed" })
+
+      // Load hotel configuration
       const response = await getHotelConfiguration(hotelId)
       if (response && response.data) {
         setHotelConfig(response.data)
@@ -183,6 +186,7 @@ export default function CheckInPage() {
         website: configuration?.website,
         tax_id: configuration?.tax_id,
       },
+      configuration, // Pass the full configuration
       checkInDate: new Date().toISOString(),
       staff: {
         name: user?.full_name || user?.name || "Front Desk Agent",
@@ -229,6 +233,7 @@ export default function CheckInPage() {
         special_requests: checkInData.specialRequests,
         notes: checkInData.arrivalNotes,
         deposit_amount: checkInData.depositAmount || 0,
+        deposit_payment_method: checkInData.depositPaymentMethod,
         key_cards_issued: checkInData.keyCards || 2,
         parking_space: checkInData.parkingSpace,
         vehicle_details: checkInData.vehicleDetails,
@@ -240,8 +245,8 @@ export default function CheckInPage() {
 
       const checkInResult = await checkInGuest(checkInApiData)
 
-      // Show receipt with actual data
-      setReceiptData(checkInResult)
+      // Show receipt with actual data and configuration
+      setReceiptData({ ...checkInResult, configuration })
       setShowReceiptDialog(true)
 
       // Reset form
@@ -264,6 +269,7 @@ export default function CheckInPage() {
       specialRequests: "",
       arrivalNotes: "",
       depositAmount: 0,
+      depositPaymentMethod: "",
       numberOfGuests: 1,
       numberOfNights: 1,
       parkingSpace: "",
@@ -283,12 +289,12 @@ export default function CheckInPage() {
   }
 
   const handlePrintReceipt = (checkInData: any) => {
-    setReceiptData(checkInData)
+    setReceiptData({ ...checkInData, configuration })
     setShowReceiptDialog(true)
   }
 
   const handlePrintInvoice = (checkInData: any) => {
-    setInvoiceData(checkInData)
+    setInvoiceData({ ...checkInData, configuration })
     setShowInvoiceDialog(true)
   }
 
@@ -410,9 +416,19 @@ export default function CheckInPage() {
         onCreateGuest={handleCreateGuest}
       />
 
-      <ReceiptDialog open={showReceiptDialog} onOpenChange={setShowReceiptDialog} receiptData={receiptData} />
+      <ReceiptDialog
+        open={showReceiptDialog}
+        onOpenChange={setShowReceiptDialog}
+        receiptData={receiptData}
+        configuration={configuration}
+      />
 
-      <InvoiceDialog open={showInvoiceDialog} onOpenChange={setShowInvoiceDialog} invoiceData={invoiceData} />
+      <InvoiceDialog
+        open={showInvoiceDialog}
+        onOpenChange={setShowInvoiceDialog}
+        invoiceData={invoiceData}
+        configuration={configuration}
+      />
     </div>
   )
 }

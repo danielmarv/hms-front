@@ -53,12 +53,24 @@ export function CheckInDetailsPanel({
     const roomRate = selectedRoom.roomType?.basePrice || 0
     const nights = checkInData.numberOfNights || selectedBooking?.duration || 1
     const roomCharges = roomRate * nights
-    const deposit = checkInData.depositAmount || 0
     const taxRate = 10 // This should come from configuration
     const taxAmount = (roomCharges * taxRate) / 100
+    const totalCharges = roomCharges + taxAmount
 
-    return roomCharges + taxAmount + deposit
+    // Deposit is a payment made by guest towards the bill
+    const depositPaid = checkInData.depositAmount || 0
+    const balanceDue = totalCharges - depositPaid
+
+    return {
+      roomCharges,
+      taxAmount,
+      totalCharges,
+      depositPaid,
+      balanceDue: Math.max(0, balanceDue), // Balance can't be negative
+    }
   }
+
+  const totals = calculateTotal()
 
   return (
     <div className="space-y-6">
@@ -174,41 +186,85 @@ export function CheckInDetailsPanel({
               </Select>
             </div>
 
-            {/* Additional Deposit */}
+            {/* Number of Nights */}
             <div className="space-y-2">
-              <Label htmlFor="depositAmount">Additional Deposit ($)</Label>
+              <Label htmlFor="numberOfNights">Number of Nights</Label>
               <Input
-                id="depositAmount"
+                id="numberOfNights"
                 type="number"
-                min="0"
-                step="0.01"
-                placeholder="0.00"
-                value={checkInData.depositAmount || ""}
+                min="1"
+                value={checkInData.numberOfNights || selectedBooking?.duration || 1}
                 onChange={(e) =>
                   onCheckInDataChange({
                     ...checkInData,
-                    depositAmount: Number.parseFloat(e.target.value) || 0,
+                    numberOfNights: Number.parseInt(e.target.value) || 1,
                   })
                 }
               />
             </div>
           </div>
 
-          {/* Number of Nights */}
-          <div className="space-y-2">
-            <Label htmlFor="numberOfNights">Number of Nights</Label>
-            <Input
-              id="numberOfNights"
-              type="number"
-              min="1"
-              value={checkInData.numberOfNights || selectedBooking?.duration || 1}
-              onChange={(e) =>
-                onCheckInDataChange({
-                  ...checkInData,
-                  numberOfNights: Number.parseInt(e.target.value) || 1,
-                })
-              }
-            />
+          {/* Payment Collection */}
+          <div className="space-y-4">
+            <h4 className="font-medium">Payment Collection</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="depositAmount">Payment Amount ($)</Label>
+                <Input
+                  id="depositAmount"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={checkInData.depositAmount || ""}
+                  onChange={(e) =>
+                    onCheckInDataChange({
+                      ...checkInData,
+                      depositAmount: Number.parseFloat(e.target.value) || 0,
+                    })
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  Amount paid by guest towards their bill (Total: ${totals.totalCharges.toFixed(2)})
+                </p>
+              </div>
+
+              {checkInData.depositAmount > 0 && (
+                <div className="space-y-2">
+                  <Label htmlFor="depositPaymentMethod">Payment Method</Label>
+                  <Select
+                    value={checkInData.depositPaymentMethod || ""}
+                    onValueChange={(value) => onCheckInDataChange({ ...checkInData, depositPaymentMethod: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select payment method" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="credit_card">Credit Card</SelectItem>
+                      <SelectItem value="debit_card">Debit Card</SelectItem>
+                      <SelectItem value="cash">Cash</SelectItem>
+                      <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                      <SelectItem value="mobile_payment">Mobile Payment</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+
+            {checkInData.depositAmount > 0 && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                <div className="flex items-start gap-2">
+                  <div className="w-4 h-4 rounded-full bg-green-400 mt-0.5 flex-shrink-0"></div>
+                  <div className="text-sm">
+                    <p className="font-medium text-green-800">Payment Information</p>
+                    <p className="text-green-700">
+                      Guest is paying ${checkInData.depositAmount} towards their bill. Remaining balance: $
+                      {totals.balanceDue.toFixed(2)} will be collected at checkout.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Parking Space */}
@@ -389,26 +445,33 @@ export function CheckInDetailsPanel({
             <h4 className="font-medium mb-3">Payment Summary</h4>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <span>Room Rate:</span>
-                <span>${selectedRoom.roomType?.basePrice || 0}</span>
+                <span>Room Rate ({checkInData.numberOfNights || 1} night(s)):</span>
+                <span>${totals.roomCharges.toFixed(2)}</span>
               </div>
-              {selectedBooking && (
-                <div className="flex justify-between">
-                  <span>Booking Total:</span>
-                  <span>${selectedBooking.total_amount}</span>
-                </div>
-              )}
-              {checkInData.depositAmount > 0 && (
-                <div className="flex justify-between">
-                  <span>Additional Deposit:</span>
-                  <span>${checkInData.depositAmount}</span>
-                </div>
-              )}
+              <div className="flex justify-between">
+                <span>Tax (10%):</span>
+                <span>${totals.taxAmount.toFixed(2)}</span>
+              </div>
               <Separator />
               <div className="flex justify-between font-semibold">
-                <span>Total:</span>
-                <span>${calculateTotal()}</span>
+                <span>Total Amount:</span>
+                <span>${totals.totalCharges.toFixed(2)}</span>
               </div>
+              {checkInData.depositAmount > 0 && (
+                <>
+                  <div className="flex justify-between text-green-600">
+                    <span>Payment Received:</span>
+                    <span>-${totals.depositPaid.toFixed(2)}</span>
+                  </div>
+                  <Separator />
+                  <div className="flex justify-between font-bold text-lg">
+                    <span>Balance Due:</span>
+                    <span className={totals.balanceDue > 0 ? "text-red-600" : "text-green-600"}>
+                      ${totals.balanceDue.toFixed(2)}
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </CardContent>
