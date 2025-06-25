@@ -184,7 +184,7 @@ export default function CheckInPage() {
         website: configuration?.website,
         tax_id: configuration?.tax_id,
       },
-      configuration, // Pass the full configuration
+      configuration,
       checkInDate: new Date().toISOString(),
       staff: {
         name: user?.full_name || user?.name || "Front Desk Agent",
