@@ -120,7 +120,6 @@ export default function CheckInPage() {
     setSelectedGuest(booking.guest)
     setActiveTab("rooms")
 
-    // Search for available rooms based on booking requirements
     searchAvailableRooms({
       check_in: booking.check_in,
       check_out: booking.check_out,
