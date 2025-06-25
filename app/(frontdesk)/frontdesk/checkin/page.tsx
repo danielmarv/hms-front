@@ -170,7 +170,6 @@ export default function CheckInPage() {
       return
     }
 
-    // Prepare registration data with real hotel and user data
     const regData = {
       booking: selectedBooking,
       guest: selectedGuest,
