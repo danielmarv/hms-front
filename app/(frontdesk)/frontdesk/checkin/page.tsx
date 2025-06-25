@@ -201,9 +201,7 @@ export default function CheckInPage() {
 
   const handleCompleteCheckIn = async (registrationData: any) => {
     try {
-      // Format check-in data for the API to match backend expectations
       const checkInApiData = {
-        // Guest information
         guest_id: selectedGuest._id || selectedGuest.id,
         guest_info: selectedGuest._id
           ? undefined
