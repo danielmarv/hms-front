@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "sonner"
 import { Search, UserCheck, Plus, Bed, RefreshCw } from "lucide-react"
-import { RegistrationDocumentDialog } from "@/components/frontdesk/registration-document-dialog"
+import RegistrationDocumentDialog from "@/components/frontdesk/registration-document-dialog"
 import { CreateGuestDialog } from "@/components/frontdesk/create-guest-dialog"
 import { BookingSearchPanel } from "@/components/frontdesk/booking-search-panel"
 import { RoomSelectionPanel } from "@/components/frontdesk/room-selection-panel"
@@ -17,6 +17,8 @@ import { useGuests } from "@/hooks/use-guests"
 import { useRooms } from "@/hooks/use-rooms"
 import { useRealtimeUpdates } from "@/hooks/use-realtime-updates"
 import { useBookings } from "@/hooks/use-bookings"
+import { useHotelConfiguration } from "@/hooks/use-hotel-configuration"
+import { useAuth } from "@/hooks/use-auth"
 
 export default function CheckInPage() {
   const [activeTab, setActiveTab] = useState("search")
@@ -28,6 +30,16 @@ export default function CheckInPage() {
     specialRequests: "",
     arrivalNotes: "",
     depositAmount: 0,
+    depositPaymentMethod: "",
+    numberOfGuests: 1,
+    numberOfNights: 1,
+    parkingSpace: "",
+    vehicleDetails: {
+      license_plate: "",
+      make: "",
+      model: "",
+      color: "",
+    },
     emergencyContact: {
       name: "",
       phone: "",
@@ -43,6 +55,7 @@ export default function CheckInPage() {
   const [registrationData, setRegistrationData] = useState<any>(null)
   const [receiptData, setReceiptData] = useState<any>(null)
   const [invoiceData, setInvoiceData] = useState<any>(null)
+  const [configuration, setHotelConfig] = useState<any>(null)
 
   // API hooks
   const { checkInGuest, getCurrentOccupancy, isLoading: checkInLoading } = useCheckInApi()
@@ -51,6 +64,11 @@ export default function CheckInPage() {
   const { bookings, getBookings, isLoading: bookingsLoading } = useBookings()
 
   const [guests, setGuests] = useState<any[]>([])
+
+  // Add these hooks for real data
+  const { user }: { user: any } = useAuth()
+  const hotelId = user?.primaryHotel?.id
+  const { getHotelConfiguration } = useHotelConfiguration()
 
   // Real-time updates
   useRealtimeUpdates({
@@ -61,14 +79,25 @@ export default function CheckInPage() {
 
   // Load initial data
   useEffect(() => {
+    if (!user || !hotelId) {
+      toast.error("User or hotel not found")
+      return
+    }
     loadInitialData()
-  }, [])
+  }, [user])
 
   const loadInitialData = async () => {
     try {
-
+      // Load bookings
       await getBookings({ status: "confirmed" })
 
+      // Load hotel configuration
+      const response = await getHotelConfiguration(hotelId)
+      if (response && response.data) {
+        setHotelConfig(response.data)
+      }
+
+      // Load guests with simpler approach
       const guestsResponse = await getGuests()
 
       if (guestsResponse.data && Array.isArray(guestsResponse.data)) {
@@ -81,44 +110,16 @@ export default function CheckInPage() {
       await fetchRooms()
       await getCurrentOccupancy()
     } catch (error) {
-
+      console.error("Error loading initial data:", error)
       toast.error("Failed to load initial data")
     }
   }
-  // const loadGuests = async () => {
-  //   try {
-  //     const response = await getGuests({
-  //       ...filters,
-  //       search: searchQuery,
-  //     })
-  //     console.log("API Response:", response)
-
-  //     if (response.data && Array.isArray(response.data)) {
-  //       console.log("Setting guests:", response.data)
-  //       setGuests(response.data)
-  //       // Since the hook doesn't return pagination info, set basic pagination
-  //       setPagination({
-  //         page: filters.page || 1,
-  //         limit: filters.limit || 10,
-  //         totalPages: Math.ceil(response.data.length / (filters.limit || 10)),
-  //         total: response.data.length,
-  //       })
-  //     } else {
-  //       console.error("Unexpected API response structure:", response)
-  //       setGuests([])
-  //     }
-  //   } catch (error) {
-  //     console.error("Failed to load guests:", error)
-  //     setGuests([]) // Ensure guests is an array even on error
-  //   }
-  // }
 
   const handleBookingSelect = (booking: any) => {
     setSelectedBooking(booking)
     setSelectedGuest(booking.guest)
     setActiveTab("rooms")
 
-    // Search for available rooms based on booking requirements
     searchAvailableRooms({
       check_in: booking.check_in,
       check_out: booking.check_out,
@@ -169,22 +170,28 @@ export default function CheckInPage() {
       return
     }
 
-    // Prepare registration data
     const regData = {
       booking: selectedBooking,
       guest: selectedGuest,
       room: selectedRoom,
       checkInData,
       hotel: {
-        name: "Grand Hotel", // From configuration
-        address: "123 Main Street, City, State 12345",
-        phone: "+1-555-0100",
-        email: "info@grandhotel.com",
+        name: configuration?.hotel_name || "Hotel",
+        address: configuration?.address || "Hotel Address",
+        phone: configuration?.phone || "Hotel Phone",
+        email: configuration?.email || "hotel@example.com",
+        logo: configuration?.logo_url,
+        website: configuration?.website,
+        tax_id: configuration?.tax_id,
       },
+      configuration,
       checkInDate: new Date().toISOString(),
       staff: {
-        name: "Front Desk Agent", // From current user
-        id: "FD001",
+        name: user?.full_name || user?.name || "Front Desk Agent",
+        id: user?.id || user?._id,
+        email: user?.email,
+        role: user?.role,
+        department: user?.department || "Front Desk",
       },
     }
 
@@ -192,12 +199,50 @@ export default function CheckInPage() {
     setShowRegistrationDialog(true)
   }
 
-  const handleCompleteCheckIn = async (completeCheckInData: any) => {
+  const handleCompleteCheckIn = async (registrationData: any) => {
     try {
-      const checkInResult = await checkInGuest(completeCheckInData)
+      const checkInApiData = {
+        guest_id: selectedGuest._id || selectedGuest.id,
+        guest_info: selectedGuest._id
+          ? undefined
+          : {
+              full_name: selectedGuest.full_name,
+              email: selectedGuest.email,
+              phone: selectedGuest.phone,
+              address: selectedGuest.address,
+              id_number: selectedGuest.id_number,
+              nationality: selectedGuest.nationality,
+            },
 
-      // Show receipt
-      setReceiptData(checkInResult)
+        // Room and stay information
+        room_id: selectedRoom._id || selectedRoom.id,
+        expected_check_out:
+          selectedBooking?.check_out ||
+          new Date(Date.now() + (checkInData.numberOfNights || 1) * 24 * 60 * 60 * 1000).toISOString(),
+        number_of_guests: selectedBooking?.number_of_guests || checkInData.numberOfGuests || 1,
+        number_of_nights: selectedBooking?.duration || checkInData.numberOfNights,
+
+        // Booking information (if exists)
+        booking_id: selectedBooking?._id || selectedBooking?.id,
+
+        // Additional information
+        special_requests: checkInData.specialRequests,
+        notes: checkInData.arrivalNotes,
+        deposit_amount: checkInData.depositAmount || 0,
+        deposit_payment_method: checkInData.depositPaymentMethod,
+        key_cards_issued: checkInData.keyCards || 2,
+        parking_space: checkInData.parkingSpace,
+        vehicle_details: checkInData.vehicleDetails,
+        emergency_contact: checkInData.emergencyContact,
+
+        // Registration document data
+        registration_document: registrationData.registration_document,
+      }
+
+      const checkInResult = await checkInGuest(checkInApiData)
+
+      // Show receipt with actual data and configuration
+      setReceiptData({ ...checkInResult, configuration })
       setShowReceiptDialog(true)
 
       // Reset form
@@ -206,6 +251,7 @@ export default function CheckInPage() {
 
       toast.success("Check-in completed successfully!")
     } catch (error) {
+      console.error("Check-in failed:", error)
       toast.error("Failed to complete check-in")
     }
   }
@@ -219,6 +265,16 @@ export default function CheckInPage() {
       specialRequests: "",
       arrivalNotes: "",
       depositAmount: 0,
+      depositPaymentMethod: "",
+      numberOfGuests: 1,
+      numberOfNights: 1,
+      parkingSpace: "",
+      vehicleDetails: {
+        license_plate: "",
+        make: "",
+        model: "",
+        color: "",
+      },
       emergencyContact: {
         name: "",
         phone: "",
@@ -229,12 +285,12 @@ export default function CheckInPage() {
   }
 
   const handlePrintReceipt = (checkInData: any) => {
-    setReceiptData(checkInData)
+    setReceiptData({ ...checkInData, configuration })
     setShowReceiptDialog(true)
   }
 
   const handlePrintInvoice = (checkInData: any) => {
-    setInvoiceData(checkInData)
+    setInvoiceData({ ...checkInData, configuration })
     setShowInvoiceDialog(true)
   }
 
@@ -356,9 +412,19 @@ export default function CheckInPage() {
         onCreateGuest={handleCreateGuest}
       />
 
-      <ReceiptDialog open={showReceiptDialog} onOpenChange={setShowReceiptDialog} receiptData={receiptData} />
+      <ReceiptDialog
+        open={showReceiptDialog}
+        onOpenChange={setShowReceiptDialog}
+        receiptData={receiptData}
+        configuration={configuration}
+      />
 
-      <InvoiceDialog open={showInvoiceDialog} onOpenChange={setShowInvoiceDialog} invoiceData={invoiceData} />
+      <InvoiceDialog
+        open={showInvoiceDialog}
+        onOpenChange={setShowInvoiceDialog}
+        invoiceData={invoiceData}
+        configuration={configuration}
+      />
     </div>
   )
 }

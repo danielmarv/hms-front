@@ -22,6 +22,7 @@ export interface CheckInData {
   special_requests?: string
   notes?: string
   deposit_amount?: number
+  deposit_payment_method?: string
   key_cards_issued?: number
   parking_space?: string
   vehicle_details?: {
@@ -106,15 +107,43 @@ export function useCheckInApi() {
   // Check-in a guest
   const checkInGuest = async (checkInData: CheckInData) => {
     try {
-      const response = await request("/check-ins", "POST", checkInData)
-      if (response.data) {
+      // Format the data to match backend expectations
+      const apiData = {
+        // Guest information
+        guest_id: checkInData.guest_id,
+        guest_info: checkInData.guest_info,
+
+        // Room and stay information
+        room_id: checkInData.room_id,
+        expected_check_out: checkInData.expected_check_out,
+        number_of_guests: checkInData.number_of_guests,
+        number_of_nights: checkInData.number_of_nights,
+
+        // Booking information (optional)
+        booking_id: checkInData.booking_id,
+
+        // Additional information
+        special_requests: checkInData.special_requests,
+        notes: checkInData.notes,
+        deposit_amount: checkInData.deposit_amount || 0, // Payment made by guest towards bill
+        deposit_payment_method: checkInData.deposit_payment_method,
+        key_cards_issued: checkInData.key_cards_issued || 1,
+        parking_space: checkInData.parking_space,
+        vehicle_details: checkInData.vehicle_details,
+        emergency_contact: checkInData.emergency_contact,
+      }
+
+      const response = await request("/check-ins", "POST", apiData)
+
+      if (response.success && response.data) {
         setCheckIns((prev) => [response.data, ...prev])
         toast.success("Guest checked in successfully!")
         return response.data
       }
-      throw new Error("Failed to check in guest")
+      throw new Error(response.message || "Failed to check in guest")
     } catch (error) {
-      toast.error("Failed to check in guest")
+      console.error("Check-in error:", error)
+      toast.error(error.message || "Failed to check in guest")
       throw error
     }
   }
