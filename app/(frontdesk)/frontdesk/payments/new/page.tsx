@@ -5,7 +5,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { usePayments } from "@/hooks/use-payments"
-import { useGuests } from "@/hooks/use-guests"
+import { useGuests, type Guest } from "@/hooks/use-guests"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -21,7 +21,10 @@ import { ArrowLeft, Save } from "lucide-react"
 export default function NewPaymentPage() {
   const router = useRouter()
   const { createPayment, isLoading } = usePayments()
-  const { guests, getGuests } = useGuests()
+  const { getGuests } = useGuests()
+  // State for fetched data
+    const [guests, setGuests] = useState<Guest[]>([])
+    const [guestsLoading, setGuestsLoading] = useState(false)
 
   const [paymentData, setPaymentData] = useState({
     guest: "",
@@ -155,7 +158,7 @@ export default function NewPaymentPage() {
 
       if (response.success) {
         toast.success("Payment created successfully")
-        router.push("/dashboard/payments")
+        router.push("/frontdesk/payments")
       }
     } catch (error) {
       console.error("Error creating payment:", error)
@@ -163,6 +166,22 @@ export default function NewPaymentPage() {
     }
   }
 
+  const loadGuests = async () => {
+      try {
+        setGuestsLoading(true)
+        const response = await getGuests({ limit: 100 })
+        if (response.data) {
+          // Handle different response formats
+          const guestsData = Array.isArray(response.data) ? response.data : response.data.data || []
+          setGuests(guestsData)
+        }
+      } catch (error) {
+        console.error("Error loading guests:", error)
+        toast.error("Failed to load guests")
+      } finally {
+        setGuestsLoading(false)
+      }
+    }
   // Render payment method specific fields
   const renderPaymentMethodFields = () => {
     switch (paymentData.method) {
