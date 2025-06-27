@@ -181,19 +181,11 @@ export function useBookings() {
   }
 
   const checkInBooking = async (id: string) => {
-    return await request<{
-      success: boolean
-      message: string
-      data: Booking
-    }>(`/bookings/${id}/check-in`, "PATCH")
+    return await request(`/bookings/${id}/check-in`, "PATCH")
   }
 
   const checkOutBooking = async (id: string) => {
-    return await request<{
-      success: boolean
-      message: string
-      data: Booking
-    }>(`/bookings/${id}/check-out`, "PATCH")
+    return await request(`/bookings/${id}/check-out`, "PATCH")
   }
 
   const getAvailableRooms = async (filters: AvailableRoomFilters) => {
