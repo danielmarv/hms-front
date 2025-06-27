@@ -54,9 +54,11 @@ import {
 } from "lucide-react"
 import { format, parseISO } from "date-fns"
 import { useBookings, type Booking, type BookingFilters } from "@/hooks/use-bookings"
-import { useGuests } from "@/hooks/use-guests"
+import { useGuests, type Guest } from "@/hooks/use-guests"
 import { useRooms } from "@/hooks/use-rooms"
 import { useRoomTypes } from "@/hooks/use-room-types"
+import { useCheckInApi } from "@/hooks/use-checkin-api"
+import { useCheckoutApi } from "@/hooks/use-checkout-api"
 import { toast } from "sonner"
 
 export default function ReservationsPage() {
@@ -69,15 +71,19 @@ export default function ReservationsPage() {
     createBooking,
     updateBooking,
     cancelBooking,
-    checkInBooking,
-    checkOutBooking,
     getAvailableRooms,
     getBookingStats,
   } = useBookings()
 
-  const { getGuests} = useGuests()
-  const { fetchRooms } = useRooms()
-  const { fetchRoomTypes } = useRoomTypes()
+  const { getGuests } = useGuests()
+  const { fetchRooms, rooms } = useRooms()
+  const { fetchRoomTypes, roomTypes } = useRoomTypes()
+  const { checkInGuest } = useCheckInApi()
+  const { checkOutGuest } = useCheckoutApi()
+
+  // State for fetched data
+  const [guests, setGuests] = useState<Guest[]>([])
+  const [guestsLoading, setGuestsLoading] = useState(false)
 
   const [filters, setFilters] = useState<BookingFilters>({
     page: 1,
@@ -90,6 +96,8 @@ export default function ReservationsPage() {
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [showDetailsDialog, setShowDetailsDialog] = useState(false)
   const [showCancelDialog, setShowCancelDialog] = useState(false)
+  const [showCheckInDialog, setShowCheckInDialog] = useState(false)
+  const [showCheckOutDialog, setShowCheckOutDialog] = useState(false)
   const [activeTab, setActiveTab] = useState("all")
   const [bookingStats, setBookingStats] = useState<any>(null)
   const [totalCount, setTotalCount] = useState(0)
@@ -121,13 +129,51 @@ export default function ReservationsPage() {
   const [editForm, setEditForm] = useState<any>({})
   const [cancellationReason, setCancellationReason] = useState("")
 
+  // Check-in form state
+  const [checkInForm, setCheckInForm] = useState({
+    deposit_amount: 0,
+    deposit_payment_method: "cash",
+    key_cards_issued: 1,
+    parking_space: "",
+    vehicle_details: {
+      license_plate: "",
+      make: "",
+      model: "",
+      color: "",
+    },
+    emergency_contact: {
+      name: "",
+      phone: "",
+      relationship: "",
+    },
+    special_requests: "",
+    notes: "",
+  })
+
+  // Check-out form state
+  const [checkOutForm, setCheckOutForm] = useState({
+    additional_charges: [] as Array<{
+      description: string
+      amount: number
+      category: string
+    }>,
+    discounts: [] as Array<{
+      description: string
+      amount: number
+      type: "fixed" | "percentage"
+    }>,
+    payment_method: "cash",
+    payment_amount: 0,
+    notes: "",
+  })
+
   useEffect(() => {
     loadData()
   }, [filters])
 
   useEffect(() => {
     // Load supporting data
-    getGuests({ limit: 100 })
+    loadGuests()
     fetchRooms()
     fetchRoomTypes()
     loadBookingStats()
@@ -146,6 +192,23 @@ export default function ReservationsPage() {
     }
   }
 
+  const loadGuests = async () => {
+    try {
+      setGuestsLoading(true)
+      const response = await getGuests({ limit: 100 })
+      if (response.data) {
+        // Handle different response formats
+        const guestsData = Array.isArray(response.data) ? response.data : response.data.data || []
+        setGuests(guestsData)
+      }
+    } catch (error) {
+      console.error("Error loading guests:", error)
+      toast.error("Failed to load guests")
+    } finally {
+      setGuestsLoading(false)
+    }
+  }
+
   const loadBookingStats = async () => {
     try {
       const response = await getBookingStats()
@@ -159,8 +222,6 @@ export default function ReservationsPage() {
 
   const handleSearch = (query: string) => {
     setSearchQuery(query)
-    // In a real implementation, you'd search by guest name, confirmation number, etc.
-    // For now, we'll just filter the current bookings
   }
 
   const handleFilterChange = (key: string, value: any) => {
@@ -229,25 +290,59 @@ export default function ReservationsPage() {
     }
   }
 
-  const handleCheckIn = async (booking: Booking) => {
+  const handleCheckIn = async () => {
     try {
-      await checkInBooking(booking._id)
+      if (!selectedBooking) return
+
+      const checkInData = {
+        guest_id: selectedBooking.guest._id,
+        room_id: selectedBooking.room._id,
+        expected_check_out: selectedBooking.check_out,
+        number_of_guests: selectedBooking.number_of_guests,
+        booking_id: selectedBooking._id,
+        special_requests: checkInForm.special_requests || selectedBooking.special_requests,
+        notes: checkInForm.notes,
+        deposit_amount: checkInForm.deposit_amount,
+        deposit_payment_method: checkInForm.deposit_payment_method,
+        key_cards_issued: checkInForm.key_cards_issued,
+        parking_space: checkInForm.parking_space,
+        vehicle_details: checkInForm.vehicle_details.license_plate ? checkInForm.vehicle_details : undefined,
+        emergency_contact: checkInForm.emergency_contact.name ? checkInForm.emergency_contact : undefined,
+      }
+
+      await checkInGuest(checkInData)
       toast.success("Guest checked in successfully")
+      setShowCheckInDialog(false)
+      setSelectedBooking(null)
+      resetCheckInForm()
       loadData()
     } catch (error: any) {
       console.error("Error checking in:", error)
-      toast.error(error.response?.data?.message || "Failed to check in guest")
+      toast.error(error.message || "Failed to check in guest")
     }
   }
 
-  const handleCheckOut = async (booking: Booking) => {
+  const handleCheckOut = async () => {
     try {
-      await checkOutBooking(booking._id)
+      if (!selectedBooking) return
+
+      const checkOutData = {
+        additional_charges: checkOutForm.additional_charges.length > 0 ? checkOutForm.additional_charges : undefined,
+        discounts: checkOutForm.discounts.length > 0 ? checkOutForm.discounts : undefined,
+        payment_method: checkOutForm.payment_method,
+        payment_amount: checkOutForm.payment_amount,
+        notes: checkOutForm.notes,
+      }
+
+      await checkOutGuest(selectedBooking._id, checkOutData)
       toast.success("Guest checked out successfully")
+      setShowCheckOutDialog(false)
+      setSelectedBooking(null)
+      resetCheckOutForm()
       loadData()
     } catch (error: any) {
       console.error("Error checking out:", error)
-      toast.error(error.response?.data?.message || "Failed to check out guest")
+      toast.error(error.message || "Failed to check out guest")
     }
   }
 
@@ -291,6 +386,66 @@ export default function ReservationsPage() {
       corporate_id: "",
       assigned_staff: "",
     })
+  }
+
+  const resetCheckInForm = () => {
+    setCheckInForm({
+      deposit_amount: 0,
+      deposit_payment_method: "cash",
+      key_cards_issued: 1,
+      parking_space: "",
+      vehicle_details: {
+        license_plate: "",
+        make: "",
+        model: "",
+        color: "",
+      },
+      emergency_contact: {
+        name: "",
+        phone: "",
+        relationship: "",
+      },
+      special_requests: "",
+      notes: "",
+    })
+  }
+
+  const resetCheckOutForm = () => {
+    setCheckOutForm({
+      additional_charges: [],
+      discounts: [],
+      payment_method: "cash",
+      payment_amount: 0,
+      notes: "",
+    })
+  }
+
+  const addAdditionalCharge = () => {
+    setCheckOutForm((prev) => ({
+      ...prev,
+      additional_charges: [...prev.additional_charges, { description: "", amount: 0, category: "other" }],
+    }))
+  }
+
+  const removeAdditionalCharge = (index: number) => {
+    setCheckOutForm((prev) => ({
+      ...prev,
+      additional_charges: prev.additional_charges.filter((_, i) => i !== index),
+    }))
+  }
+
+  const addDiscount = () => {
+    setCheckOutForm((prev) => ({
+      ...prev,
+      discounts: [...prev.discounts, { description: "", amount: 0, type: "fixed" }],
+    }))
+  }
+
+  const removeDiscount = (index: number) => {
+    setCheckOutForm((prev) => ({
+      ...prev,
+      discounts: prev.discounts.filter((_, i) => i !== index),
+    }))
   }
 
   const getStatusBadge = (status: string) => {
@@ -385,12 +540,13 @@ export default function ReservationsPage() {
                     onValueChange={(value) => setCreateForm((prev) => ({ ...prev, guest: value }))}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select a guest" />
+                      <SelectValue placeholder={guestsLoading ? "Loading guests..." : "Select a guest"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {guests.map((guest: any) => (
+                      {guests.map((guest) => (
                         <SelectItem key={guest._id} value={guest._id}>
-                          {guest.full_name} - {guest.email}
+                          {guest.full_name} - {guest.email || guest.phone}
+                          {guest.vip && <Badge className="ml-2 bg-purple-100 text-purple-800 text-xs">VIP</Badge>}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -825,13 +981,27 @@ export default function ReservationsPage() {
                                 </Button>
 
                                 {booking.status === "confirmed" && (
-                                  <Button variant="ghost" size="sm" onClick={() => handleCheckIn(booking)}>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setSelectedBooking(booking)
+                                      setShowCheckInDialog(true)
+                                    }}
+                                  >
                                     <UserCheck className="h-4 w-4" />
                                   </Button>
                                 )}
 
                                 {booking.status === "checked_in" && (
-                                  <Button variant="ghost" size="sm" onClick={() => handleCheckOut(booking)}>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setSelectedBooking(booking)
+                                      setShowCheckOutDialog(true)
+                                    }}
+                                  >
                                     <UserX className="h-4 w-4" />
                                   </Button>
                                 )}
@@ -902,6 +1072,388 @@ export default function ReservationsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Check-In Dialog */}
+      <Dialog open={showCheckInDialog} onOpenChange={setShowCheckInDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Check-In Guest</DialogTitle>
+            <DialogDescription>Complete check-in process for {selectedBooking?.guest.full_name}</DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-6 py-4">
+            {/* Deposit Information */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="deposit_amount">Deposit Amount</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={checkInForm.deposit_amount}
+                  onChange={(e) =>
+                    setCheckInForm((prev) => ({ ...prev, deposit_amount: Number.parseFloat(e.target.value) || 0 }))
+                  }
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="deposit_payment_method">Payment Method</Label>
+                <Select
+                  value={checkInForm.deposit_payment_method}
+                  onValueChange={(value) => setCheckInForm((prev) => ({ ...prev, deposit_payment_method: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="card">Credit Card</SelectItem>
+                    <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                    <SelectItem value="mobile_payment">Mobile Payment</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Key Cards and Parking */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="key_cards_issued">Key Cards Issued</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={checkInForm.key_cards_issued}
+                  onChange={(e) =>
+                    setCheckInForm((prev) => ({ ...prev, key_cards_issued: Number.parseInt(e.target.value) || 1 }))
+                  }
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="parking_space">Parking Space</Label>
+                <Input
+                  value={checkInForm.parking_space}
+                  onChange={(e) => setCheckInForm((prev) => ({ ...prev, parking_space: e.target.value }))}
+                  placeholder="e.g., P1-A15"
+                />
+              </div>
+            </div>
+
+            {/* Vehicle Details */}
+            <div className="space-y-4">
+              <Label className="text-sm font-medium">Vehicle Details (Optional)</Label>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="license_plate">License Plate</Label>
+                  <Input
+                    value={checkInForm.vehicle_details.license_plate}
+                    onChange={(e) =>
+                      setCheckInForm((prev) => ({
+                        ...prev,
+                        vehicle_details: { ...prev.vehicle_details, license_plate: e.target.value },
+                      }))
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="make">Make</Label>
+                  <Input
+                    value={checkInForm.vehicle_details.make}
+                    onChange={(e) =>
+                      setCheckInForm((prev) => ({
+                        ...prev,
+                        vehicle_details: { ...prev.vehicle_details, make: e.target.value },
+                      }))
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="model">Model</Label>
+                  <Input
+                    value={checkInForm.vehicle_details.model}
+                    onChange={(e) =>
+                      setCheckInForm((prev) => ({
+                        ...prev,
+                        vehicle_details: { ...prev.vehicle_details, model: e.target.value },
+                      }))
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="color">Color</Label>
+                  <Input
+                    value={checkInForm.vehicle_details.color}
+                    onChange={(e) =>
+                      setCheckInForm((prev) => ({
+                        ...prev,
+                        vehicle_details: { ...prev.vehicle_details, color: e.target.value },
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Emergency Contact */}
+            <div className="space-y-4">
+              <Label className="text-sm font-medium">Emergency Contact (Optional)</Label>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="emergency_name">Name</Label>
+                  <Input
+                    value={checkInForm.emergency_contact.name}
+                    onChange={(e) =>
+                      setCheckInForm((prev) => ({
+                        ...prev,
+                        emergency_contact: { ...prev.emergency_contact, name: e.target.value },
+                      }))
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="emergency_phone">Phone</Label>
+                  <Input
+                    value={checkInForm.emergency_contact.phone}
+                    onChange={(e) =>
+                      setCheckInForm((prev) => ({
+                        ...prev,
+                        emergency_contact: { ...prev.emergency_contact, phone: e.target.value },
+                      }))
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="emergency_relationship">Relationship</Label>
+                  <Input
+                    value={checkInForm.emergency_contact.relationship}
+                    onChange={(e) =>
+                      setCheckInForm((prev) => ({
+                        ...prev,
+                        emergency_contact: { ...prev.emergency_contact, relationship: e.target.value },
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Special Requests and Notes */}
+            <div className="grid gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="special_requests">Special Requests</Label>
+                <Textarea
+                  value={checkInForm.special_requests}
+                  onChange={(e) => setCheckInForm((prev) => ({ ...prev, special_requests: e.target.value }))}
+                  placeholder="Any special requests..."
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="notes">Check-in Notes</Label>
+                <Textarea
+                  value={checkInForm.notes}
+                  onChange={(e) => setCheckInForm((prev) => ({ ...prev, notes: e.target.value }))}
+                  placeholder="Additional notes for check-in..."
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowCheckInDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCheckIn}>Complete Check-In</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Check-Out Dialog */}
+      <Dialog open={showCheckOutDialog} onOpenChange={setShowCheckOutDialog}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Check-Out Guest</DialogTitle>
+            <DialogDescription>Complete check-out process for {selectedBooking?.guest.full_name}</DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-6 py-4">
+            {/* Additional Charges */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Additional Charges</Label>
+                <Button type="button" variant="outline" size="sm" onClick={addAdditionalCharge}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Charge
+                </Button>
+              </div>
+              {checkOutForm.additional_charges.map((charge, index) => (
+                <div key={index} className="grid grid-cols-4 gap-4 items-end">
+                  <div className="grid gap-2">
+                    <Label>Description</Label>
+                    <Input
+                      value={charge.description}
+                      onChange={(e) => {
+                        const newCharges = [...checkOutForm.additional_charges]
+                        newCharges[index].description = e.target.value
+                        setCheckOutForm((prev) => ({ ...prev, additional_charges: newCharges }))
+                      }}
+                      placeholder="e.g., Mini bar"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Amount</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={charge.amount}
+                      onChange={(e) => {
+                        const newCharges = [...checkOutForm.additional_charges]
+                        newCharges[index].amount = Number.parseFloat(e.target.value) || 0
+                        setCheckOutForm((prev) => ({ ...prev, additional_charges: newCharges }))
+                      }}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Category</Label>
+                    <Select
+                      value={charge.category}
+                      onValueChange={(value) => {
+                        const newCharges = [...checkOutForm.additional_charges]
+                        newCharges[index].category = value
+                        setCheckOutForm((prev) => ({ ...prev, additional_charges: newCharges }))
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="food_beverage">Food & Beverage</SelectItem>
+                        <SelectItem value="laundry">Laundry</SelectItem>
+                        <SelectItem value="spa">Spa</SelectItem>
+                        <SelectItem value="parking">Parking</SelectItem>
+                        <SelectItem value="phone">Phone</SelectItem>
+                        <SelectItem value="internet">Internet</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={() => removeAdditionalCharge(index)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+
+            {/* Discounts */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Discounts</Label>
+                <Button type="button" variant="outline" size="sm" onClick={addDiscount}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Discount
+                </Button>
+              </div>
+              {checkOutForm.discounts.map((discount, index) => (
+                <div key={index} className="grid grid-cols-4 gap-4 items-end">
+                  <div className="grid gap-2">
+                    <Label>Description</Label>
+                    <Input
+                      value={discount.description}
+                      onChange={(e) => {
+                        const newDiscounts = [...checkOutForm.discounts]
+                        newDiscounts[index].description = e.target.value
+                        setCheckOutForm((prev) => ({ ...prev, discounts: newDiscounts }))
+                      }}
+                      placeholder="e.g., Senior discount"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Amount</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={discount.amount}
+                      onChange={(e) => {
+                        const newDiscounts = [...checkOutForm.discounts]
+                        newDiscounts[index].amount = Number.parseFloat(e.target.value) || 0
+                        setCheckOutForm((prev) => ({ ...prev, discounts: newDiscounts }))
+                      }}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Type</Label>
+                    <Select
+                      value={discount.type}
+                      onValueChange={(value: "fixed" | "percentage") => {
+                        const newDiscounts = [...checkOutForm.discounts]
+                        newDiscounts[index].type = value
+                        setCheckOutForm((prev) => ({ ...prev, discounts: newDiscounts }))
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="fixed">Fixed Amount</SelectItem>
+                        <SelectItem value="percentage">Percentage</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={() => removeDiscount(index)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+
+            {/* Payment Information */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="payment_method">Payment Method</Label>
+                <Select
+                  value={checkOutForm.payment_method}
+                  onValueChange={(value) => setCheckOutForm((prev) => ({ ...prev, payment_method: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="card">Credit Card</SelectItem>
+                    <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                    <SelectItem value="mobile_payment">Mobile Payment</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="payment_amount">Payment Amount</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={checkOutForm.payment_amount}
+                  onChange={(e) =>
+                    setCheckOutForm((prev) => ({ ...prev, payment_amount: Number.parseFloat(e.target.value) || 0 }))
+                  }
+                />
+              </div>
+            </div>
+
+            {/* Notes */}
+            <div className="grid gap-2">
+              <Label htmlFor="checkout_notes">Check-out Notes</Label>
+              <Textarea
+                value={checkOutForm.notes}
+                onChange={(e) => setCheckOutForm((prev) => ({ ...prev, notes: e.target.value }))}
+                placeholder="Additional notes for check-out..."
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowCheckOutDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCheckOut}>Complete Check-Out</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Booking Details Dialog */}
       <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
