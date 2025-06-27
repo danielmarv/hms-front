@@ -189,7 +189,7 @@ export function useBookings() {
 
   const updateBooking = useCallback(
     async (id: string, bookingData: Partial<Booking>) => {
-      const { data, error } = await request<{ data: Booking; success: boolean; message?: string }>(
+      const { data, error } = await request(
         `/bookings/${id}`,
         "PUT",
         bookingData,
