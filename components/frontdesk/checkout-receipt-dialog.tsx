@@ -206,7 +206,7 @@ export function CheckOutReceiptDialog({
                   alt="Hotel Logo"
                   className="logo mx-auto"
                   onError={(e) => {
-                    e.target.style.display = "none"
+                    (e.target as HTMLImageElement).style.display = "none"
                   }}
                 />
               )}

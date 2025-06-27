@@ -89,12 +89,12 @@ export function useCheckInApi() {
       const endpoint = `/check-ins${queryParams.toString() ? `?${queryParams.toString()}` : ""}`
       const response = await request(endpoint, "GET")
 
-      if (response.data) {
+      if (response && response.data) {
         setCheckIns(response.data)
         return {
           data: response.data,
-          total: response.total,
-          pagination: response.pagination,
+          total: 'total' in response ? (response as any).total : 0,
+          pagination: 'pagination' in response ? (response as any).pagination : null,
         }
       }
       return { data: [], total: 0, pagination: null }
@@ -135,15 +135,16 @@ export function useCheckInApi() {
 
       const response = await request("/check-ins", "POST", apiData)
 
-      if (response.success && response.data) {
+      if (response && response.data) {
         setCheckIns((prev) => [response.data, ...prev])
         toast.success("Guest checked in successfully!")
         return response.data
       }
-      throw new Error(response.message || "Failed to check in guest")
+      throw new Error((response && 'message' in response ? (response as any).message : undefined) || "Failed to check in guest")
     } catch (error) {
       console.error("Check-in error:", error)
-      toast.error(error.message || "Failed to check in guest")
+      const errorMessage = (error && typeof error === "object" && "message" in error) ? (error as { message?: string }).message : undefined
+      toast.error(errorMessage || "Failed to check in guest")
       throw error
     }
   }
@@ -155,96 +156,6 @@ export function useCheckInApi() {
       return response.data
     } catch (error) {
       toast.error("Failed to fetch check-in details")
-      throw error
-    }
-  }
-
-  // Check-out a guest
-  const checkOutGuest = async (
-    checkInId: string,
-    checkOutData: {
-      additional_charges?: Array<{
-        description: string
-        amount: number
-        category: string
-      }>
-      discounts?: Array<{
-        description: string
-        amount: number
-        type: "fixed" | "percentage"
-      }>
-      payment_method?: string
-      payment_amount?: number
-      notes?: string
-    },
-  ) => {
-    try {
-      const response = await request(`/check-ins/${checkInId}/checkout`, "PATCH", checkOutData)
-      if (response.data) {
-        setCheckIns((prev) => prev.map((checkIn) => (checkIn.id === checkInId ? response.data : checkIn)))
-        toast.success("Guest checked out successfully!")
-        return response.data
-      }
-      throw new Error("Failed to check out guest")
-    } catch (error) {
-      toast.error("Failed to check out guest")
-      throw error
-    }
-  }
-
-  // Add charges to check-in
-  const addCharges = async (
-    checkInId: string,
-    charges: Array<{
-      description: string
-      amount: number
-      category: string
-    }>,
-  ) => {
-    try {
-      const response = await request(`/check-ins/${checkInId}/charges`, "POST", { charges })
-      if (response.data) {
-        setCheckIns((prev) => prev.map((checkIn) => (checkIn.id === checkInId ? response.data : checkIn)))
-        toast.success("Charges added successfully!")
-        return response.data
-      }
-      throw new Error("Failed to add charges")
-    } catch (error) {
-      toast.error("Failed to add charges")
-      throw error
-    }
-  }
-
-  // Add discount to check-in
-  const addDiscount = async (
-    checkInId: string,
-    discount: {
-      description: string
-      amount: number
-      type: "fixed" | "percentage"
-    },
-  ) => {
-    try {
-      const response = await request(`/check-ins/${checkInId}/discount`, "POST", discount)
-      if (response.data) {
-        setCheckIns((prev) => prev.map((checkIn) => (checkIn.id === checkInId ? response.data : checkIn)))
-        toast.success("Discount added successfully!")
-        return response.data
-      }
-      throw new Error("Failed to add discount")
-    } catch (error) {
-      toast.error("Failed to add discount")
-      throw error
-    }
-  }
-
-  // Get guest folio
-  const getGuestFolio = async (checkInId: string) => {
-    try {
-      const response = await request(`/check-ins/${checkInId}/folio`, "GET")
-      return response.data
-    } catch (error) {
-      toast.error("Failed to fetch guest folio")
       throw error
     }
   }
@@ -289,10 +200,6 @@ export function useCheckInApi() {
     getCheckIns,
     checkInGuest,
     getCheckInById,
-    checkOutGuest,
-    addCharges,
-    addDiscount,
-    getGuestFolio,
     getCurrentOccupancy,
     searchAvailableRooms,
   }

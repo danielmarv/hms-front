@@ -321,7 +321,7 @@ export function ReceiptDialog({ open, onOpenChange, receiptData, hotel, configur
                   alt="Hotel Logo"
                   className="logo mx-auto"
                   onError={(e) => {
-                    e.target.style.display = "none"
+                    (e.target as HTMLImageElement).style.display = "none"
                   }}
                 />
               )}

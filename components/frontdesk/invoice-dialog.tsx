@@ -267,7 +267,7 @@ export function InvoiceDialog({ open, onOpenChange, invoiceData, hotel, configur
                     alt={hotel?.name || "Hotel Logo"}
                     className="logo mr-4"
                     onError={(e) => {
-                      e.target.style.display = "none"
+                      (e.target as HTMLImageElement).style.display = "none"
                     }}
                   />
                 )}
