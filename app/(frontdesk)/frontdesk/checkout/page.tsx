@@ -117,7 +117,7 @@ export default function CheckOutPage() {
       const checkOutApiData = {
         additional_charges: checkOutData.additionalCharges,
         discounts: checkOutData.discounts,
-        payment_method: checkOutData.paymentMethod,
+        payment_method: checkOutData.paymentMethod || undefined,
         payment_amount: checkOutData.paymentAmount,
         notes: checkOutData.notes,
       }

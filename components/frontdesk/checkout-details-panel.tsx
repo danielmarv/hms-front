@@ -516,7 +516,6 @@ export function CheckOutDetailsPanel({
           <CardDescription>Collect any outstanding balance</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {totals.balanceDue > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="paymentAmount">Payment Amount</Label>
@@ -540,12 +539,13 @@ export function CheckOutDetailsPanel({
                 </p>
               </div>
 
-              {checkOutData.paymentAmount > 0 && (
+
                 <div className="space-y-2">
                   <Label htmlFor="paymentMethod">Payment Method</Label>
                   <Select
                     value={checkOutData.paymentMethod || ""}
                     onValueChange={(value) => onCheckOutDataChange({ ...checkOutData, paymentMethod: value })}
+                    required
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select payment method" />
@@ -555,13 +555,13 @@ export function CheckOutDetailsPanel({
                       <SelectItem value="debit_card">Debit Card</SelectItem>
                       <SelectItem value="cash">Cash</SelectItem>
                       <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                      <SelectItem value="mobile_payment">Mobile Payment</SelectItem>
+                      <SelectItem value="mobile_money">Mobile Payment</SelectItem>
+                      <SelectItem value="online">Online</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-              )}
             </div>
-          )}
 
           {/* Notes */}
           <div className="space-y-2">
