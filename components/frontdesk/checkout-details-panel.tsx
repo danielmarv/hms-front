@@ -303,13 +303,15 @@ export function CheckOutDetailsPanel({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="food_beverage">Food & Beverage</SelectItem>
+                          <SelectItem value="food">Food</SelectItem>
+                          <SelectItem value="beverage">Beverage</SelectItem>
                           <SelectItem value="room_service">Room Service</SelectItem>
                           <SelectItem value="laundry">Laundry</SelectItem>
                           <SelectItem value="spa">Spa & Wellness</SelectItem>
                           <SelectItem value="parking">Parking</SelectItem>
-                          <SelectItem value="telephone">Telephone</SelectItem>
+                          <SelectItem value="phone">Telephone</SelectItem>
                           <SelectItem value="miscellaneous">Miscellaneous</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
