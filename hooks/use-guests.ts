@@ -164,10 +164,7 @@ export function useGuests() {
   }
 
   const createGuest = async (guestData: Partial<CreateGuestData>) => {
-    return await request<{
-      success: boolean
-      data: Guest
-    }>("/guests", "POST", guestData)
+    return await request("/guests", "POST", guestData)
   }
 
   const updateGuest = async (id: string, guestData: Partial<CreateGuestData>) => {
