@@ -160,11 +160,7 @@ export function useGuests() {
   }
 
   const getGuestBookingHistory = async (id: string) => {
-    return await request<{
-      success: boolean
-      count: number
-      data: GuestBooking[]
-    }>(`/guests/${id}/bookings`)
+    return await request(`/guests/${id}/bookings`)
   }
 
   const createGuest = async (guestData: Partial<CreateGuestData>) => {
