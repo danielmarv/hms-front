@@ -209,7 +209,7 @@ export function useBookings() {
 
   const cancelBooking = useCallback(
     async (id: string, cancellation_reason: string) => {
-      const { data, error } = await request<{ data: Booking; success: boolean; message?: string }>(
+      const { data, error } = await request(
         `/bookings/${id}/cancel`,
         "PATCH",
         { cancellation_reason },
