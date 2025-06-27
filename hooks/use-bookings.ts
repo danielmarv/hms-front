@@ -308,7 +308,7 @@ export function useBookings() {
       if (filters.end_date) queryParams.append("end_date", filters.end_date)
 
       const url = `/bookings/stats${queryParams.toString() ? `?${queryParams.toString()}` : ""}`
-      const { data, error } = await request<{ data: any; success: boolean }>(url)
+      const { data, error } = await request(url)
 
       return {
         data: error || !data?.success ? null : data,
@@ -325,7 +325,7 @@ export function useBookings() {
       queryParams.append("end_date", end_date)
 
       const url = `/bookings/calendar?${queryParams.toString()}`
-      const { data, error } = await request<{ data: any[]; success: boolean }>(url)
+      const { data, error } = await request(url)
 
       return {
         data: error || !data?.success ? [] : data?.data || [],
