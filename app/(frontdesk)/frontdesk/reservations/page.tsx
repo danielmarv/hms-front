@@ -32,7 +32,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { EmptyState } from "@/components/ui/empty-state"
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton"
-import { Pagination } from "@/components/ui/pagination"
 import {
   Calendar,
   Plus,
@@ -78,7 +77,7 @@ export default function ReservationsPage() {
 
   const { getGuests, guests } = useGuests()
   const { fetchRooms, rooms } = useRooms()
-  const { getRoomTypes, roomTypes } = useRoomTypes()
+  const { fetchRoomTypes, roomTypes } = useRoomTypes()
 
   const [filters, setFilters] = useState<BookingFilters>({
     page: 1,
@@ -130,7 +129,7 @@ export default function ReservationsPage() {
     // Load supporting data
     getGuests({ limit: 100 })
     fetchRooms()
-    getRoomTypes()
+    fetchRoomTypes()
     loadBookingStats()
   }, [])
 
@@ -389,7 +388,7 @@ export default function ReservationsPage() {
                       <SelectValue placeholder="Select a guest" />
                     </SelectTrigger>
                     <SelectContent>
-                      {guests.map((guest) => (
+                      {guests.map((guest: any) => (
                         <SelectItem key={guest._id} value={guest._id}>
                           {guest.full_name} - {guest.email}
                         </SelectItem>
@@ -873,11 +872,29 @@ export default function ReservationsPage() {
 
                   {/* Pagination */}
                   {totalPages > 1 && (
-                    <Pagination
-                      currentPage={filters.page || 1}
-                      totalPages={totalPages}
-                      onPageChange={(page) => handleFilterChange("page", page)}
-                    />
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-muted-foreground">
+                        Page {filters.page || 1} of {totalPages}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleFilterChange("page", (filters.page || 1) - 1)}
+                          disabled={(filters.page || 1) <= 1}
+                        >
+                          Previous
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleFilterChange("page", (filters.page || 1) + 1)}
+                          disabled={(filters.page || 1) >= totalPages}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
                   )}
                 </div>
               )}

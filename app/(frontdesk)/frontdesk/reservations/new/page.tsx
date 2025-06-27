@@ -36,7 +36,7 @@ export default function NewReservationPage() {
   const router = useRouter()
   const { createBooking, getAvailableRooms, availableRooms, isLoading } = useBookings()
   const { getGuests, guests } = useGuests()
-  const { getRoomTypes, roomTypes } = useRoomTypes()
+  const { fetchRoomTypes, roomTypes } = useRoomTypes()
 
   const [step, setStep] = useState(1)
   const [formData, setFormData] = useState<CreateBookingData>({
@@ -74,7 +74,7 @@ export default function NewReservationPage() {
   useEffect(() => {
     // Load supporting data
     getGuests({ limit: 100 })
-    getRoomTypes()
+    fetchRoomTypes()
   }, [])
 
   useEffect(() => {
@@ -134,7 +134,7 @@ export default function NewReservationPage() {
   }
 
   const handleGuestSelect = (guestId: string) => {
-    const guest = guests.find((g) => g._id === guestId)
+    const guest = guests.find((g: any) => g._id === guestId)
     setSelectedGuest(guest)
     setFormData((prev) => ({
       ...prev,
@@ -169,7 +169,7 @@ export default function NewReservationPage() {
   }
 
   const calculateTax = () => {
-    return (calculateSubtotal() * formData.tax_rate) / 100
+    return (calculateSubtotal() * (formData.tax_rate || 0)) / 100
   }
 
   const calculateTotal = () => {
@@ -511,7 +511,7 @@ export default function NewReservationPage() {
                   <SelectValue placeholder="Select a guest" />
                 </SelectTrigger>
                 <SelectContent>
-                  {guests.map((guest) => (
+                  {guests.map((guest: any) => (
                     <SelectItem key={guest._id} value={guest._id}>
                       <div className="flex items-center gap-2">
                         <div>
@@ -658,10 +658,10 @@ export default function NewReservationPage() {
                   <span>Tax ({formData.tax_rate}%)</span>
                   <span>${calculateTax().toFixed(2)}</span>
                 </div>
-                {formData.discount > 0 && (
+                {(formData.discount || 0) > 0 && (
                   <div className="flex justify-between text-green-600">
                     <span>Discount</span>
-                    <span>-${formData.discount.toFixed(2)}</span>
+                    <span>-${(formData.discount || 0).toFixed(2)}</span>
                   </div>
                 )}
                 <Separator />
@@ -818,10 +818,10 @@ export default function NewReservationPage() {
                     <span>Tax ({formData.tax_rate}%)</span>
                     <span>${calculateTax().toFixed(2)}</span>
                   </div>
-                  {formData.discount > 0 && (
+                  {(formData.discount || 0) > 0 && (
                     <div className="flex justify-between text-green-600">
                       <span>Discount {formData.discount_reason && `(${formData.discount_reason})`}</span>
-                      <span>-${formData.discount.toFixed(2)}</span>
+                      <span>-${(formData.discount || 0).toFixed(2)}</span>
                     </div>
                   )}
                   <Separator />

@@ -1,3 +1,5 @@
-export default function Loading() {
-  return null
+import { LoadingSkeleton } from "@/components/ui/loading-skeleton"
+
+export default function NewReservationLoading() {
+  return <LoadingSkeleton />
 }

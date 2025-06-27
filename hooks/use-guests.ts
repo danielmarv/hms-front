@@ -148,13 +148,7 @@ export function useGuests() {
       }
     })
 
-    return await request<{
-      success: boolean
-      count: number
-      total: number
-      pagination: { page: number; limit: number; totalPages: number }
-      data: Guest[]
-    }>(`/guests?${queryParams.toString()}`)
+    return await request(`/guests?${queryParams.toString()}`)
   }
 
   const getGuestById = async (id: string) => {
@@ -162,10 +156,7 @@ export function useGuests() {
     if (id === "new") {
       return { data: null, error: null, isLoading: false }
     }
-    return await request<{
-      success: boolean
-      data: Guest
-    }>(`/guests/${id}`)
+    return await request(`/guests/${id}`)
   }
 
   const getGuestBookingHistory = async (id: string) => {
