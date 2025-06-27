@@ -232,15 +232,15 @@ export const usePayments = () => {
       if (filters.limit) queryParams.append("limit", filters.limit.toString())
       if (filters.sort) queryParams.append("sort", filters.sort)
 
-      const response = await request<Payment[]>(`/payments?${queryParams.toString()}`)
+      const response = await request(`/payments?${queryParams.toString()}`)
 
-      if (response.success) {
+      if (response) {
         setPayments(response.data || [])
         setPagination({
-          page: response.pagination?.page || 1,
-          limit: response.pagination?.limit || 20,
-          totalPages: response.pagination?.totalPages || 1,
-          total: response.total || 0,
+          page: response.data?.pagination?.page || 1,
+          limit: response.data?.pagination?.limit || 20,
+          totalPages: response.data?.pagination?.totalPages || 1,
+          total: response.data?.pagination?.total || 0,
         })
       }
 
@@ -253,9 +253,9 @@ export const usePayments = () => {
 
   const getPaymentById = async (id: string) => {
     try {
-      const response = await request<Payment>(`/payments/${id}`)
+      const response = await request(`/payments/${id}`)
 
-      if (response.success) {
+      if (response) {
         setPayment(response.data || null)
       }
 
@@ -268,9 +268,9 @@ export const usePayments = () => {
 
   const createPayment = async (data: CreatePaymentData) => {
     try {
-      const response = await request<Payment>("/payments", "POST", data)
+      const response = await request("/payments", "POST", data)
 
-      if (response.success) {
+      if (response) {
         toast.success("Payment created successfully")
       }
 
@@ -283,9 +283,9 @@ export const usePayments = () => {
 
   const updatePayment = async (id: string, data: UpdatePaymentData) => {
     try {
-      const response = await request<Payment>(`/payments/${id}`, "PUT", data)
+      const response = await request(`/payments/${id}`, "PUT", data)
 
-      if (response.success) {
+      if (response) {
         toast.success("Payment updated successfully")
         if (payment && payment._id === id) {
           setPayment(response.data || null)
@@ -301,9 +301,9 @@ export const usePayments = () => {
 
   const deletePayment = async (id: string) => {
     try {
-      const response = await request<{ message: string }>(`/payments/${id}`, "DELETE")
+      const response = await request(`/payments/${id}`, "DELETE")
 
-      if (response.success) {
+      if (response) {
         toast.success("Payment deleted successfully")
         // Update local state
         setPayments(payments.filter((payment) => payment._id !== id))
@@ -318,9 +318,9 @@ export const usePayments = () => {
 
   const processRefund = async (id: string, data: RefundData) => {
     try {
-      const response = await request<Payment>(`/payments/${id}/refund`, "PATCH", data)
+      const response = await request(`/payments/${id}/refund`, "PATCH", data)
 
-      if (response.success) {
+      if (response) {
         toast.success("Refund processed successfully")
         // Update local state
         if (payment && payment._id === id) {
@@ -338,12 +338,9 @@ export const usePayments = () => {
 
   const issueReceipt = async (id: string) => {
     try {
-      const response = await request<{ paymentId: string; receiptNumber: string; receiptUrl?: string }>(
-        `/payments/${id}/receipt`,
-        "PATCH",
-      )
+      const response = await request(`/payments/${id}/receipt`, "PATCH")
 
-      if (response.success) {
+      if (response) {
         toast.success("Receipt issued successfully")
         // Update local state if needed
         getPaymentById(id)
@@ -358,9 +355,9 @@ export const usePayments = () => {
 
   const sendReceiptByEmail = async (id: string, data: SendReceiptEmailData) => {
     try {
-      const response = await request<{ message: string }>(`/payments/${id}/email`, "POST", data)
+      const response = await request(`/payments/${id}/email`, "POST", data)
 
-      if (response.success) {
+      if (response) {
         toast.success("Receipt sent by email successfully")
       }
 
@@ -378,9 +375,9 @@ export const usePayments = () => {
       if (startDate) queryParams.append("startDate", startDate)
       if (endDate) queryParams.append("endDate", endDate)
 
-      const response = await request<PaymentStats>(`/payments/stats?${queryParams.toString()}`)
+      const response = await request(`/payments/stats?${queryParams.toString()}`)
 
-      if (response.success) {
+      if (response) {
         setStats(response.data || null)
       }
 
