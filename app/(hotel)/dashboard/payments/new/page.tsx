@@ -5,7 +5,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { usePayments } from "@/hooks/use-payments"
-import { useGuests } from "@/hooks/use-guests"
+import { useGuests, type Guest } from "@/hooks/use-guests"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -14,14 +14,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { DatePicker } from "@/components/ui/date-picker"
 import { Checkbox } from "@/components/ui/checkbox"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { toast } from "sonner"
-import { ArrowLeft, Save } from "lucide-react"
+import { ArrowLeft, Save, RefreshCw } from "lucide-react"
 
 export default function NewPaymentPage() {
   const router = useRouter()
   const { createPayment, isLoading } = usePayments()
-  const { guests, getGuests } = useGuests()
+  const { getGuests } = useGuests()
+
+  // State for fetched data
+  const [guests, setGuests] = useState<Guest[]>([])
+  const [guestsLoading, setGuestsLoading] = useState(false)
 
   const [paymentData, setPaymentData] = useState({
     guest: "",
@@ -29,7 +32,7 @@ export default function NewPaymentPage() {
     booking: "",
     order: "",
     amountPaid: 0,
-    method: "credit_card",
+    method: "cash",
     currency: "USD",
     transactionReference: "",
     notes: "",
@@ -38,25 +41,26 @@ export default function NewPaymentPage() {
     receiptIssued: true,
   })
 
-  const [paymentDetails, setPaymentDetails] = useState({
-    cardType: "",
-    last4: "",
-    expiryMonth: "",
-    expiryYear: "",
-    cardholderName: "",
-    bankName: "",
-    accountNumber: "",
-    routingNumber: "",
-    accountName: "",
-    provider: "",
-    phoneNumber: "",
-    transactionId: "",
-    payerEmail: "",
-  })
-
   useEffect(() => {
-    getGuests()
+    loadGuests()
   }, [])
+
+  const loadGuests = async () => {
+    try {
+      setGuestsLoading(true)
+      const response = await getGuests({ limit: 100 })
+      if (response.data) {
+        // Handle different response formats
+        const guestsData = Array.isArray(response.data) ? response.data : response.data.data || []
+        setGuests(guestsData)
+      }
+    } catch (error) {
+      console.error("Error loading guests:", error)
+      toast.error("Failed to load guests")
+    } finally {
+      setGuestsLoading(false)
+    }
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -66,11 +70,6 @@ export default function NewPaymentPage() {
   const handleNumberInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
     setPaymentData({ ...paymentData, [name]: Number.parseFloat(value) || 0 })
-  }
-
-  const handleDetailsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setPaymentDetails({ ...paymentDetails, [name]: value })
   }
 
   const handleSelectChange = (name: string, value: string) => {
@@ -101,56 +100,9 @@ export default function NewPaymentPage() {
     }
 
     try {
-      // Prepare payment details based on method
-      let paymentDetailsData = {}
-
-      switch (paymentData.method) {
-        case "credit_card":
-          paymentDetailsData = {
-            cardDetails: {
-              cardType: paymentDetails.cardType,
-              last4: paymentDetails.last4,
-              expiryMonth: paymentDetails.expiryMonth,
-              expiryYear: paymentDetails.expiryYear,
-              cardholderName: paymentDetails.cardholderName,
-            },
-          }
-          break
-        case "bank_transfer":
-          paymentDetailsData = {
-            bankDetails: {
-              bankName: paymentDetails.bankName,
-              accountNumber: paymentDetails.accountNumber,
-              routingNumber: paymentDetails.routingNumber,
-              accountName: paymentDetails.accountName,
-            },
-          }
-          break
-        case "mobile_money":
-          paymentDetailsData = {
-            mobileMoneyDetails: {
-              provider: paymentDetails.provider,
-              phoneNumber: paymentDetails.phoneNumber,
-              transactionId: paymentDetails.transactionId,
-            },
-          }
-          break
-        case "paypal":
-        case "stripe":
-          paymentDetailsData = {
-            onlinePaymentDetails: {
-              provider: paymentData.method,
-              paymentId: paymentDetails.transactionId,
-              payerEmail: paymentDetails.payerEmail,
-            },
-          }
-          break
-      }
-
       const response = await createPayment({
         ...paymentData,
         paidAt: paymentData.paidAt.toISOString(),
-        ...paymentDetailsData,
       })
 
       if (response.success) {
@@ -163,226 +115,6 @@ export default function NewPaymentPage() {
     }
   }
 
-  // Render payment method specific fields
-  const renderPaymentMethodFields = () => {
-    switch (paymentData.method) {
-      case "credit_card":
-        return (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="cardType">Card Type</Label>
-                <Select
-                  value={paymentDetails.cardType}
-                  onValueChange={(value) => setPaymentDetails({ ...paymentDetails, cardType: value })}
-                >
-                  <SelectTrigger id="cardType">
-                    <SelectValue placeholder="Select card type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="visa">Visa</SelectItem>
-                    <SelectItem value="mastercard">Mastercard</SelectItem>
-                    <SelectItem value="amex">American Express</SelectItem>
-                    <SelectItem value="discover">Discover</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="last4">Last 4 Digits</Label>
-                <Input
-                  id="last4"
-                  name="last4"
-                  value={paymentDetails.last4}
-                  onChange={handleDetailsChange}
-                  maxLength={4}
-                  placeholder="1234"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <div className="space-y-2">
-                <Label htmlFor="expiryMonth">Expiry Month</Label>
-                <Select
-                  value={paymentDetails.expiryMonth}
-                  onValueChange={(value) => setPaymentDetails({ ...paymentDetails, expiryMonth: value })}
-                >
-                  <SelectTrigger id="expiryMonth">
-                    <SelectValue placeholder="MM" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: 12 }, (_, i) => {
-                      const month = (i + 1).toString().padStart(2, "0")
-                      return (
-                        <SelectItem key={month} value={month}>
-                          {month}
-                        </SelectItem>
-                      )
-                    })}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="expiryYear">Expiry Year</Label>
-                <Select
-                  value={paymentDetails.expiryYear}
-                  onValueChange={(value) => setPaymentDetails({ ...paymentDetails, expiryYear: value })}
-                >
-                  <SelectTrigger id="expiryYear">
-                    <SelectValue placeholder="YYYY" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: 10 }, (_, i) => {
-                      const year = (new Date().getFullYear() + i).toString()
-                      return (
-                        <SelectItem key={year} value={year}>
-                          {year}
-                        </SelectItem>
-                      )
-                    })}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2 sm:col-span-3">
-                <Label htmlFor="cardholderName">Cardholder Name</Label>
-                <Input
-                  id="cardholderName"
-                  name="cardholderName"
-                  value={paymentDetails.cardholderName}
-                  onChange={handleDetailsChange}
-                  placeholder="John Smith"
-                />
-              </div>
-            </div>
-          </div>
-        )
-      case "bank_transfer":
-        return (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="bankName">Bank Name</Label>
-              <Input
-                id="bankName"
-                name="bankName"
-                value={paymentDetails.bankName}
-                onChange={handleDetailsChange}
-                placeholder="Bank of America"
-              />
-            </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="accountNumber">Account Number</Label>
-                <Input
-                  id="accountNumber"
-                  name="accountNumber"
-                  value={paymentDetails.accountNumber}
-                  onChange={handleDetailsChange}
-                  placeholder="XXXX1234"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="routingNumber">Routing Number</Label>
-                <Input
-                  id="routingNumber"
-                  name="routingNumber"
-                  value={paymentDetails.routingNumber}
-                  onChange={handleDetailsChange}
-                  placeholder="123456789"
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="accountName">Account Holder Name</Label>
-              <Input
-                id="accountName"
-                name="accountName"
-                value={paymentDetails.accountName}
-                onChange={handleDetailsChange}
-                placeholder="John Smith"
-              />
-            </div>
-          </div>
-        )
-      case "mobile_money":
-        return (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="provider">Provider</Label>
-              <Select
-                value={paymentDetails.provider}
-                onValueChange={(value) => setPaymentDetails({ ...paymentDetails, provider: value })}
-              >
-                <SelectTrigger id="provider">
-                  <SelectValue placeholder="Select provider" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="mpesa">M-Pesa</SelectItem>
-                  <SelectItem value="airtel">Airtel Money</SelectItem>
-                  <SelectItem value="orange">Orange Money</SelectItem>
-                  <SelectItem value="mtn">MTN Mobile Money</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="phoneNumber">Phone Number</Label>
-                <Input
-                  id="phoneNumber"
-                  name="phoneNumber"
-                  value={paymentDetails.phoneNumber}
-                  onChange={handleDetailsChange}
-                  placeholder="+1234567890"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="transactionId">Transaction ID</Label>
-                <Input
-                  id="transactionId"
-                  name="transactionId"
-                  value={paymentDetails.transactionId}
-                  onChange={handleDetailsChange}
-                  placeholder="ABC123XYZ"
-                />
-              </div>
-            </div>
-          </div>
-        )
-      case "paypal":
-      case "stripe":
-        return (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="transactionId">Transaction ID</Label>
-                <Input
-                  id="transactionId"
-                  name="transactionId"
-                  value={paymentDetails.transactionId}
-                  onChange={handleDetailsChange}
-                  placeholder="TXN_123456789"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="payerEmail">Payer Email</Label>
-                <Input
-                  id="payerEmail"
-                  name="payerEmail"
-                  value={paymentDetails.payerEmail}
-                  onChange={handleDetailsChange}
-                  placeholder="customer@example.com"
-                  type="email"
-                />
-              </div>
-            </div>
-          </div>
-        )
-      case "cash":
-      default:
-        return null
-    }
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -390,10 +122,16 @@ export default function NewPaymentPage() {
           <h2 className="text-3xl font-bold tracking-tight">New Payment</h2>
           <p className="text-muted-foreground">Record a new payment from a guest</p>
         </div>
-        <Button variant="outline" onClick={() => router.back()}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={loadGuests} disabled={guestsLoading}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            {guestsLoading ? "Loading..." : "Refresh Guests"}
+          </Button>
+          <Button variant="outline" onClick={() => router.back()}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
+          </Button>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit}>
@@ -405,24 +143,36 @@ export default function NewPaymentPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="guest">Guest</Label>
+                <Label htmlFor="guest">Guest *</Label>
                 <Select value={paymentData.guest} onValueChange={(value) => handleSelectChange("guest", value)}>
                   <SelectTrigger id="guest">
-                    <SelectValue placeholder="Select guest" />
+                    <SelectValue placeholder={guestsLoading ? "Loading guests..." : "Select guest"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {guests.map((guest) => (
-                      <SelectItem key={guest._id} value={guest._id}>
-                        {guest.full_name}
+                    {guests.length === 0 && !guestsLoading ? (
+                      <SelectItem value="" disabled>
+                        No guests found
                       </SelectItem>
-                    ))}
+                    ) : (
+                      guests.map((guest) => (
+                        <SelectItem key={guest._id} value={guest._id}>
+                          <div className="flex items-center gap-2">
+                            <span>{guest.full_name}</span>
+                            {guest.vip && (
+                              <span className="bg-purple-100 text-purple-800 text-xs px-1 py-0.5 rounded">VIP</span>
+                            )}
+                            <span className="text-muted-foreground">- {guest.email}</span>
+                          </div>
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="amountPaid">Amount</Label>
+                  <Label htmlFor="amountPaid">Amount *</Label>
                   <Input
                     id="amountPaid"
                     name="amountPaid"
@@ -454,49 +204,23 @@ export default function NewPaymentPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="method">Payment Method</Label>
-                <RadioGroup
-                  value={paymentData.method}
-                  onValueChange={(value) => handleSelectChange("method", value)}
-                  className="grid grid-cols-2 gap-4 pt-2"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="credit_card" id="credit_card" />
-                    <Label htmlFor="credit_card" className="cursor-pointer">
-                      Credit Card
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="cash" id="cash" />
-                    <Label htmlFor="cash" className="cursor-pointer">
-                      Cash
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="bank_transfer" id="bank_transfer" />
-                    <Label htmlFor="bank_transfer" className="cursor-pointer">
-                      Bank Transfer
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="mobile_money" id="mobile_money" />
-                    <Label htmlFor="mobile_money" className="cursor-pointer">
-                      Mobile Money
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="paypal" id="paypal" />
-                    <Label htmlFor="paypal" className="cursor-pointer">
-                      PayPal
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="stripe" id="stripe" />
-                    <Label htmlFor="stripe" className="cursor-pointer">
-                      Stripe
-                    </Label>
-                  </div>
-                </RadioGroup>
+                <Label htmlFor="method">Payment Method *</Label>
+                <Select value={paymentData.method} onValueChange={(value) => handleSelectChange("method", value)}>
+                  <SelectTrigger id="method">
+                    <SelectValue placeholder="Select payment method" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="credit_card">Credit Card</SelectItem>
+                    <SelectItem value="debit_card">Debit Card</SelectItem>
+                    <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                    <SelectItem value="mobile_money">Mobile Money</SelectItem>
+                    <SelectItem value="check">Check</SelectItem>
+                    <SelectItem value="paypal">PayPal</SelectItem>
+                    <SelectItem value="stripe">Stripe</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">
@@ -511,11 +235,11 @@ export default function NewPaymentPage() {
                   name="transactionReference"
                   value={paymentData.transactionReference}
                   onChange={handleInputChange}
-                  placeholder="REF123456"
+                  placeholder="REF123456 (optional)"
                 />
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-4">
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id="isDeposit"
@@ -526,9 +250,7 @@ export default function NewPaymentPage() {
                     This is a deposit payment
                   </Label>
                 </div>
-              </div>
 
-              <div className="space-y-2">
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id="receiptIssued"
@@ -543,43 +265,67 @@ export default function NewPaymentPage() {
             </CardContent>
           </Card>
 
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Payment Details</CardTitle>
-                <CardDescription>Enter the specific details for the selected payment method</CardDescription>
-              </CardHeader>
-              <CardContent>{renderPaymentMethodFields()}</CardContent>
-            </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Additional Information</CardTitle>
+              <CardDescription>Optional details and notes</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="invoice">Related Invoice ID</Label>
+                <Input
+                  id="invoice"
+                  name="invoice"
+                  value={paymentData.invoice}
+                  onChange={handleInputChange}
+                  placeholder="Invoice ID (optional)"
+                />
+              </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Additional Information</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <Label htmlFor="notes">Notes</Label>
-                  <Textarea
-                    id="notes"
-                    name="notes"
-                    value={paymentData.notes}
-                    onChange={handleInputChange}
-                    placeholder="Add any additional notes about this payment"
-                    rows={3}
-                  />
-                </div>
-              </CardContent>
-              <CardFooter className="flex justify-between">
-                <Button variant="outline" type="button" onClick={() => router.back()}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={isLoading}>
-                  {isLoading ? "Saving..." : "Save Payment"}
-                  {!isLoading && <Save className="ml-2 h-4 w-4" />}
-                </Button>
-              </CardFooter>
-            </Card>
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="booking">Related Booking ID</Label>
+                <Input
+                  id="booking"
+                  name="booking"
+                  value={paymentData.booking}
+                  onChange={handleInputChange}
+                  placeholder="Booking ID (optional)"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="order">Related Order ID</Label>
+                <Input
+                  id="order"
+                  name="order"
+                  value={paymentData.order}
+                  onChange={handleInputChange}
+                  placeholder="Order ID (optional)"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="notes">Notes</Label>
+                <Textarea
+                  id="notes"
+                  name="notes"
+                  value={paymentData.notes}
+                  onChange={handleInputChange}
+                  placeholder="Add any additional notes about this payment"
+                  rows={4}
+                />
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-between">
+              <Button variant="outline" type="button" onClick={() => router.back()}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isLoading || guestsLoading}>
+                {isLoading ? "Saving..." : "Save Payment"}
+                {!isLoading && <Save className="ml-2 h-4 w-4" />}
+              </Button>
+            </CardFooter>
+          </Card>
         </div>
       </form>
     </div>
