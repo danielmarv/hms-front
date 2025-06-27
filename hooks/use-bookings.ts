@@ -217,11 +217,7 @@ export function useBookings() {
   }
 
   const getBookingCalendar = async (start_date: string, end_date: string) => {
-    return await request<{
-      success: boolean
-      count: number
-      data: any[]
-    }>(`/bookings/calendar?start_date=${start_date}&end_date=${end_date}`)
+    return await request(`/bookings/calendar?start_date=${start_date}&end_date=${end_date}`)
   }
 
   return {
