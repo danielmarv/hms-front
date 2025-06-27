@@ -213,19 +213,7 @@ export function useBookings() {
       }
     })
 
-    return await request<{
-      success: boolean
-      data: {
-        byStatus: any[]
-        bySource: any[]
-        daily: any[]
-        totals: {
-          totalBookings: number
-          totalRevenue: number
-          avgBookingValue: number
-        }
-      }
-    }>(`/bookings/stats?${queryParams.toString()}`)
+    return await request(`/bookings/stats?${queryParams.toString()}`)
   }
 
   const getBookingCalendar = async (start_date: string, end_date: string) => {
