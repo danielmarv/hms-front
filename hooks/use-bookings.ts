@@ -276,7 +276,7 @@ export function useBookings() {
       })
 
       const url = `/bookings/available-rooms?${queryParams.toString()}`
-      const { data, error } = await request<{ data: any[]; success: boolean }>(url)
+      const { data, error } = await request(url)
 
       if (error) {
         console.error("API error:", error)
