@@ -17,7 +17,7 @@ import { useGuests } from "@/hooks/use-guests"
 import { useRooms } from "@/hooks/use-rooms"
 import { useRealtimeUpdates } from "@/hooks/use-realtime-updates"
 import { useBookings } from "@/hooks/use-bookings"
-import { useHotelConfiguration } from "@/hooks/use-hotel-configuration"
+import { useCurrentHotel } from "@/hooks/use-current-hotel"
 import { useAuth } from "@/hooks/use-auth"
 
 export default function CheckInPage() {
@@ -55,20 +55,19 @@ export default function CheckInPage() {
   const [registrationData, setRegistrationData] = useState<any>(null)
   const [receiptData, setReceiptData] = useState<any>(null)
   const [invoiceData, setInvoiceData] = useState<any>(null)
-  const [configuration, setHotelConfig] = useState<any>(null)
 
   // API hooks
   const { checkInGuest, getCurrentOccupancy, isLoading: checkInLoading } = useCheckInApi()
   const { getGuests, createGuest, isLoading: guestsLoading } = useGuests()
   const { rooms, fetchRooms, fetchAvailableRooms, isLoading: roomsLoading } = useRooms()
   const { bookings, getBookings, isLoading: bookingsLoading } = useBookings()
+  const { hotel, configuration, effectiveConfig, isLoading: hotelLoading, error: hotelError } = useCurrentHotel()
 
   const [guests, setGuests] = useState<any[]>([])
 
-  // Add these hooks for real data
+  // Get user and hotel info
   const { user }: { user: any } = useAuth()
   const hotelId = user?.primaryHotel?.id
-  const { getHotelConfiguration } = useHotelConfiguration()
 
   // Real-time updates
   useRealtimeUpdates({
@@ -79,36 +78,45 @@ export default function CheckInPage() {
 
   // Load initial data
   useEffect(() => {
-    if (!user || !hotelId) {
-      toast.error("User or hotel not found")
+    if (!user) {
+      toast.error("User not found")
       return
     }
+
+    if (!hotelId) {
+      toast.error("Primary hotel not found for user")
+      return
+    }
+
+    console.log("Loading data for hotel:", hotelId, "User:", user.full_name)
     loadInitialData()
-  }, [user])
+  }, [user, hotelId])
 
   const loadInitialData = async () => {
     try {
+      console.log("Starting to load initial data...")
+
       // Load bookings
+      console.log("Loading bookings...")
       await getBookings({ status: "confirmed" })
 
-      // Load hotel configuration
-      const response = await getHotelConfiguration(hotelId)
-      if (response && response.data) {
-        setHotelConfig(response.data)
-      }
-
-      // Load guests with simpler approach
+      // Load guests
+      console.log("Loading guests...")
       const guestsResponse = await getGuests()
-
       if (guestsResponse.data && Array.isArray(guestsResponse.data)) {
         setGuests(guestsResponse.data)
+        console.log("Loaded", guestsResponse.data.length, "guests")
       } else {
         setGuests([])
+        console.log("No guests found")
       }
 
       // Load rooms
+      console.log("Loading rooms...")
       await fetchRooms()
       await getCurrentOccupancy()
+
+      console.log("Initial data loading completed")
     } catch (error) {
       console.error("Error loading initial data:", error)
       toast.error("Failed to load initial data")
@@ -120,6 +128,7 @@ export default function CheckInPage() {
     setSelectedGuest(booking.guest)
     setActiveTab("rooms")
 
+    // Search for available rooms based on booking requirements
     searchAvailableRooms({
       check_in: booking.check_in,
       check_out: booking.check_out,
@@ -170,27 +179,28 @@ export default function CheckInPage() {
       return
     }
 
+    // Prepare registration data with real hotel and user data
     const regData = {
       booking: selectedBooking,
       guest: selectedGuest,
       room: selectedRoom,
       checkInData,
       hotel: {
-        name: configuration?.hotel_name || "Hotel",
-        address: configuration?.address || "Hotel Address",
-        phone: configuration?.phone || "Hotel Phone",
-        email: configuration?.email || "hotel@example.com",
-        logo: configuration?.logo_url,
-        website: configuration?.website,
-        tax_id: configuration?.tax_id,
+        name: hotel?.name || "Hotel",
+        address: hotel?.address || configuration?.address || "Hotel Address",
+        phone: hotel?.contact?.phone || configuration?.phone || "Hotel Phone",
+        email: hotel?.contact?.email || configuration?.email || "hotel@example.com",
+        logo: hotel?.branding?.logoUrl || configuration?.branding?.logoUrl,
+        website: hotel?.contact?.website || configuration?.website,
+        tax_id: hotel?.legalInfo?.taxId || configuration?.tax_id,
       },
-      configuration,
+      configuration: effectiveConfig || configuration,
       checkInDate: new Date().toISOString(),
       staff: {
         name: user?.full_name || user?.name || "Front Desk Agent",
         id: user?.id || user?._id,
         email: user?.email,
-        role: user?.role,
+        role: user?.role?.name || user?.role,
         department: user?.department || "Front Desk",
       },
     }
@@ -201,7 +211,9 @@ export default function CheckInPage() {
 
   const handleCompleteCheckIn = async (registrationData: any) => {
     try {
+      // Format check-in data for the API to match backend expectations
       const checkInApiData = {
+        // Guest information
         guest_id: selectedGuest._id || selectedGuest.id,
         guest_info: selectedGuest._id
           ? undefined
@@ -239,10 +251,50 @@ export default function CheckInPage() {
         registration_document: registrationData.registration_document,
       }
 
+      console.log("Submitting check-in data:", checkInApiData)
       const checkInResult = await checkInGuest(checkInApiData)
+      console.log("Check-in result:", checkInResult)
+
+      // Prepare complete receipt data with all required information
+      const completeReceiptData = {
+        ...checkInResult,
+        guest: selectedGuest,
+        room: selectedRoom,
+        booking: selectedBooking,
+        number_of_nights: checkInData.numberOfNights || 1,
+        number_of_guests: checkInData.numberOfGuests || 1,
+        deposit_amount: checkInData.depositAmount || 0,
+        deposit_payment_method: checkInData.depositPaymentMethod || "Not specified",
+        key_cards_issued: checkInData.keyCards || 2,
+        expected_check_out:
+          selectedBooking?.check_out ||
+          new Date(Date.now() + (checkInData.numberOfNights || 1) * 24 * 60 * 60 * 1000).toISOString(),
+        additional_charges: [],
+        payment_status: checkInData.depositAmount > 0 ? "partial" : "pending",
+
+        // Ensure we have room rate information
+        room_rate: selectedRoom.roomType?.basePrice || selectedRoom.roomType?.rate || 100,
+        total_room_charges: (selectedRoom.roomType?.basePrice || 100) * (checkInData.numberOfNights || 1),
+        tax_rate:
+          effectiveConfig?.financial?.taxRates?.[0]?.rate || configuration?.financial?.taxRates?.[0]?.rate || 10,
+        tax_amount:
+          (selectedRoom.roomType?.basePrice || 100) *
+          (checkInData.numberOfNights || 1) *
+          ((effectiveConfig?.financial?.taxRates?.[0]?.rate || configuration?.financial?.taxRates?.[0]?.rate || 10) /
+            100),
+        total_amount:
+          (selectedRoom.roomType?.basePrice || 100) *
+          (checkInData.numberOfNights || 1) *
+          (1 +
+            (effectiveConfig?.financial?.taxRates?.[0]?.rate || configuration?.financial?.taxRates?.[0]?.rate || 10) /
+              100),
+      }
+
+      console.log("Complete receipt data:", completeReceiptData)
+      console.log("Configuration being passed:", configuration)
 
       // Show receipt with actual data and configuration
-      setReceiptData({ ...checkInResult, configuration })
+      setReceiptData(completeReceiptData)
       setShowReceiptDialog(true)
 
       // Reset form
@@ -285,12 +337,12 @@ export default function CheckInPage() {
   }
 
   const handlePrintReceipt = (checkInData: any) => {
-    setReceiptData({ ...checkInData, configuration })
+    setReceiptData({ ...checkInData })
     setShowReceiptDialog(true)
   }
 
   const handlePrintInvoice = (checkInData: any) => {
-    setInvoiceData({ ...checkInData, configuration })
+    setInvoiceData({ ...checkInData })
     setShowInvoiceDialog(true)
   }
 
@@ -300,11 +352,14 @@ export default function CheckInPage() {
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Guest Check-in</h1>
-          <p className="text-muted-foreground">Process guest arrivals and room assignments</p>
+          <p className="text-muted-foreground">
+            Process guest arrivals and room assignments
+            {hotel && <span className="ml-2 text-sm text-blue-600">• {hotel.name}</span>}
+          </p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={loadInitialData} variant="outline" size="sm">
-            <RefreshCw className="mr-2 h-4 w-4" />
+          <Button onClick={loadInitialData} variant="outline" size="sm" disabled={hotelLoading}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${hotelLoading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
           <Button onClick={() => setShowCreateGuestDialog(true)} size="sm">
@@ -416,14 +471,16 @@ export default function CheckInPage() {
         open={showReceiptDialog}
         onOpenChange={setShowReceiptDialog}
         receiptData={receiptData}
-        configuration={configuration}
+        hotel={hotel}
+        configuration={effectiveConfig || configuration}
       />
 
       <InvoiceDialog
         open={showInvoiceDialog}
         onOpenChange={setShowInvoiceDialog}
         invoiceData={invoiceData}
-        configuration={configuration}
+        hotel={hotel}
+        configuration={effectiveConfig || configuration}
       />
     </div>
   )

@@ -11,13 +11,18 @@ interface ReceiptDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   receiptData: any
+  hotel?: any
   configuration?: any
 }
 
-export function ReceiptDialog({ open, onOpenChange, receiptData, configuration }: ReceiptDialogProps) {
+export function ReceiptDialog({ open, onOpenChange, receiptData, hotel, configuration }: ReceiptDialogProps) {
   const printRef = useRef<HTMLDivElement>(null)
 
   if (!receiptData) return null
+
+  // Debug logging
+  console.log("Receipt Dialog - receiptData:", receiptData)
+  console.log("Receipt Dialog - configuration:", configuration)
 
   const handlePrint = () => {
     if (printRef.current) {
@@ -145,6 +150,17 @@ export function ReceiptDialog({ open, onOpenChange, receiptData, configuration }
                   font-weight: bold;
                   font-size: 16px;
                 }
+                .paid-full-row {
+                  background: #dcfce7;
+                  border: 1px solid #16a34a;
+                  padding: 12px;
+                  margin-top: 10px;
+                  border-radius: 5px;
+                  color: #166534;
+                  font-weight: bold;
+                  text-align: center;
+                  font-size: 16px;
+                }
                 .key-cards-section {
                   background: ${configuration?.branding?.primaryColor || "#3b82f6"}15;
                   border: 1px solid ${configuration?.branding?.primaryColor || "#3b82f6"};
@@ -245,17 +261,36 @@ export function ReceiptDialog({ open, onOpenChange, receiptData, configuration }
   }
 
   const calculateTotal = () => {
-    const roomRate = receiptData.room?.roomType?.basePrice || 0
-    const nights = receiptData.number_of_nights || 1
-    const subtotal = roomRate * nights
+    // Get room rate from multiple possible sources
+    const roomRate =
+      receiptData.room_rate ||
+      receiptData.room?.roomType?.basePrice ||
+      receiptData.room?.roomType?.rate ||
+      receiptData.total_room_charges ||
+      100 // fallback rate
 
-    const taxRate = configuration?.financial?.taxRates?.[0]?.rate || 0
-    const taxAmount = subtotal * (taxRate / 100)
-    const totalCharges = subtotal + taxAmount
+    const nights = receiptData.number_of_nights || 1
+    const subtotal = receiptData.total_room_charges || roomRate * nights
+
+    // Get tax information
+    const taxRate = receiptData.tax_rate || configuration?.financial?.taxRates?.[0]?.rate || 10
+    const taxAmount = receiptData.tax_amount || subtotal * (taxRate / 100)
+    const totalCharges = receiptData.total_amount || subtotal + taxAmount
 
     // Payment made by guest towards the bill
     const paymentReceived = receiptData.deposit_amount || 0
-    const balanceDue = totalCharges - paymentReceived
+    const balanceDue = Math.max(0, totalCharges - paymentReceived)
+
+    console.log("Receipt calculations:", {
+      roomRate,
+      nights,
+      subtotal,
+      taxRate,
+      taxAmount,
+      totalCharges,
+      paymentReceived,
+      balanceDue,
+    })
 
     return {
       subtotal,
@@ -263,7 +298,7 @@ export function ReceiptDialog({ open, onOpenChange, receiptData, configuration }
       taxRate,
       totalCharges,
       paymentReceived,
-      balanceDue: Math.max(0, balanceDue),
+      balanceDue,
     }
   }
 
@@ -280,34 +315,39 @@ export function ReceiptDialog({ open, onOpenChange, receiptData, configuration }
           <div ref={printRef} className="p-6 space-y-6">
             {/* Hotel Header */}
             <div className="header text-center">
-              {configuration?.branding?.logoUrl && (
+              {(hotel?.branding?.logoUrl || configuration?.branding?.logoUrl) && (
                 <img
-                  src={configuration.branding.logoUrl || "/placeholder.svg"}
+                  src={hotel?.branding?.logoUrl || configuration?.branding?.logoUrl || "/placeholder.svg"}
                   alt="Hotel Logo"
                   className="logo mx-auto"
+                  onError={(e) => {
+                    e.target.style.display = "none"
+                  }}
                 />
               )}
               <h1 className="hotel-name" style={{ color: configuration?.branding?.primaryColor || "#1e40af" }}>
-                {configuration?.hotel_name || "Hotel Name"}
+                {hotel?.name || configuration?.hotel_name || configuration?.name || "Hotel Name"}
               </h1>
               <div className="hotel-info space-y-1">
                 <div className="flex items-center justify-center gap-1">
                   <MapPin className="h-3 w-3" />
-                  <span>{configuration?.address || "Hotel Address"}</span>
+                  <span>{hotel?.address || configuration?.address || "Hotel Address"}</span>
                 </div>
                 <div className="flex items-center justify-center gap-4">
                   <div className="flex items-center gap-1">
                     <Phone className="h-3 w-3" />
-                    <span>{configuration?.phone || "+1-555-0100"}</span>
+                    <span>{hotel?.contact?.phone || configuration?.phone || "+1-555-0100"}</span>
                   </div>
-                  {configuration?.website && (
+                  {(hotel?.contact?.website || configuration?.website) && (
                     <div className="flex items-center gap-1">
                       <Globe className="h-3 w-3" />
-                      <span>{configuration.website}</span>
+                      <span>{hotel?.contact?.website || configuration?.website}</span>
                     </div>
                   )}
                 </div>
-                {configuration?.tax_id && <p className="text-xs">Tax ID: {configuration.tax_id}</p>}
+                {(hotel?.legalInfo?.taxId || configuration?.tax_id) && (
+                  <p className="text-xs">Tax ID: {hotel?.legalInfo?.taxId || configuration?.tax_id}</p>
+                )}
               </div>
             </div>
 
@@ -414,7 +454,7 @@ export function ReceiptDialog({ open, onOpenChange, receiptData, configuration }
                   <div>
                     <span className="font-medium">Room Rate</span>
                     <div className="text-xs text-gray-500">
-                      {receiptData.room?.roomType?.name} × {receiptData.number_of_nights || 1} night(s)
+                      {receiptData.room?.roomType?.name || "Room"} × {receiptData.number_of_nights || 1} night(s)
                     </div>
                   </div>
                   <span className="font-semibold">{formatCurrency(totals.subtotal)}</span>
@@ -428,7 +468,7 @@ export function ReceiptDialog({ open, onOpenChange, receiptData, configuration }
                 ))}
 
                 <div className="charge-row">
-                  <span className="font-medium">Tax ({totals.taxRate}%)</span>
+                  <span className="font-medium">Tax ({totals.taxRate.toFixed(1)}%)</span>
                   <span className="font-semibold">{formatCurrency(totals.taxAmount)}</span>
                 </div>
 
@@ -443,33 +483,24 @@ export function ReceiptDialog({ open, onOpenChange, receiptData, configuration }
                   <div className="payment-row">
                     <div className="flex justify-between items-center">
                       <div>
-                        <span className="font-medium">Payment Received</span>
-                        <div className="text-xs">
-                          {receiptData.deposit_payment_method || "Payment method not specified"}
-                        </div>
+                        <span className="font-medium">✓ Payment Received</span>
+                        <div className="text-xs">Method: {receiptData.deposit_payment_method || "Not specified"}</div>
                       </div>
-                      <span className="font-bold">-{formatCurrency(totals.paymentReceived)}</span>
+                      <span className="font-bold text-green-700">-{formatCurrency(totals.paymentReceived)}</span>
                     </div>
                   </div>
                 )}
 
-                {totals.balanceDue > 0 && (
+                {totals.balanceDue > 0 ? (
                   <div className="balance-row">
                     <div className="flex justify-between items-center">
                       <span>Balance Due at Checkout</span>
-                      <span>{formatCurrency(totals.balanceDue)}</span>
+                      <span className="font-bold">{formatCurrency(totals.balanceDue)}</span>
                     </div>
                   </div>
-                )}
-
-                {totals.balanceDue === 0 && totals.paymentReceived > 0 && (
-                  <div className="payment-row">
-                    <div className="flex justify-between items-center">
-                      <span className="font-bold">✓ PAID IN FULL</span>
-                      <span className="font-bold">$0.00</span>
-                    </div>
-                  </div>
-                )}
+                ) : totals.paymentReceived > 0 ? (
+                  <div className="paid-full-row">✓ PAID IN FULL</div>
+                ) : null}
               </div>
             </div>
 
@@ -508,11 +539,12 @@ export function ReceiptDialog({ open, onOpenChange, receiptData, configuration }
                 className="text-lg font-semibold mb-1"
                 style={{ color: configuration?.branding?.primaryColor || "#1e40af" }}
               >
-                Thank you for choosing {configuration?.hotel_name || "our hotel"}!
+                Thank you for choosing {hotel?.name || configuration?.hotel_name || "our hotel"}!
               </p>
               <p className="text-sm mb-2">We hope you enjoy your stay with us.</p>
               <p className="text-xs">
-                For questions or assistance, please contact our front desk at {configuration?.phone || "+1-555-0100"}
+                For questions or assistance, please contact our front desk at{" "}
+                {hotel?.contact?.phone || configuration?.phone || "+1-555-0100"}
               </p>
             </div>
           </div>
