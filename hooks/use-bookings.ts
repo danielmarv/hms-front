@@ -175,11 +175,9 @@ export function useBookings() {
   }
 
   const cancelBooking = async (id: string, cancellation_reason: string) => {
-    return await request<{
-      success: boolean
-      message: string
-      data: Booking
-    }>(`/bookings/${id}/cancel`, "PATCH", { cancellation_reason })
+    return await request(
+      `/bookings/${id}/cancel`, "PATCH", { cancellation_reason }
+    )
   }
 
   const checkInBooking = async (id: string) => {
