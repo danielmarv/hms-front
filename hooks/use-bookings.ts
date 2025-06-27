@@ -229,7 +229,7 @@ export function useBookings() {
 
   const checkInBooking = useCallback(
     async (id: string) => {
-      const { data, error } = await request<{ data: Booking; success: boolean; message?: string }>(
+      const { data, error } = await request(
         `/bookings/${id}/check-in`,
         "PATCH",
       )
@@ -248,7 +248,7 @@ export function useBookings() {
 
   const checkOutBooking = useCallback(
     async (id: string) => {
-      const { data, error } = await request<{ data: Booking; success: boolean; message?: string }>(
+      const { data, error } = await request(
         `/bookings/${id}/check-out`,
         "PATCH",
       )
