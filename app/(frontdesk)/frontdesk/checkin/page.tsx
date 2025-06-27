@@ -276,22 +276,19 @@ export default function CheckInPage() {
         room_rate: selectedRoom.roomType?.basePrice || selectedRoom.roomType?.rate || 100,
         total_room_charges: (selectedRoom.roomType?.basePrice || 100) * (checkInData.numberOfNights || 1),
         tax_rate:
-          effectiveConfig?.financial?.taxRates?.[0]?.rate || configuration?.financial?.taxRates?.[0]?.rate || 10,
+          effectiveConfig?.financial?.taxRates?.[0]?.rate || configuration?.financial?.taxRates?.[0]?.rate || 0,
         tax_amount:
           (selectedRoom.roomType?.basePrice || 100) *
           (checkInData.numberOfNights || 1) *
-          ((effectiveConfig?.financial?.taxRates?.[0]?.rate || configuration?.financial?.taxRates?.[0]?.rate || 10) /
+          ((effectiveConfig?.financial?.taxRates?.[0]?.rate || configuration?.financial?.taxRates?.[0]?.rate || 0) /
             100),
         total_amount:
           (selectedRoom.roomType?.basePrice || 100) *
           (checkInData.numberOfNights || 1) *
           (1 +
-            (effectiveConfig?.financial?.taxRates?.[0]?.rate || configuration?.financial?.taxRates?.[0]?.rate || 10) /
+            (effectiveConfig?.financial?.taxRates?.[0]?.rate || configuration?.financial?.taxRates?.[0]?.rate || 0) /
               100),
       }
-
-      console.log("Complete receipt data:", completeReceiptData)
-      console.log("Configuration being passed:", configuration)
 
       // Show receipt with actual data and configuration
       setReceiptData(completeReceiptData)

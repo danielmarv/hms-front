@@ -221,7 +221,7 @@ export function InvoiceDialog({ open, onOpenChange, invoiceData, hotel, configur
     const beforeTax = subtotal + additionalCharges - discounts
 
     // Get tax information
-    const defaultTaxRate = invoiceData.tax_rate || configuration?.financial?.taxRates?.[0]?.rate || 10
+    const defaultTaxRate = invoiceData.tax_rate || configuration?.financial?.taxRates?.[0]?.rate || 0
     const taxRate = defaultTaxRate / 100
     const taxAmount = invoiceData.tax_amount || beforeTax * taxRate
     const totalCharges = invoiceData.total_amount || beforeTax + taxAmount

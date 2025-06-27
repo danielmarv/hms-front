@@ -273,7 +273,7 @@ export function ReceiptDialog({ open, onOpenChange, receiptData, hotel, configur
     const subtotal = receiptData.total_room_charges || roomRate * nights
 
     // Get tax information
-    const taxRate = receiptData.tax_rate || configuration?.financial?.taxRates?.[0]?.rate || 10
+    const taxRate = receiptData.tax_rate || configuration?.financial?.taxRates?.[0]?.rate || 0
     const taxAmount = receiptData.tax_amount || subtotal * (taxRate / 100)
     const totalCharges = receiptData.total_amount || subtotal + taxAmount
 
