@@ -196,11 +196,7 @@ export function useBookings() {
       }
     })
 
-    const response = await request<{
-      success: boolean
-      count: number
-      data: any[]
-    }>(`/bookings/available-rooms?${queryParams.toString()}`)
+    const response = await request(`/bookings/available-rooms?${queryParams.toString()}`)
 
     if (response.data?.data) {
       setAvailableRooms(response.data.data)
