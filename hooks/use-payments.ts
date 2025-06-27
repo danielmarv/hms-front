@@ -7,6 +7,7 @@ import { toast } from "sonner"
 export type Payment = {
   _id: string
   receiptNumber: string
+  paymentNumber: string  
   guest: {
     _id: string
     full_name: string

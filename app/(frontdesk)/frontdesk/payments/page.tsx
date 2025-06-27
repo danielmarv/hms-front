@@ -284,7 +284,7 @@ export default function PaymentsPage() {
                 ) : (
                   payments.map((payment) => (
                     <TableRow key={payment._id}>
-                      <TableCell className="font-medium">{payment.receiptNumber || "N/A"}</TableCell>
+                      <TableCell className="font-medium">{payment.paymentNumber || "N/A"}</TableCell>
                       <TableCell>{payment.guest.full_name}</TableCell>
                       <TableCell className="hidden md:table-cell">{formatDate(payment.paidAt)}</TableCell>
                       <TableCell>{formatCurrency(payment.amountPaid, payment.currency)}</TableCell>
