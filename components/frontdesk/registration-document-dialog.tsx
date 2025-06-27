@@ -22,14 +22,18 @@ import { toast } from "sonner"
 interface RegistrationDocumentDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  registrationData: any // Replace 'any' with the actual type of registrationData
-  onConfirm: (registrationData: any) => void // Replace 'any' with the actual type of registrationData
+  registrationData: any
+  hotel?: any
+  configuration?: any
+  onConfirm: (registrationData: any) => void
 }
 
 const RegistrationDocumentDialog: React.FC<RegistrationDocumentDialogProps> = ({
   open,
   onOpenChange,
   registrationData,
+  hotel,
+  configuration,
   onConfirm,
 }) => {
   const [guestSignature, setGuestSignature] = useState<string | null>(null)
@@ -75,6 +79,17 @@ const RegistrationDocumentDialog: React.FC<RegistrationDocumentDialogProps> = ({
       // All the original registration data
       ...registrationData,
 
+      // Hotel information
+      hotel: {
+        name: hotel?.name || "Hotel",
+        address: hotel?.address || configuration?.address || "Hotel Address",
+        phone: hotel?.contact?.phone || configuration?.phone || "Hotel Phone",
+        email: hotel?.contact?.email || configuration?.email || "hotel@example.com",
+        logo: hotel?.branding?.logoUrl || configuration?.branding?.logoUrl,
+        website: hotel?.contact?.website || configuration?.website,
+        tax_id: hotel?.legalInfo?.taxId || configuration?.tax_id,
+      },
+
       // Registration document with signature and agreements
       registration_document: {
         guest_signature: guestSignature,
@@ -85,6 +100,11 @@ const RegistrationDocumentDialog: React.FC<RegistrationDocumentDialogProps> = ({
           no_smoking_policy: agreements.noSmokingPolicy,
         },
         additional_requests: additionalRequests,
+        hotel_policies: {
+          check_out_time: configuration?.operational?.checkOutTime || "12:00 PM",
+          cancellation_policy: configuration?.operational?.cancellationPolicy,
+          damage_policy: configuration?.operational?.damagePolicy,
+        },
       },
     }
 
@@ -96,7 +116,9 @@ const RegistrationDocumentDialog: React.FC<RegistrationDocumentDialogProps> = ({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Registration Document</AlertDialogTitle>
-          <AlertDialogDescription>Please review and sign the registration document.</AlertDialogDescription>
+          <AlertDialogDescription>
+            Please review and sign the registration document for {hotel?.name || "the hotel"}.
+          </AlertDialogDescription>
         </AlertDialogHeader>
         <div className="grid gap-4 py-4">
           <div>
@@ -121,7 +143,7 @@ const RegistrationDocumentDialog: React.FC<RegistrationDocumentDialogProps> = ({
                   handleAgreementChange({ target: { checked: checked ?? false } } as any, "termsAndConditions")
                 }
               />
-              <span className="ml-2">I agree to the Terms and Conditions</span>
+              <span className="ml-2">I agree to the Terms and Conditions of {hotel?.name || "the hotel"}</span>
             </Label>
           </div>
           <div>

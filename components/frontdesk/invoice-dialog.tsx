@@ -11,10 +11,11 @@ interface InvoiceDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   invoiceData: any
+  hotel?: any
   configuration?: any
 }
 
-export function InvoiceDialog({ open, onOpenChange, invoiceData, configuration }: InvoiceDialogProps) {
+export function InvoiceDialog({ open, onOpenChange, invoiceData, hotel, configuration }: InvoiceDialogProps) {
   const printRef = useRef<HTMLDivElement>(null)
 
   if (!invoiceData) return null
@@ -202,23 +203,32 @@ export function InvoiceDialog({ open, onOpenChange, invoiceData, configuration }
   }
 
   const calculateTotals = () => {
-    const roomRate = invoiceData.room?.roomType?.basePrice || 0
+    // Get room rate from multiple possible sources
+    const roomRate =
+      invoiceData.room_rate ||
+      invoiceData.room?.roomType?.basePrice ||
+      invoiceData.room?.roomType?.rate ||
+      invoiceData.total_room_charges ||
+      100 // fallback rate
+
     const nights = invoiceData.number_of_nights || 1
-    const subtotal = roomRate * nights
+    const subtotal = invoiceData.total_room_charges || roomRate * nights
 
     const additionalCharges =
       invoiceData.additional_charges?.reduce((sum: number, charge: any) => sum + charge.amount, 0) || 0
     const discounts = invoiceData.discounts?.reduce((sum: number, discount: any) => sum + discount.amount, 0) || 0
 
     const beforeTax = subtotal + additionalCharges - discounts
-    const defaultTaxRate = configuration?.financial?.taxRates?.[0]?.rate || 0
+
+    // Get tax information
+    const defaultTaxRate = invoiceData.tax_rate || configuration?.financial?.taxRates?.[0]?.rate || 0
     const taxRate = defaultTaxRate / 100
-    const taxAmount = beforeTax * taxRate
-    const totalCharges = beforeTax + taxAmount
+    const taxAmount = invoiceData.tax_amount || beforeTax * taxRate
+    const totalCharges = invoiceData.total_amount || beforeTax + taxAmount
 
     // Payment made by guest towards the bill
     const paymentReceived = invoiceData.deposit_amount || 0
-    const balanceDue = totalCharges - paymentReceived
+    const balanceDue = Math.max(0, totalCharges - paymentReceived)
 
     return {
       subtotal,
@@ -229,7 +239,7 @@ export function InvoiceDialog({ open, onOpenChange, invoiceData, configuration }
       taxAmount,
       totalCharges,
       paymentReceived,
-      balanceDue: Math.max(0, balanceDue),
+      balanceDue,
     }
   }
 
@@ -251,32 +261,37 @@ export function InvoiceDialog({ open, onOpenChange, invoiceData, configuration }
             {/* Hotel Header */}
             <div className="header">
               <div className="flex items-center justify-center mb-3">
-                {configuration?.branding?.logoUrl && (
+                {(hotel?.branding?.logoUrl || configuration?.branding?.logoUrl) && (
                   <img
-                    src={configuration.branding.logoUrl || "/placeholder.svg"}
-                    alt={configuration.hotel_name || "Hotel Logo"}
+                    src={hotel?.branding?.logoUrl || configuration?.branding?.logoUrl || "/placeholder.svg"}
+                    alt={hotel?.name || "Hotel Logo"}
                     className="logo mr-4"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = "none"
+                    }}
                   />
                 )}
-                <h1 className="hotel-name">{configuration?.hotel_name || "Hotel Name"}</h1>
+                <h1 className="hotel-name">
+                  {hotel?.name || configuration?.hotel_name || configuration?.name || "Hotel Name"}
+                </h1>
               </div>
               <div className="hotel-info space-y-2">
                 <div className="flex items-center justify-center gap-2">
                   <MapPin className="h-4 w-4" />
-                  <span>{configuration?.address || "Hotel Address"}</span>
+                  <span>{hotel?.address || configuration?.address || "Hotel Address"}</span>
                 </div>
                 <div className="flex items-center justify-center gap-6">
                   <div className="flex items-center gap-1">
                     <Phone className="h-4 w-4" />
-                    <span>{configuration?.phone || "+1-555-0100"}</span>
+                    <span>{hotel?.contact?.phone || configuration?.phone || "+1-555-0100"}</span>
                   </div>
-                  {configuration?.website && (
+                  {(hotel?.contact?.website || configuration?.website) && (
                     <div className="flex items-center gap-1">
                       <Globe className="h-4 w-4" />
-                      <span>{configuration.website}</span>
+                      <span>{hotel?.contact?.website || configuration?.website}</span>
                     </div>
                   )}
-                  <span>Tax ID: {configuration?.tax_id || "123-456-789"}</span>
+                  <span>Tax ID: {hotel?.legalInfo?.taxId || configuration?.tax_id || "123-456-789"}</span>
                 </div>
               </div>
             </div>
@@ -470,7 +485,7 @@ export function InvoiceDialog({ open, onOpenChange, invoiceData, configuration }
                       }}
                     >
                       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "5px" }}>
-                        <span style={{ fontWeight: "600", color: "#166534" }}>Payment Received:</span>
+                        <span style={{ fontWeight: "600", color: "#166534" }}>✓ Payment Received:</span>
                         <span style={{ fontWeight: "600", color: "#166534" }}>
                           -{formatCurrency(totals.paymentReceived)}
                         </span>
@@ -554,12 +569,12 @@ export function InvoiceDialog({ open, onOpenChange, invoiceData, configuration }
                   color: configuration?.branding?.primaryColor || "#1e40af",
                 }}
               >
-                Thank you for choosing {configuration?.hotel_name || "our hotel"}!
+                Thank you for choosing {hotel?.name || configuration?.hotel_name || "our hotel"}!
               </p>
               <p style={{ marginBottom: "4px" }}>We appreciate your business and hope you enjoy your stay.</p>
               <p>
                 For questions about this invoice, please contact our accounting department at{" "}
-                {configuration?.phone || "+1-555-0100"}
+                {hotel?.contact?.phone || configuration?.phone || "+1-555-0100"}
               </p>
             </div>
           </div>

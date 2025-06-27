@@ -190,7 +190,7 @@ export function FrontDeskSidebar({ user }: FrontDeskSidebarProps) {
       </Sheet>
 
       {/* Desktop Sidebar */}
-      <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
+      <div className="hidden lg:fixed lg:inset-y-0 lg:z-40 lg:flex lg:w-52 lg:flex-col">
         <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r border-sidebar-border bg-sidebar">
           <SidebarContent />
         </div>

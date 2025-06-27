@@ -138,6 +138,7 @@ export type CreateGuestData = Omit<
 export function useGuests() {
   const { request, isLoading } = useApi()
   const [guestStats, setGuestStats] = useState<GuestStats | null>(null)
+  
 
   const getGuests = async (filters: GuestFilters = {}) => {
     // Convert filters to query string
@@ -148,13 +149,7 @@ export function useGuests() {
       }
     })
 
-    return await request<{
-      success: boolean
-      count: number
-      total: number
-      pagination: { page: number; limit: number; totalPages: number }
-      data: Guest[]
-    }>(`/guests?${queryParams.toString()}`)
+    return await request(`/guests?${queryParams.toString()}`)
   }
 
   const getGuestById = async (id: string) => {
@@ -162,25 +157,15 @@ export function useGuests() {
     if (id === "new") {
       return { data: null, error: null, isLoading: false }
     }
-    return await request<{
-      success: boolean
-      data: Guest
-    }>(`/guests/${id}`)
+    return await request(`/guests/${id}`)
   }
 
   const getGuestBookingHistory = async (id: string) => {
-    return await request<{
-      success: boolean
-      count: number
-      data: GuestBooking[]
-    }>(`/guests/${id}/bookings`)
+    return await request(`/guests/${id}/bookings`)
   }
 
   const createGuest = async (guestData: Partial<CreateGuestData>) => {
-    return await request<{
-      success: boolean
-      data: Guest
-    }>("/guests", "POST", guestData)
+    return await request("/guests", "POST", guestData)
   }
 
   const updateGuest = async (id: string, guestData: Partial<CreateGuestData>) => {

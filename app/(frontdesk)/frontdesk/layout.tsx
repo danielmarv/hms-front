@@ -55,7 +55,7 @@ export default function FrontDeskLayout({
   return (
     <div className="flex min-h-screen bg-background">
       <FrontDeskSidebar user={user} />
-      <main className="flex-1 pl-0 lg:pl-72">
+      <main className="flex-1 pl-0 lg:pl-56">
         <div className="h-full bg-background">{children}</div>
       </main>
       <Toaster position="top-right" />
