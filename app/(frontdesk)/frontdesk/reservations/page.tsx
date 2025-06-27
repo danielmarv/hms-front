@@ -75,9 +75,9 @@ export default function ReservationsPage() {
     getBookingStats,
   } = useBookings()
 
-  const { getGuests, guests } = useGuests()
-  const { fetchRooms, rooms } = useRooms()
-  const { fetchRoomTypes, roomTypes } = useRoomTypes()
+  const { getGuests} = useGuests()
+  const { fetchRooms } = useRooms()
+  const { fetchRoomTypes } = useRoomTypes()
 
   const [filters, setFilters] = useState<BookingFilters>({
     page: 1,
