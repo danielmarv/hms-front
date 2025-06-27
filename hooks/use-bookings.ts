@@ -169,7 +169,7 @@ export function useBookings() {
 
   const createBooking = useCallback(
     async (bookingData: CreateBookingData) => {
-      const { data, error } = await request<{ data: Booking; success: boolean; message?: string }>(
+      const { data, error } = await request(
         "/bookings",
         "POST",
         bookingData,
