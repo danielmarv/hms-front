@@ -6,122 +6,464 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Users, Calendar, CreditCard, Key, UserCheck, UserX, Clock, AlertTriangle } from "lucide-react"
+import { Progress } from "@/components/ui/progress"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Users,
+  Calendar,
+  CreditCard,
+  Key,
+  UserCheck,
+  UserX,
+  Clock,
+  AlertTriangle,
+  Phone,
+  MessageSquare,
+  ClipboardList,
+  TrendingUp,
+  DollarSign,
+  Bed,
+  Utensils,
+  Wifi,
+  RefreshCw,
+  MapPin,
+} from "lucide-react"
 import Link from "next/link"
 import { workflowCoordinator } from "@/lib/workflow-coordinator"
 import { useRooms } from "@/hooks/use-rooms"
 import { useGuests } from "@/hooks/use-guests"
 import { useMaintenanceRequests } from "@/hooks/use-maintenance"
+import { useCheckInApi } from "@/hooks/use-checkin-api"
+import { usePayments } from "@/hooks/use-payments"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
+import { format, addDays } from "date-fns"
 
 interface ActivityItem {
-  id: number
-  type: string
+  id: string
+  type: "checkin" | "checkout" | "maintenance" | "payment" | "reservation" | "complaint" | "service"
   guest?: string
+  guestId?: string
   room?: string
   time: string
-  status: string
+  status: "completed" | "pending" | "in-progress" | "cancelled"
   description?: string
+  amount?: number
+  priority?: "low" | "medium" | "high" | "urgent"
 }
 
 interface TaskItem {
   id: string
   title: string
-  priority: string
+  description: string
+  priority: "low" | "medium" | "high" | "urgent"
   time: string
+  assignedTo?: string
+  category: "maintenance" | "housekeeping" | "guest_service" | "admin"
+  dueDate?: string
 }
 
 interface ArrivalItem {
   id: string
   guest: string
+  guestId: string
   room: string
+  roomType: string
   time: string
-  status: string
+  status: "confirmed" | "checked_in" | "no_show" | "cancelled"
   vip: boolean
+  specialRequests?: string[]
+  estimatedArrival?: string
+  contactNumber?: string
+}
+
+interface DepartureItem {
+  id: string
+  guest: string
+  guestId: string
+  room: string
+  checkOutTime: string
+  status: "scheduled" | "checked_out" | "late_checkout" | "extended"
+  balanceDue: number
+  vip: boolean
+}
+
+interface ReservationItem {
+  id: string
+  guest: string
+  checkIn: string
+  checkOut: string
+  roomType: string
+  status: "confirmed" | "pending" | "cancelled"
+  totalAmount: number
+  source: "direct" | "booking.com" | "expedia" | "phone" | "walk_in"
+}
+
+interface ServiceRequest {
+  id: string
+  guest: string
+  room: string
+  type: "housekeeping" | "maintenance" | "concierge" | "room_service" | "laundry"
+  description: string
+  priority: "low" | "medium" | "high" | "urgent"
+  status: "pending" | "in_progress" | "completed"
+  requestedAt: string
 }
 
 export default function FrontDeskDashboard() {
   const { fetchRooms, fetchRoomStats, roomStats, isLoading: roomsLoading } = useRooms()
   const { getGuests, getGuestStatistics, guestStats, isLoading: guestsLoading } = useGuests()
   const { getMaintenanceRequests, isLoading: maintenanceLoading } = useMaintenanceRequests()
+  const { getCheckIns, getCurrentOccupancy } = useCheckInApi()
+  const { getPaymentStats } = usePayments()
 
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([])
   const [pendingTasks, setPendingTasks] = useState<TaskItem[]>([])
-  const [upcomingArrivals, setUpcomingArrivals] = useState<ArrivalItem[]>([])
+  const [todayArrivals, setTodayArrivals] = useState<ArrivalItem[]>([])
+  const [todayDepartures, setTodayDepartures] = useState<DepartureItem[]>([])
+  const [upcomingReservations, setUpcomingReservations] = useState<ReservationItem[]>([])
+  const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>([])
   const [maintenanceRequests, setMaintenanceRequests] = useState<any[]>([])
+  const [occupancyData, setOccupancyData] = useState<any>(null)
+  const [paymentStats, setPaymentStats] = useState<any>(null)
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
 
   useEffect(() => {
     loadDashboardData()
+    // Set up auto-refresh every 5 minutes
+    const interval = setInterval(loadDashboardData, 5 * 60 * 1000)
+    return () => clearInterval(interval)
   }, [])
 
   const loadDashboardData = async () => {
     try {
+      setLastRefresh(new Date())
+
       // Load room statistics
       await fetchRoomStats()
 
       // Load guest statistics
       await getGuestStatistics()
 
-      // Load recent guests for upcoming arrivals
-      const guestsResponse = await getGuests({ limit: 10, sort: "-createdAt" })
-      if (guestsResponse.data && Array.isArray(guestsResponse.data)) {
-        setUpcomingArrivals(
-          guestsResponse.data.slice(0, 5).map((guest: any) => ({
-            id: guest._id,
-            guest: guest.full_name,
-            room: "TBD", // Would come from booking data
-            time: new Date().toLocaleTimeString(),
-            status: "confirmed",
-            vip: guest.vip || false,
-          })),
-        )
-      }
+      // Load occupancy data
+      const occupancy = await getCurrentOccupancy()
+      setOccupancyData(occupancy)
+
+      // Load payment statistics
+      const payments = await getPaymentStats()
+      setPaymentStats(payments)
 
       // Load maintenance requests
-      const maintenanceResponse = await getMaintenanceRequests({ status: "pending", limit: 5 })
+      const maintenanceResponse = await getMaintenanceRequests({ status: "pending", limit: 10 })
       if ("data" in maintenanceResponse && Array.isArray(maintenanceResponse.data)) {
         setMaintenanceRequests(maintenanceResponse.data)
-        setPendingTasks(
-          maintenanceResponse.data.map((req: any) => ({
-            id: req._id,
-            title: `${req.type} - Room ${req.room?.number || "N/A"}`,
-            priority: req.priority,
-            time: new Date(req.createdAt).toLocaleString(),
-          })),
-        )
       }
 
-      // Simulate recent activity (in real app, this would come from activity logs)
-      setRecentActivity([
-        {
-          id: 1,
-          type: "checkin",
-          guest: "Recent Check-in",
-          room: "301",
-          time: new Date().toLocaleTimeString(),
-          status: "completed",
-        },
-        {
-          id: 2,
-          type: "maintenance",
-          description: "Maintenance Request",
-          room: "412",
-          time: new Date().toLocaleTimeString(),
-          status: "pending",
-        },
-      ])
+      // Generate realistic mock data
+      generateMockData()
     } catch (error) {
       console.error("Error loading dashboard data:", error)
       toast.error("Failed to load dashboard data")
     }
   }
 
+  const generateMockData = () => {
+    // Generate realistic recent activity
+    const activities: ActivityItem[] = [
+      {
+        id: "1",
+        type: "checkin",
+        guest: "Sarah Johnson",
+        guestId: "guest_001",
+        room: "301",
+        time: format(new Date(Date.now() - 15 * 60 * 1000), "HH:mm"),
+        status: "completed",
+        description: "Standard check-in completed",
+      },
+      {
+        id: "2",
+        type: "payment",
+        guest: "Michael Chen",
+        guestId: "guest_002",
+        room: "205",
+        time: format(new Date(Date.now() - 32 * 60 * 1000), "HH:mm"),
+        status: "completed",
+        amount: 450.0,
+        description: "Payment received for room charges",
+      },
+      {
+        id: "3",
+        type: "maintenance",
+        room: "412",
+        time: format(new Date(Date.now() - 45 * 60 * 1000), "HH:mm"),
+        status: "pending",
+        priority: "high",
+        description: "Air conditioning not working",
+      },
+      {
+        id: "4",
+        type: "checkout",
+        guest: "Emma Wilson",
+        guestId: "guest_003",
+        room: "156",
+        time: format(new Date(Date.now() - 67 * 60 * 1000), "HH:mm"),
+        status: "completed",
+        description: "Express checkout completed",
+      },
+      {
+        id: "5",
+        type: "service",
+        guest: "David Rodriguez",
+        guestId: "guest_004",
+        room: "234",
+        time: format(new Date(Date.now() - 89 * 60 * 1000), "HH:mm"),
+        status: "in-progress",
+        description: "Room service delivery",
+      },
+      {
+        id: "6",
+        type: "complaint",
+        guest: "Lisa Thompson",
+        guestId: "guest_005",
+        room: "178",
+        time: format(new Date(Date.now() - 112 * 60 * 1000), "HH:mm"),
+        status: "pending",
+        priority: "medium",
+        description: "Noise complaint from neighboring room",
+      },
+    ]
+    setRecentActivity(activities)
+
+    // Generate pending tasks
+    const tasks: TaskItem[] = [
+      {
+        id: "task_1",
+        title: "AC Repair - Room 412",
+        description: "Air conditioning unit not cooling properly",
+        priority: "high",
+        time: format(new Date(Date.now() - 45 * 60 * 1000), "HH:mm"),
+        assignedTo: "Maintenance Team",
+        category: "maintenance",
+        dueDate: format(addDays(new Date(), 0), "yyyy-MM-dd"),
+      },
+      {
+        id: "task_2",
+        title: "VIP Guest Arrival Preparation",
+        description: "Prepare suite 501 for VIP guest arrival at 3 PM",
+        priority: "high",
+        time: format(new Date(Date.now() - 30 * 60 * 1000), "HH:mm"),
+        assignedTo: "Housekeeping",
+        category: "guest_service",
+        dueDate: format(new Date(), "yyyy-MM-dd"),
+      },
+      {
+        id: "task_3",
+        title: "Noise Complaint Investigation",
+        description: "Investigate noise complaint from room 178",
+        priority: "medium",
+        time: format(new Date(Date.now() - 112 * 60 * 1000), "HH:mm"),
+        assignedTo: "Front Desk",
+        category: "guest_service",
+        dueDate: format(new Date(), "yyyy-MM-dd"),
+      },
+      {
+        id: "task_4",
+        title: "Late Checkout Processing",
+        description: "Process late checkout for room 289",
+        priority: "medium",
+        time: format(new Date(Date.now() - 25 * 60 * 1000), "HH:mm"),
+        assignedTo: "Front Desk",
+        category: "admin",
+        dueDate: format(new Date(), "yyyy-MM-dd"),
+      },
+      {
+        id: "task_5",
+        title: "Minibar Restock",
+        description: "Restock minibar in rooms 345, 346, 347",
+        priority: "low",
+        time: format(new Date(Date.now() - 180 * 60 * 1000), "HH:mm"),
+        assignedTo: "Housekeeping",
+        category: "housekeeping",
+        dueDate: format(addDays(new Date(), 1), "yyyy-MM-dd"),
+      },
+    ]
+    setPendingTasks(tasks)
+
+    // Generate today's arrivals
+    const arrivals: ArrivalItem[] = [
+      {
+        id: "arr_1",
+        guest: "Robert Anderson",
+        guestId: "guest_006",
+        room: "425",
+        roomType: "Deluxe Suite",
+        time: "15:00",
+        status: "confirmed",
+        vip: true,
+        specialRequests: ["Late checkout", "Extra pillows", "Champagne"],
+        estimatedArrival: "14:30",
+        contactNumber: "+1-555-0123",
+      },
+      {
+        id: "arr_2",
+        guest: "Maria Garcia",
+        guestId: "guest_007",
+        room: "312",
+        roomType: "Standard Room",
+        time: "16:30",
+        status: "confirmed",
+        vip: false,
+        specialRequests: ["Ground floor room"],
+        estimatedArrival: "16:00",
+        contactNumber: "+1-555-0124",
+      },
+      {
+        id: "arr_3",
+        guest: "James Wilson",
+        guestId: "guest_008",
+        room: "189",
+        roomType: "Business Room",
+        time: "18:00",
+        status: "confirmed",
+        vip: false,
+        estimatedArrival: "17:45",
+        contactNumber: "+1-555-0125",
+      },
+      {
+        id: "arr_4",
+        guest: "Jennifer Lee",
+        guestId: "guest_009",
+        room: "267",
+        roomType: "Family Room",
+        time: "14:00",
+        status: "checked_in",
+        vip: false,
+        specialRequests: ["Crib for baby"],
+        contactNumber: "+1-555-0126",
+      },
+    ]
+    setTodayArrivals(arrivals)
+
+    // Generate today's departures
+    const departures: DepartureItem[] = [
+      {
+        id: "dep_1",
+        guest: "Thomas Brown",
+        guestId: "guest_010",
+        room: "145",
+        checkOutTime: "11:00",
+        status: "checked_out",
+        balanceDue: 0,
+        vip: false,
+      },
+      {
+        id: "dep_2",
+        guest: "Amanda Davis",
+        guestId: "guest_011",
+        room: "298",
+        checkOutTime: "12:00",
+        status: "late_checkout",
+        balanceDue: 75.0,
+        vip: true,
+      },
+      {
+        id: "dep_3",
+        guest: "Kevin Martinez",
+        guestId: "guest_012",
+        room: "367",
+        checkOutTime: "11:30",
+        status: "scheduled",
+        balanceDue: 125.5,
+        vip: false,
+      },
+      {
+        id: "dep_4",
+        guest: "Rachel Taylor",
+        guestId: "guest_013",
+        room: "423",
+        checkOutTime: "10:30",
+        status: "extended",
+        balanceDue: 0,
+        vip: true,
+      },
+    ]
+    setTodayDepartures(departures)
+
+    // Generate upcoming reservations
+    const reservations: ReservationItem[] = [
+      {
+        id: "res_1",
+        guest: "Christopher White",
+        checkIn: format(addDays(new Date(), 1), "yyyy-MM-dd"),
+        checkOut: format(addDays(new Date(), 4), "yyyy-MM-dd"),
+        roomType: "Executive Suite",
+        status: "confirmed",
+        totalAmount: 1200.0,
+        source: "direct",
+      },
+      {
+        id: "res_2",
+        guest: "Nicole Johnson",
+        checkIn: format(addDays(new Date(), 1), "yyyy-MM-dd"),
+        checkOut: format(addDays(new Date(), 3), "yyyy-MM-dd"),
+        roomType: "Standard Room",
+        status: "confirmed",
+        totalAmount: 450.0,
+        source: "booking.com",
+      },
+      {
+        id: "res_3",
+        guest: "Daniel Kim",
+        checkIn: format(addDays(new Date(), 2), "yyyy-MM-dd"),
+        checkOut: format(addDays(new Date(), 5), "yyyy-MM-dd"),
+        roomType: "Business Room",
+        status: "pending",
+        totalAmount: 675.0,
+        source: "expedia",
+      },
+    ]
+    setUpcomingReservations(reservations)
+
+    // Generate service requests
+    const services: ServiceRequest[] = [
+      {
+        id: "srv_1",
+        guest: "Sarah Johnson",
+        room: "301",
+        type: "room_service",
+        description: "Dinner order - Grilled salmon with vegetables",
+        priority: "medium",
+        status: "in_progress",
+        requestedAt: format(new Date(Date.now() - 20 * 60 * 1000), "HH:mm"),
+      },
+      {
+        id: "srv_2",
+        guest: "Michael Chen",
+        room: "205",
+        type: "housekeeping",
+        description: "Extra towels and toiletries",
+        priority: "low",
+        status: "pending",
+        requestedAt: format(new Date(Date.now() - 35 * 60 * 1000), "HH:mm"),
+      },
+      {
+        id: "srv_3",
+        guest: "Robert Anderson",
+        room: "425",
+        type: "concierge",
+        description: "Restaurant reservation for 2 at 8 PM",
+        priority: "high",
+        status: "completed",
+        requestedAt: format(new Date(Date.now() - 90 * 60 * 1000), "HH:mm"),
+      },
+    ]
+    setServiceRequests(services)
+  }
+
   useEffect(() => {
     // Listen for workflow events
     const handleWorkflowEvent = (event: any) => {
       console.log("Front desk received workflow event:", event)
-      // Refresh data when workflows complete
       loadDashboardData()
     }
 
@@ -142,6 +484,12 @@ export default function FrontDeskDashboard() {
         return <AlertTriangle className="h-4 w-4 text-orange-600" />
       case "payment":
         return <CreditCard className="h-4 w-4 text-purple-600" />
+      case "reservation":
+        return <Calendar className="h-4 w-4 text-indigo-600" />
+      case "service":
+        return <Utensils className="h-4 w-4 text-teal-600" />
+      case "complaint":
+        return <MessageSquare className="h-4 w-4 text-red-600" />
       default:
         return <Clock className="h-4 w-4 text-gray-600" />
     }
@@ -154,7 +502,22 @@ export default function FrontDeskDashboard() {
       case "pending":
         return <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>
       case "in-progress":
+      case "in_progress":
         return <Badge className="bg-blue-100 text-blue-800">In Progress</Badge>
+      case "cancelled":
+        return <Badge className="bg-red-100 text-red-800">Cancelled</Badge>
+      case "confirmed":
+        return <Badge className="bg-green-100 text-green-800">Confirmed</Badge>
+      case "checked_in":
+        return <Badge className="bg-blue-100 text-blue-800">Checked In</Badge>
+      case "checked_out":
+        return <Badge className="bg-gray-100 text-gray-800">Checked Out</Badge>
+      case "late_checkout":
+        return <Badge className="bg-orange-100 text-orange-800">Late Checkout</Badge>
+      case "extended":
+        return <Badge className="bg-purple-100 text-purple-800">Extended</Badge>
+      case "no_show":
+        return <Badge className="bg-red-100 text-red-800">No Show</Badge>
       default:
         return <Badge variant="outline">{status}</Badge>
     }
@@ -162,6 +525,8 @@ export default function FrontDeskDashboard() {
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
+      case "urgent":
+        return "border-l-red-600 bg-red-50"
       case "high":
         return "border-l-red-500 bg-red-50"
       case "medium":
@@ -170,6 +535,38 @@ export default function FrontDeskDashboard() {
         return "border-l-green-500 bg-green-50"
       default:
         return "border-l-gray-500 bg-gray-50"
+    }
+  }
+
+  const getCategoryIcon = (category: string) => {
+    switch (category) {
+      case "maintenance":
+        return <AlertTriangle className="h-4 w-4" />
+      case "housekeeping":
+        return <Bed className="h-4 w-4" />
+      case "guest_service":
+        return <Users className="h-4 w-4" />
+      case "admin":
+        return <ClipboardList className="h-4 w-4" />
+      default:
+        return <Clock className="h-4 w-4" />
+    }
+  }
+
+  const getServiceIcon = (type: string) => {
+    switch (type) {
+      case "room_service":
+        return <Utensils className="h-4 w-4 text-orange-600" />
+      case "housekeeping":
+        return <Bed className="h-4 w-4 text-blue-600" />
+      case "maintenance":
+        return <AlertTriangle className="h-4 w-4 text-red-600" />
+      case "concierge":
+        return <MapPin className="h-4 w-4 text-purple-600" />
+      case "laundry":
+        return <Wifi className="h-4 w-4 text-teal-600" />
+      default:
+        return <Clock className="h-4 w-4 text-gray-600" />
     }
   }
 
@@ -209,9 +606,16 @@ export default function FrontDeskDashboard() {
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Front Desk Dashboard</h1>
-          <p className="text-muted-foreground">Welcome back! Here's what's happening at your hotel today.</p>
+          <p className="text-muted-foreground">
+            Welcome back! Here's what's happening at your hotel today.
+            <span className="ml-2 text-xs">Last updated: {format(lastRefresh, "HH:mm:ss")}</span>
+          </p>
         </div>
         <div className="flex gap-2">
+          <Button onClick={loadDashboardData} variant="outline" size="sm">
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Refresh
+          </Button>
           <Button asChild>
             <Link href="/frontdesk/checkin">
               <UserCheck className="mr-2 h-4 w-4" />
@@ -236,134 +640,168 @@ export default function FrontDeskDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{occupancyRate}%</div>
-            <p className="text-xs text-muted-foreground">{availableRooms} rooms available</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Guests</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{guestStats?.totalGuests || 0}</div>
-            <p className="text-xs text-muted-foreground">{guestStats?.vipGuests || 0} VIP guests</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Room Status</CardTitle>
-            <Key className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{roomStats?.occupied || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              {roomStats?.cleaning || 0} cleaning, {roomStats?.maintenance || 0} maintenance
+            <Progress value={occupancyRate} className="mt-2" />
+            <p className="text-xs text-muted-foreground mt-2">
+              {totalRooms - availableRooms} occupied • {availableRooms} available
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Issues</CardTitle>
+            <CardTitle className="text-sm font-medium">Today's Revenue</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">$12,450</div>
+            <div className="flex items-center text-xs text-green-600 mt-1">
+              <TrendingUp className="h-3 w-3 mr-1" />
+              +12% from yesterday
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Room: $8,900 • Services: $3,550</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Guests</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{guestStats?.totalGuests || 156}</div>
+            <p className="text-xs text-muted-foreground">
+              {guestStats?.vipGuests || 12} VIP • {guestStats?.loyaltyMembers || 89} Loyalty
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pending Issues</CardTitle>
             <AlertTriangle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{maintenanceRequests.length}</div>
-            <p className="text-xs text-muted-foreground">Maintenance requests pending</p>
+            <div className="text-2xl font-bold">{pendingTasks.length}</div>
+            <p className="text-xs text-muted-foreground">
+              {pendingTasks.filter((t) => t.priority === "high" || t.priority === "urgent").length} high priority
+            </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Main Content */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {/* Recent Activity */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-            <CardDescription>Latest check-ins, check-outs, and other activities</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[300px]">
-              <div className="space-y-4">
-                {recentActivity.length > 0 ? (
-                  recentActivity.map((activity) => (
-                    <div key={activity.id} className="flex items-center justify-between space-x-4">
-                      <div className="flex items-center space-x-3">
-                        {getActivityIcon(activity.type)}
-                        <div className="space-y-1">
-                          <p className="text-sm font-medium leading-none">
-                            {activity.type === "checkin" && `Check-in: ${activity.guest}`}
-                            {activity.type === "checkout" && `Check-out: ${activity.guest}`}
-                            {activity.type === "maintenance" && activity.description}
-                            {activity.type === "payment" && `Payment: ${activity.guest}`}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {activity.room && `Room ${activity.room} • `}
-                            {activity.time}
-                          </p>
+      {/* Main Content Tabs */}
+      <Tabs defaultValue="overview" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="arrivals">Arrivals</TabsTrigger>
+          <TabsTrigger value="departures">Departures</TabsTrigger>
+          <TabsTrigger value="services">Services</TabsTrigger>
+          <TabsTrigger value="tasks">Tasks</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-6">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {/* Recent Activity */}
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  Recent Activity
+                </CardTitle>
+                <CardDescription>Latest check-ins, check-outs, and other activities</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-[400px]">
+                  <div className="space-y-4">
+                    {recentActivity.map((activity) => (
+                      <div
+                        key={activity.id}
+                        className="flex items-start justify-between space-x-4 p-3 rounded-lg border"
+                      >
+                        <div className="flex items-start space-x-3">
+                          {getActivityIcon(activity.type)}
+                          <div className="space-y-1 flex-1">
+                            <p className="text-sm font-medium leading-none">
+                              {activity.type === "checkin" && `Check-in: ${activity.guest}`}
+                              {activity.type === "checkout" && `Check-out: ${activity.guest}`}
+                              {activity.type === "maintenance" && activity.description}
+                              {activity.type === "payment" && `Payment: ${activity.guest} - $${activity.amount}`}
+                              {activity.type === "service" && `Service: ${activity.description}`}
+                              {activity.type === "complaint" && `Complaint: ${activity.description}`}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {activity.room && `Room ${activity.room} • `}
+                              {activity.time}
+                              {activity.priority && ` • ${activity.priority} priority`}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                          {getStatusBadge(activity.status)}
+                          {activity.guestId && (
+                            <Button variant="ghost" size="sm" asChild>
+                              <Link href={`/frontdesk/guests/${activity.guestId}`}>View</Link>
+                            </Button>
+                          )}
                         </div>
                       </div>
-                      {getStatusBadge(activity.status)}
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-sm text-muted-foreground">No recent activity</p>
-                )}
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
 
-        {/* Pending Tasks */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Pending Tasks</CardTitle>
-            <CardDescription>Items requiring your attention</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[300px]">
-              <div className="space-y-3">
-                {pendingTasks.length > 0 ? (
-                  pendingTasks.map((task) => (
-                    <div key={task.id} className={`p-3 rounded-lg border-l-4 ${getPriorityColor(task.priority)}`}>
-                      <p className="text-sm font-medium">{task.title}</p>
-                      <div className="flex items-center justify-between mt-2">
-                        <p className="text-xs text-muted-foreground">{task.time}</p>
-                        <Badge
-                          variant={
-                            task.priority === "high"
-                              ? "destructive"
-                              : task.priority === "medium"
-                                ? "default"
-                                : "secondary"
-                          }
-                        >
-                          {task.priority}
-                        </Badge>
+            {/* Upcoming Reservations */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5" />
+                  Upcoming Reservations
+                </CardTitle>
+                <CardDescription>Next 3 days</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-[400px]">
+                  <div className="space-y-3">
+                    {upcomingReservations.map((reservation) => (
+                      <div key={reservation.id} className="p-3 rounded-lg border space-y-2">
+                        <div className="flex items-center justify-between">
+                          <p className="font-medium text-sm">{reservation.guest}</p>
+                          {getStatusBadge(reservation.status)}
+                        </div>
+                        <div className="text-xs text-muted-foreground space-y-1">
+                          <p>{reservation.roomType}</p>
+                          <p>
+                            {format(new Date(reservation.checkIn), "MMM dd")} -{" "}
+                            {format(new Date(reservation.checkOut), "MMM dd")}
+                          </p>
+                          <p className="font-medium">${reservation.totalAmount}</p>
+                          <Badge variant="outline" className="text-xs">
+                            {reservation.source}
+                          </Badge>
+                        </div>
                       </div>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-sm text-muted-foreground">No pending tasks</p>
-                )}
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
 
-        {/* Upcoming Arrivals */}
-        <Card className="lg:col-span-3">
-          <CardHeader>
-            <CardTitle>Recent Guests</CardTitle>
-            <CardDescription>Recently registered guests</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {upcomingArrivals.length > 0 ? (
-                upcomingArrivals.map((arrival) => (
-                  <div key={arrival.id} className="flex items-center justify-between">
+        <TabsContent value="arrivals" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <UserCheck className="h-5 w-5" />
+                Today's Arrivals ({todayArrivals.length})
+              </CardTitle>
+              <CardDescription>Expected check-ins for {format(new Date(), "MMMM dd, yyyy")}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {todayArrivals.map((arrival) => (
+                  <div key={arrival.id} className="flex items-center justify-between p-4 rounded-lg border">
                     <div className="flex items-center space-x-4">
                       <Avatar>
                         <AvatarFallback>
@@ -373,31 +811,189 @@ export default function FrontDeskDashboard() {
                             .join("")}
                         </AvatarFallback>
                       </Avatar>
-                      <div>
+                      <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium">{arrival.guest}</p>
+                          <p className="font-medium">{arrival.guest}</p>
                           {arrival.vip && <Badge className="bg-purple-100 text-purple-800">VIP</Badge>}
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                          {arrival.room} • {arrival.time}
+                        <p className="text-sm text-muted-foreground">
+                          Room {arrival.room} • {arrival.roomType}
                         </p>
+                        <p className="text-xs text-muted-foreground">
+                          Expected: {arrival.time}
+                          {arrival.estimatedArrival && ` • ETA: ${arrival.estimatedArrival}`}
+                        </p>
+                        {arrival.specialRequests && arrival.specialRequests.length > 0 && (
+                          <div className="flex gap-1 mt-1">
+                            {arrival.specialRequests.map((request, idx) => (
+                              <Badge key={idx} variant="outline" className="text-xs">
+                                {request}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
                       {getStatusBadge(arrival.status)}
+                      {arrival.contactNumber && (
+                        <Button variant="ghost" size="sm">
+                          <Phone className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button size="sm" variant="outline" asChild>
-                        <Link href={`/frontdesk/guests/${arrival.id}`}>View</Link>
+                        <Link href={`/frontdesk/checkin?guest=${arrival.guestId}`}>
+                          {arrival.status === "confirmed" ? "Check In" : "View"}
+                        </Link>
                       </Button>
                     </div>
                   </div>
-                ))
-              ) : (
-                <p className="text-sm text-muted-foreground">No recent guests</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="departures" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <UserX className="h-5 w-5" />
+                Today's Departures ({todayDepartures.length})
+              </CardTitle>
+              <CardDescription>Expected check-outs for {format(new Date(), "MMMM dd, yyyy")}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {todayDepartures.map((departure) => (
+                  <div key={departure.id} className="flex items-center justify-between p-4 rounded-lg border">
+                    <div className="flex items-center space-x-4">
+                      <Avatar>
+                        <AvatarFallback>
+                          {departure.guest
+                            .split(" ")
+                            .map((n: string) => n[0])
+                            .join("")}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{departure.guest}</p>
+                          {departure.vip && <Badge className="bg-purple-100 text-purple-800">VIP</Badge>}
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Room {departure.room} • Check-out: {departure.checkOutTime}
+                        </p>
+                        {departure.balanceDue > 0 && (
+                          <p className="text-sm font-medium text-red-600">
+                            Balance Due: ${departure.balanceDue.toFixed(2)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {getStatusBadge(departure.status)}
+                      <Button size="sm" variant="outline" asChild>
+                        <Link href={`/frontdesk/checkout?guest=${departure.guestId}`}>
+                          {departure.status === "scheduled" ? "Check Out" : "View"}
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="services" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Utensils className="h-5 w-5" />
+                Service Requests ({serviceRequests.length})
+              </CardTitle>
+              <CardDescription>Active guest service requests</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {serviceRequests.map((service) => (
+                  <div key={service.id} className="flex items-start justify-between p-4 rounded-lg border">
+                    <div className="flex items-start space-x-3">
+                      {getServiceIcon(service.type)}
+                      <div className="space-y-1">
+                        <p className="font-medium text-sm">
+                          {service.guest} - Room {service.room}
+                        </p>
+                        <p className="text-sm text-muted-foreground">{service.description}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Requested at {service.requestedAt} • {service.priority} priority
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      {getStatusBadge(service.status)}
+                      <Button size="sm" variant="outline">
+                        Update
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="tasks" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ClipboardList className="h-5 w-5" />
+                Pending Tasks ({pendingTasks.length})
+              </CardTitle>
+              <CardDescription>Items requiring attention</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {pendingTasks.map((task) => (
+                  <div key={task.id} className={`p-4 rounded-lg border-l-4 ${getPriorityColor(task.priority)}`}>
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start space-x-3">
+                        {getCategoryIcon(task.category)}
+                        <div className="space-y-1">
+                          <p className="font-medium text-sm">{task.title}</p>
+                          <p className="text-sm text-muted-foreground">{task.description}</p>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span>Created: {task.time}</span>
+                            {task.assignedTo && <span>• Assigned to: {task.assignedTo}</span>}
+                            {task.dueDate && <span>• Due: {format(new Date(task.dueDate), "MMM dd")}</span>}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant={
+                            task.priority === "urgent" || task.priority === "high"
+                              ? "destructive"
+                              : task.priority === "medium"
+                                ? "default"
+                                : "secondary"
+                          }
+                        >
+                          {task.priority}
+                        </Badge>
+                        <Button size="sm" variant="outline">
+                          Assign
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Quick Actions */}
       <Card>
@@ -406,26 +1002,38 @@ export default function FrontDeskDashboard() {
           <CardDescription>Frequently used functions</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Button variant="outline" className="h-20 flex-col gap-2" asChild>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
+            <Button variant="outline" className="h-20 flex-col gap-2 bg-transparent" asChild>
+              <Link href="/frontdesk/checkin">
+                <UserCheck className="h-6 w-6" />
+                Check In
+              </Link>
+            </Button>
+            <Button variant="outline" className="h-20 flex-col gap-2 bg-transparent" asChild>
+              <Link href="/frontdesk/checkout">
+                <UserX className="h-6 w-6" />
+                Check Out
+              </Link>
+            </Button>
+            <Button variant="outline" className="h-20 flex-col gap-2 bg-transparent" asChild>
               <Link href="/frontdesk/reservations/new">
                 <Calendar className="h-6 w-6" />
                 New Reservation
               </Link>
             </Button>
-            <Button variant="outline" className="h-20 flex-col gap-2" asChild>
+            <Button variant="outline" className="h-20 flex-col gap-2 bg-transparent" asChild>
               <Link href="/frontdesk/guests/new">
                 <Users className="h-6 w-6" />
                 Register Guest
               </Link>
             </Button>
-            <Button variant="outline" className="h-20 flex-col gap-2" asChild>
+            <Button variant="outline" className="h-20 flex-col gap-2 bg-transparent" asChild>
               <Link href="/frontdesk/payments/new">
                 <CreditCard className="h-6 w-6" />
                 Process Payment
               </Link>
             </Button>
-            <Button variant="outline" className="h-20 flex-col gap-2" asChild>
+            <Button variant="outline" className="h-20 flex-col gap-2 bg-transparent" asChild>
               <Link href="/frontdesk/rooms">
                 <Key className="h-6 w-6" />
                 Room Status

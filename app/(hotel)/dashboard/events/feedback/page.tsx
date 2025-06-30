@@ -89,9 +89,9 @@ export default function EventFeedbackPage() {
       filtered = filtered.filter((fb) => fb.isResponded === isResponded)
     }
 
-    // Apply event filter
+    // Apply event filter - fix to use correct property name
     if (eventFilter !== "all") {
-      filtered = filtered.filter((fb) => fb.booking === eventFilter)
+      filtered = filtered.filter((fb) => fb.event === eventFilter) // Changed from fb.booking to fb.event
     }
 
     setFilteredFeedback(filtered)
@@ -181,6 +181,31 @@ export default function EventFeedbackPage() {
   const responseRate = getResponseRate(feedback)
   const recommendationRate = getRecommendationRate(feedback)
   const ratingDistribution = getRatingDistribution(feedback)
+
+  // Add loading and error display
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p>Loading feedback...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-semibold mb-2">Error loading feedback</h3>
+          <p className="text-muted-foreground mb-4">{error}</p>
+          <Button onClick={() => window.location.reload()}>Try Again</Button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
