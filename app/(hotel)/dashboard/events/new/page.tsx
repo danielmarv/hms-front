@@ -119,30 +119,16 @@ export default function NewEventPage() {
 
   // Debug logging
   useEffect(() => {
-    console.log("Hotel data:", { hotel, hotelId, hotelLoading })
-    console.log("Event Types:", eventTypes?.length || 0)
-    console.log("Venues:", venues?.length || 0)
-    console.log("Services:", services?.length || 0)
-    console.log("Templates:", templates?.length || 0)
-    console.log("Users:", users?.length || 0)
-    console.log("services for the hotel:", services)
   }, [hotel, hotelId, hotelLoading, eventTypes, venues, services, templates, users])
 
-  // Update hotel users when users data changes
   useEffect(() => {
     const filteredUsers = getHotelUsers()
     setHotelUsers(filteredUsers)
-    console.log("Updated hotelUsers from users state:", filteredUsers.length)
+
   }, [users, hotelId, getHotelUsers])
 
   // Debug services loading
   useEffect(() => {
-    console.log("Services debug:", {
-      services: services?.length || 0,
-      loadingServices,
-      hotelId,
-      servicesData: services,
-    })
   }, [services, loadingServices, hotelId])
 
   // NOW the conditional returns can happen after all hooks
