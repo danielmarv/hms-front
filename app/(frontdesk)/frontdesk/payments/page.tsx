@@ -225,15 +225,15 @@ export default function PaymentsPage() {
   })
 
   const handleViewPayment = (paymentId: string) => {
-    router.push(`/dashboard/payments/${paymentId}`)
+    router.push(`/frontdesk/payments/${paymentId}`)
   }
 
   const handleEditPayment = (paymentId: string) => {
-    router.push(`/dashboard/payments/${paymentId}/edit`)
+    router.push(`/frontdesk/payments/${paymentId}/edit`)
   }
 
   const handleRecordPayment = (guestId?: string) => {
-    const url = guestId ? `/dashboard/payments/new?guest=${guestId}` : "/dashboard/payments/new"
+    const url = guestId ? `/frontdesk/payments/new?guest=${guestId}` : "/frontdesk/payments/new"
     router.push(url)
   }
 
@@ -532,7 +532,7 @@ export default function PaymentsPage() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => router.push(`/dashboard/guests/${guest.guestId}`)}
+                              onClick={() => router.push(`/frontdesk/guests/${guest.guestId}`)}
                             >
                               <Eye className="h-4 w-4 mr-1" />
                               View
