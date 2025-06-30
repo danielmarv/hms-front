@@ -96,111 +96,88 @@ export type HousekeepingStats = {
   }
 }
 
-// Menu Item types
-export type MenuItem = {
+export interface MenuItem {
   _id: string
   name: string
-  description: string
+  description?: string
   price: number
-  cost: number
+  cost?: number
   category: string
   subcategory?: string
   imageUrl?: string
   availability: boolean
-  preparationTime: number
-  isVegetarian: boolean
-  isVegan: boolean
-  isGlutenFree: boolean
+  preparationTime?: number
+  isVegetarian?: boolean
+  isVegan?: boolean
+  isGlutenFree?: boolean
   allergens?: string[]
   spicyLevel?: number
   calories?: number
   ingredients?: string[]
   tags?: string[]
-  featured: boolean
+  featured?: boolean
   menuSections?: string[]
   availableDays?: string[]
   availableTimeStart?: string
   availableTimeEnd?: string
   discountPercentage?: number
-  isDiscounted: boolean
-  createdAt: string
-  updatedAt: string
+  isDiscounted?: boolean
+  createdBy?: string
+  updatedBy?: string
+  createdAt?: string
+  updatedAt?: string
 }
 
-export type MenuItemFilters = {
-  search?: string
-  category?: string
-  subcategory?: string
-  availability?: boolean
-  isVegetarian?: boolean
-  isVegan?: boolean
-  isGlutenFree?: boolean
-  featured?: boolean
-  minPrice?: number
-  maxPrice?: number
-  menuSection?: string
-  page?: number
-  limit?: number
-  sort?: string
-}
-
-// Table types
-export type Table = {
+export interface Table {
   _id: string
-  number: string | number
+  number: string
   section: string
   capacity: number
   minCapacity?: number
-  shape: string
+  shape?: "round" | "square" | "rectangle"
   width?: number
   length?: number
   positionX?: number
   positionY?: number
   rotation?: number
-  status: string
+  status: "Available" | "Occupied" | "Reserved" | "Cleaning" | "Maintenance"
   isActive: boolean
-  currentOrder?: string
   currentGuests?: number
+  currentOrder?: string
   reservationName?: string
   reservationPhone?: string
   reservationTime?: string
   lastOccupiedAt?: string
   lastCleanedAt?: string
   notes?: string
-  createdAt: string
-  updatedAt: string
+  createdBy?: string
+  updatedBy?: string
+  createdAt?: string
+  updatedAt?: string
 }
 
-export type TableFilters = {
-  section?: string
-  status?: string
-  capacity?: number
-  isActive?: boolean
-}
-
-// Order types
-export type OrderItem = {
-  _id: string
+export interface OrderItem {
   menuItem: string
   name: string
   quantity: number
   unitPrice: number
   totalPrice: number
   notes?: string
-  modifiers?: any[]
-  status: string
-  preparedBy?: string
-  servedAt?: string
+  modifiers?: Array<{
+    name: string
+    price: number
+  }>
+  status: "Pending" | "Preparing" | "Ready" | "Served"
 }
 
-export type Order = {
+export interface Order {
   _id: string
   orderNumber: string
-  table?: any
-  room?: any
-  guest?: any
-  booking?: any
-  waiter?: any
+  table?: string
+  room?: string
+  guest?: string
+  booking?: string
+  waiter?: string
   items: OrderItem[]
   subtotal: number
   taxRate: number
@@ -210,10 +187,10 @@ export type Order = {
   serviceChargePercentage: number
   serviceChargeAmount: number
   totalAmount: number
-  orderType: string
-  orderStatus: string
-  paymentStatus: string
-  priority: string
+  orderType: "Dine In" | "Takeaway" | "Delivery" | "Room Service"
+  orderStatus: "New" | "Confirmed" | "Preparing" | "Ready" | "Served" | "Completed" | "Cancelled"
+  paymentStatus: "Pending" | "Partial" | "Paid" | "Refunded"
+  priority: "Low" | "Normal" | "High" | "Urgent"
   notes?: string
   customerName?: string
   customerPhone?: string
@@ -223,13 +200,51 @@ export type Order = {
   completedAt?: string
   cancelledAt?: string
   cancellationReason?: string
-  isModified: boolean
+  isModified?: boolean
   modificationNotes?: string
-  createdAt: string
-  updatedAt: string
+  createdBy?: string
+  updatedBy?: string
+  createdAt?: string
+  updatedAt?: string
 }
 
-export type OrderFilters = {
+export interface KitchenOrderItem {
+  menuItem: string
+  name: string
+  quantity: number
+  notes?: string
+  modifiers?: Array<{
+    name: string
+    price: number
+  }>
+  status: "Pending" | "Preparing" | "Ready" | "Served"
+  startedAt?: string
+  completedAt?: string
+}
+
+export interface KitchenOrder {
+  _id: string
+  orderNumber: string
+  order: string
+  table?: string
+  room?: string
+  items: KitchenOrderItem[]
+  priority: "Low" | "Normal" | "High" | "Urgent"
+  status: "Pending" | "Preparing" | "Ready" | "Completed" | "Cancelled"
+  notes?: string
+  orderType: "Dine In" | "Takeaway" | "Delivery" | "Room Service"
+  waiter?: string
+  estimatedTime?: number
+  startedAt?: string
+  completedAt?: string
+  cancelledAt?: string
+  createdBy?: string
+  updatedBy?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface OrderFilters {
   table?: string
   room?: string
   guest?: string
@@ -238,87 +253,35 @@ export type OrderFilters = {
   orderType?: string
   startDate?: string
   endDate?: string
-  search?: string
   page?: number
   limit?: number
   sort?: string
 }
 
-export type OrderStats = {
-  byStatus: Array<{ _id: string; count: number; revenue: number }>
-  byType: Array<{ _id: string; count: number; revenue: number }>
-  daily: Array<{ _id: string; count: number; revenue: number }>
-  hourly: Array<{ _id: number; count: number; revenue: number }>
+export interface OrderStats {
+  byStatus: Array<{
+    _id: string
+    count: number
+    revenue: number
+  }>
+  byType: Array<{
+    _id: string
+    count: number
+    revenue: number
+  }>
+  daily: Array<{
+    _id: string
+    count: number
+    revenue: number
+  }>
+  hourly: Array<{
+    _id: number
+    count: number
+    revenue: number
+  }>
   totals: {
     totalOrders: number
     totalRevenue: number
     avgOrderValue: number
-  }
-}
-
-// Kitchen Order types
-export type KitchenOrderItem = {
-  _id: string
-  menuItem: any
-  name: string
-  quantity: number
-  notes?: string
-  modifiers?: any[]
-  status: string
-  assignedTo?: any
-  startedAt?: string
-  completedAt?: string
-}
-
-export type KitchenOrder = {
-  _id: string
-  orderNumber: string
-  order: any
-  table?: any
-  room?: any
-  items: KitchenOrderItem[]
-  priority: string
-  status: string
-  notes?: string
-  orderType: string
-  waiter?: any
-  chef?: any
-  estimatedCompletionTime?: string
-  actualCompletionTime?: string
-  startedAt?: string
-  completedAt?: string
-  cancelledAt?: string
-  cancellationReason?: string
-  isModified: boolean
-  modificationNotes?: string
-  createdAt: string
-  updatedAt: string
-}
-
-export type KitchenOrderFilters = {
-  status?: string
-  priority?: string
-  orderType?: string
-  startDate?: string
-  endDate?: string
-  page?: number
-  limit?: number
-  sort?: string
-}
-
-export type KitchenStats = {
-  byStatus: Array<{ _id: string; count: number }>
-  byPriority: Array<{ _id: string; count: number }>
-  byType: Array<{ _id: string; count: number }>
-  hourly: Array<{ _id: number; count: number }>
-  preparationTime: {
-    avgPreparationTime: number
-    minPreparationTime: number
-    maxPreparationTime: number
-  }
-  totals: {
-    totalOrders: number
-    completedOrders: number
-    cancelledOrders: number
   }
 }
