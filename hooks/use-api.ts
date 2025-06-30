@@ -33,8 +33,6 @@ export function useApi() {
       const headers: HeadersInit = {
         "Content-Type": "application/json",
       }
-
-      // Ensure we're formatting the Authorization header exactly as expected by the backend
       if (token) {
         headers["Authorization"] = `Bearer ${token}`
       }
@@ -49,7 +47,6 @@ export function useApi() {
       }
 
       try {
-        console.log(`API Request: ${method} ${url}`, token ? "With token" : "No token")
         const response = await fetch(url, options)
         const responseData = await response.json()
 

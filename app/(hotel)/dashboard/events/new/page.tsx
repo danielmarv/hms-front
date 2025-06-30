@@ -16,23 +16,7 @@ import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
-import {
-  ArrowLeft,
-  CalendarIcon,
-  Clock,
-  MapPin,
-  Save,
-  Users,
-  Plus,
-  Loader2,
-  X,
-  DollarSign,
-  FileText,
-  Briefcase,
-  RefreshCw,
-  AlertTriangle,
-  Building2,
-} from "lucide-react"
+import { ArrowLeft, CalendarIcon, Clock, MapPin, Save, Users, Plus, Loader2, X, DollarSign, FileText, Briefcase, RefreshCw, AlertTriangle, Building2 } from 'lucide-react'
 import { addHours, format } from "date-fns"
 import { useEventTypes } from "@/hooks/use-event-types"
 import { useVenues } from "@/hooks/use-venues"
@@ -83,54 +67,35 @@ export default function NewEventPage() {
   // Filter users who have access to the current hotel
   const getHotelUsers = useCallback(() => {
     if (!users || !hotelId) {
-      console.log("No users or hotelId available:", { users: users?.length, hotelId })
       return []
     }
 
-    // Filter users who have access to this hotel
     const filteredUsers = users.filter(
       (user) =>
         user.status === "active" &&
         (user.hotelAccess === hotelId || user.role === "admin" || user.role === "super_admin"),
     )
 
-    console.log("getHotelUsers result:", {
-      totalUsers: users.length,
-      filteredUsers: filteredUsers.length,
-      hotelId,
-    })
-
     return filteredUsers
   }, [users, hotelId])
 
-  // ALL useEffect hooks must be here, before any conditional returns
-
-  // Fetch data when hotel ID is available
   useEffect(() => {
     if (hotelId && !hotelLoading) {
-      console.log("Fetching hotel-specific data for hotel:", hotelId)
 
-      // Fetch hotel-specific data
       if (fetchEventTypes) {
-        console.log("Fetching event types for hotel:", hotelId)
         fetchEventTypes()
       }
       if (fetchVenues) {
-        console.log("Fetching venues for hotel:", hotelId)
         fetchVenues()
       }
       if (fetchServices) {
-        console.log("Fetching services for hotel:", hotelId)
         fetchServices()
       }
       if (fetchTemplates) {
-        console.log("Fetching templates for hotel:", hotelId)
         fetchTemplates()
       }
 
-      // Fetch users with hotel access filtering
       if (fetchUsers) {
-        console.log("Fetching users with access to hotel:", hotelId)
         fetchUsers()
           .then((userData) => {
             if (userData && Array.isArray(userData)) {
@@ -154,30 +119,16 @@ export default function NewEventPage() {
 
   // Debug logging
   useEffect(() => {
-    console.log("Hotel data:", { hotel, hotelId, hotelLoading })
-    console.log("Event Types:", eventTypes?.length || 0)
-    console.log("Venues:", venues?.length || 0)
-    console.log("Services:", services?.length || 0)
-    console.log("Templates:", templates?.length || 0)
-    console.log("Users:", users?.length || 0)
-    console.log("services for the hotel:", services)
   }, [hotel, hotelId, hotelLoading, eventTypes, venues, services, templates, users])
 
-  // Update hotel users when users data changes
   useEffect(() => {
     const filteredUsers = getHotelUsers()
     setHotelUsers(filteredUsers)
-    console.log("Updated hotelUsers from users state:", filteredUsers.length)
+
   }, [users, hotelId, getHotelUsers])
 
   // Debug services loading
   useEffect(() => {
-    console.log("Services debug:", {
-      services: services?.length || 0,
-      loadingServices,
-      hotelId,
-      servicesData: services,
-    })
   }, [services, loadingServices, hotelId])
 
   // NOW the conditional returns can happen after all hooks
@@ -356,13 +307,21 @@ export default function NewEventPage() {
 
     setIsSubmitting(true)
 
+    // Fix: Send attendees as a number, not an object
     const eventWithServices = {
-      ...eventData,
+      title: eventData.title,
+      description: eventData.description,
       hotel_id: hotelId,
       event_type_id: eventData.eventType,
       venue_id: eventData.venue,
       start_date: eventData.startDate,
       end_date: eventData.endDate,
+      all_day: eventData.allDay,
+      attendees: eventData.attendees, // This should be a number
+      status: eventData.status,
+      visibility: eventData.visibility,
+      color: eventData.color,
+      notes: eventData.notes,
       template_id: selectedTemplate || undefined,
       services: selectedServices.map((serviceId) => {
         const service = services?.find((s) => s._id === serviceId)

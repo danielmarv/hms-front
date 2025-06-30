@@ -90,27 +90,21 @@ export function useAuth() {
         setUser(null)
         return false
       }
-
-      console.log("Token found, verifying with API...")
-      const { data, error } = await request<User>("/auth/me", "GET", undefined, false)
+      const { data, error } = await request("/auth/me", "GET", undefined, false)
 
       if (error || !data) {
-        console.log("Token invalid or expired, trying to refresh...")
         // Try to refresh token
         const refreshed = await refreshAccessToken()
         if (!refreshed) {
-          console.log("Refresh failed, clearing tokens")
           clearTokens()
           setIsAuthenticated(false)
           setUser(null)
           setIsLoading(false)
           return false
         }
-        console.log("Token refreshed successfully")
         return true
       }
 
-      console.log("Authentication successful")
       setUser(data)
       setIsAuthenticated(true)
       setIsLoading(false)
@@ -122,13 +116,10 @@ export function useAuth() {
     }
   }, [request])
 
-  // Check auth on initial load and when window gets focus
   useEffect(() => {
     checkAuth()
 
-    // Re-check auth when window gets focus
     const handleFocus = () => {
-      console.log("Window focused, re-checking auth")
       checkAuth()
     }
 
@@ -139,22 +130,12 @@ export function useAuth() {
   const login = async (email: string, password: string) => {
     setIsLoading(true)
     try {
-      const { data, error } = await request<{
-        accessToken: string
-        refreshToken: string
-        user: User
-      }>("/auth/login", "POST", { email, password })
+      const { data, error } = await request("/auth/login", "POST", { email, password })
 
       if (error || !data) {
         throw new Error(error || "Login failed")
       }
 
-      console.log("Login successful, received tokens:", {
-        accessToken: data.accessToken ? "exists" : "missing",
-        refreshToken: data.refreshToken ? "exists" : "missing",
-      })
-
-      // Store tokens
       setTokens(data.accessToken, data.refreshToken, data.user)
 
       // Set user data
@@ -173,11 +154,7 @@ export function useAuth() {
   const register = async (userData: RegisterData) => {
     setIsLoading(true)
     try {
-      const { data, error } = await request<{
-        accessToken: string
-        refreshToken: string
-        user: User
-      }>("/auth/register", "POST", userData)
+      const { data, error } = await request("/auth/register", "POST", userData)
 
       if (error || !data) {
         throw new Error(error || "Registration failed")
@@ -282,7 +259,7 @@ export function useAuth() {
         return false
       }
 
-      const { data, error } = await request<{ accessToken: string; user: User }>(
+      const { data, error } = await request(
         "/auth/refresh-token",
         "POST",
         { refreshToken },
