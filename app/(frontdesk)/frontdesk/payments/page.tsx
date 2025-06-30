@@ -219,7 +219,7 @@ export default function PaymentsPage() {
       payment.guest?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       payment.transaction_reference?.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesStatus = statusFilter === "all" || payment.status === statusFilter
-    const matchesMethod = methodFilter === "all" || payment.payment_method === methodFilter
+    const matchesMethod = methodFilter === "all" || payment.method === methodFilter
 
     return matchesSearch && matchesStatus && matchesMethod
   })
@@ -420,7 +420,7 @@ export default function PaymentsPage() {
                         <TableCell>
                           <Badge variant="outline" className="capitalize">
                             <CreditCard className="w-3 h-3 mr-1" />
-                            {payment.payment_method || "Unknown"}
+                            {payment.method || "Unknown"}
                           </Badge>
                         </TableCell>
                         <TableCell>
