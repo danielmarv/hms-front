@@ -67,22 +67,14 @@ export default function NewEventPage() {
   // Filter users who have access to the current hotel
   const getHotelUsers = useCallback(() => {
     if (!users || !hotelId) {
-      console.log("No users or hotelId available:", { users: users?.length, hotelId })
       return []
     }
 
-    // Filter users who have access to this hotel
     const filteredUsers = users.filter(
       (user) =>
         user.status === "active" &&
         (user.hotelAccess === hotelId || user.role === "admin" || user.role === "super_admin"),
     )
-
-    console.log("getHotelUsers result:", {
-      totalUsers: users.length,
-      filteredUsers: filteredUsers.length,
-      hotelId,
-    })
 
     return filteredUsers
   }, [users, hotelId])
@@ -104,7 +96,6 @@ export default function NewEventPage() {
       }
 
       if (fetchUsers) {
-        console.log("Fetching users with access to hotel:", hotelId)
         fetchUsers()
           .then((userData) => {
             if (userData && Array.isArray(userData)) {
