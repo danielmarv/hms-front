@@ -16,23 +16,7 @@ import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
-import {
-  ArrowLeft,
-  CalendarIcon,
-  Clock,
-  MapPin,
-  Save,
-  Users,
-  Plus,
-  Loader2,
-  X,
-  DollarSign,
-  FileText,
-  Briefcase,
-  RefreshCw,
-  AlertTriangle,
-  Building2,
-} from "lucide-react"
+import { ArrowLeft, CalendarIcon, Clock, MapPin, Save, Users, Plus, Loader2, X, DollarSign, FileText, Briefcase, RefreshCw, AlertTriangle, Building2 } from 'lucide-react'
 import { addHours, format } from "date-fns"
 import { useEventTypes } from "@/hooks/use-event-types"
 import { useVenues } from "@/hooks/use-venues"
@@ -103,32 +87,22 @@ export default function NewEventPage() {
     return filteredUsers
   }, [users, hotelId])
 
-  // ALL useEffect hooks must be here, before any conditional returns
-
-  // Fetch data when hotel ID is available
   useEffect(() => {
     if (hotelId && !hotelLoading) {
-      console.log("Fetching hotel-specific data for hotel:", hotelId)
 
-      // Fetch hotel-specific data
       if (fetchEventTypes) {
-        console.log("Fetching event types for hotel:", hotelId)
         fetchEventTypes()
       }
       if (fetchVenues) {
-        console.log("Fetching venues for hotel:", hotelId)
         fetchVenues()
       }
       if (fetchServices) {
-        console.log("Fetching services for hotel:", hotelId)
         fetchServices()
       }
       if (fetchTemplates) {
-        console.log("Fetching templates for hotel:", hotelId)
         fetchTemplates()
       }
 
-      // Fetch users with hotel access filtering
       if (fetchUsers) {
         console.log("Fetching users with access to hotel:", hotelId)
         fetchUsers()
@@ -356,13 +330,21 @@ export default function NewEventPage() {
 
     setIsSubmitting(true)
 
+    // Fix: Send attendees as a number, not an object
     const eventWithServices = {
-      ...eventData,
+      title: eventData.title,
+      description: eventData.description,
       hotel_id: hotelId,
       event_type_id: eventData.eventType,
       venue_id: eventData.venue,
       start_date: eventData.startDate,
       end_date: eventData.endDate,
+      all_day: eventData.allDay,
+      attendees: eventData.attendees, // This should be a number
+      status: eventData.status,
+      visibility: eventData.visibility,
+      color: eventData.color,
+      notes: eventData.notes,
       template_id: selectedTemplate || undefined,
       services: selectedServices.map((serviceId) => {
         const service = services?.find((s) => s._id === serviceId)
