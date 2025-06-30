@@ -105,7 +105,7 @@ export default function NewPaymentPage() {
         paidAt: paymentData.paidAt.toISOString(),
       })
 
-      if (response.success) {
+      if (response) {
         toast.success("Payment created successfully")
         router.push("/dashboard/payments")
       }
