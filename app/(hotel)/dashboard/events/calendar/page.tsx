@@ -66,11 +66,13 @@ export default function EventCalendarPage() {
     getDailyEvents,
     getConflicts,
     getVenueCalendar,
+    getStaffCalendar,
     exportToICalendar,
     exportToGoogleCalendar,
     getCalendarSettings,
     updateCalendarSettings,
     clearError,
+    checkAvailability,
   } = useEventCalendar(currentHotel?.id)
 
   // Other hooks
@@ -86,14 +88,21 @@ export default function EventCalendarPage() {
   const [showFilters, setShowFilters] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showConflicts, setShowConflicts] = useState(false)
+  const [showStaffView, setShowStaffView] = useState(false)
+  const [showVenueView, setShowVenueView] = useState(false)
+  const [selectedStaffId, setSelectedStaffId] = useState<string>("")
+  const [selectedVenueForView, setSelectedVenueForView] = useState<string>("")
   const [conflicts, setConflicts] = useState<any[]>([])
   const [calendarEvents, setCalendarEvents] = useState<any[]>([])
+  const [venueCalendarData, setVenueCalendarData] = useState<any>(null)
+  const [staffEvents, setStaffEvents] = useState<any[]>([])
 
   // Load initial data
   useEffect(() => {
     if (currentHotel?.id) {
       fetchVenues()
       fetchEventTypes()
+      getCalendarSettings()
       loadCalendarEvents()
     }
   }, [currentHotel?.id, currentDate, view, selectedVenue, selectedEventType, selectedStatus])
@@ -110,6 +119,7 @@ export default function EventCalendarPage() {
       }
 
       let eventsData
+
       if (view === "month") {
         eventsData = await getMonthlyEvents(getYear(currentDate), currentDate.getMonth() + 1, filters)
         setCalendarEvents(eventsData?.events || [])
@@ -151,6 +161,51 @@ export default function EventCalendarPage() {
     }
   }
 
+  // Load venue calendar
+  const loadVenueCalendar = async (venueId: string) => {
+    if (!venueId) return
+
+    try {
+      const startDate = startOfMonth(currentDate)
+      const endDate = endOfMonth(currentDate)
+
+      const data = await getVenueCalendar(
+        venueId,
+        startDate,
+        endDate,
+        selectedStatus !== "all" ? selectedStatus : undefined,
+      )
+      setVenueCalendarData(data)
+      setShowVenueView(true)
+    } catch (error) {
+      console.error("Error loading venue calendar:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load venue calendar",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Load staff calendar
+  const loadStaffCalendar = async (staffId?: string) => {
+    try {
+      const startDate = startOfMonth(currentDate)
+      const endDate = endOfMonth(currentDate)
+
+      const data = await getStaffCalendar(startDate, endDate, staffId)
+      setStaffEvents(data || [])
+      setShowStaffView(true)
+    } catch (error) {
+      console.error("Error loading staff calendar:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load staff calendar",
+        variant: "destructive",
+      })
+    }
+  }
+
   // Export functions
   const handleExportICalendar = async () => {
     try {
@@ -177,6 +232,51 @@ export default function EventCalendarPage() {
         description: "Failed to export calendar",
         variant: "destructive",
       })
+    }
+  }
+
+  // Handle Google Calendar export for individual events
+  const handleGoogleCalendarExport = async (eventId: string) => {
+    try {
+      const url = await exportToGoogleCalendar(eventId)
+      if (url) {
+        toast({
+          title: "Success",
+          description: "Event exported to Google Calendar",
+        })
+      }
+    } catch (error) {
+      console.error("Error exporting to Google Calendar:", error)
+      toast({
+        title: "Error",
+        description: "Failed to export to Google Calendar",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Check availability for a venue
+  const handleCheckAvailability = async (venueId: string, startDate: Date, endDate: Date) => {
+    try {
+      const result = await checkAvailability(venueId, startDate, endDate)
+
+      toast({
+        title: result.available ? "Available" : "Not Available",
+        description: result.available
+          ? "Venue is available for the selected time"
+          : result.reason || "Venue is not available",
+        variant: result.available ? "default" : "destructive",
+      })
+
+      return result
+    } catch (error) {
+      console.error("Error checking availability:", error)
+      toast({
+        title: "Error",
+        description: "Failed to check availability",
+        variant: "destructive",
+      })
+      return { available: false, reason: "Error checking availability" }
     }
   }
 
@@ -216,13 +316,14 @@ export default function EventCalendarPage() {
 
   // Generate hours for day view
   const generateDayHours = () => {
-    const startHour = settings?.start_time ? Number.parseInt(settings.start_time.split(":")[0]) : 7
+    const startHour = settings?.start_time ? Number.parseInt(settings.start_time.split(":")[0]) : 8
     const endHour = settings?.end_time ? Number.parseInt(settings.end_time.split(":")[0]) : 22
 
     const hours = []
     for (let i = startHour; i <= endHour; i++) {
       hours.push(i)
     }
+
     return hours
   }
 
@@ -270,14 +371,12 @@ export default function EventCalendarPage() {
     if (settings?.event_colors) {
       return settings.event_colors[status as keyof typeof settings.event_colors] || "#3498db"
     }
-
     const defaultColors = {
       confirmed: "#22c55e",
       pending: "#f59e0b",
       cancelled: "#ef4444",
       completed: "#8b5cf6",
     }
-
     return defaultColors[status as keyof typeof defaultColors] || "#3498db"
   }
 
@@ -322,7 +421,8 @@ export default function EventCalendarPage() {
             {currentHotel ? `${currentHotel.name} - Event Schedule` : "View and manage scheduled events"}
           </p>
         </div>
-        <div className="flex gap-2">
+
+        <div className="flex gap-2 flex-wrap">
           <Button variant="outline" onClick={() => setShowFilters(!showFilters)}>
             <Filter className="mr-2 h-4 w-4" />
             Filters
@@ -330,6 +430,10 @@ export default function EventCalendarPage() {
           <Button variant="outline" onClick={checkConflicts}>
             <AlertTriangle className="mr-2 h-4 w-4" />
             Check Conflicts
+          </Button>
+          <Button variant="outline" onClick={() => loadStaffCalendar()}>
+            <Users className="mr-2 h-4 w-4" />
+            Staff View
           </Button>
           <Button variant="outline" onClick={handleExportICalendar}>
             <Download className="mr-2 h-4 w-4" />
@@ -339,12 +443,27 @@ export default function EventCalendarPage() {
             <Settings className="mr-2 h-4 w-4" />
             Settings
           </Button>
-          <Button onClick={() => router.push("/dashboard/events/new")}>
+          <Button onClick={() => router.push("/frontdesk/events/new")}>
             <Plus className="mr-2 h-4 w-4" />
             New Event
           </Button>
         </div>
       </div>
+
+      {/* Error Display */}
+      {error && (
+        <Card className="border-destructive">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <span>{error}</span>
+              <Button variant="ghost" size="sm" onClick={clearError}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filters Panel */}
       {showFilters && (
@@ -358,7 +477,7 @@ export default function EventCalendarPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <Label htmlFor="venue-filter">Venue</Label>
                 <Select value={selectedVenue} onValueChange={setSelectedVenue}>
@@ -406,6 +525,27 @@ export default function EventCalendarPage() {
                   </SelectContent>
                 </Select>
               </div>
+              <div>
+                <Label htmlFor="venue-view">Venue Calendar</Label>
+                <Select
+                  value={selectedVenueForView}
+                  onValueChange={(value) => {
+                    setSelectedVenueForView(value)
+                    if (value) loadVenueCalendar(value)
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Venue" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {venues.map((venue) => (
+                      <SelectItem key={venue._id} value={venue._id}>
+                        {venue.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -432,6 +572,7 @@ export default function EventCalendarPage() {
                 {view === "day" && format(currentDate, "EEEE, MMMM d, yyyy")}
               </CardTitle>
             </div>
+
             <Tabs value={view} onValueChange={setView} className="w-full md:w-auto">
               <TabsList>
                 <TabsTrigger value="month">Month</TabsTrigger>
@@ -471,18 +612,24 @@ export default function EventCalendarPage() {
                       {dayEvents.slice(0, 3).map((event) => (
                         <div
                           key={event.id}
-                          className="text-xs p-1 rounded truncate cursor-pointer hover:opacity-80"
+                          className="text-xs p-1 rounded truncate cursor-pointer hover:opacity-80 group"
                           style={{
-                            backgroundColor: `${getEventColor(event.extendedProps.status)}20`,
-                            borderLeft: `3px solid ${getEventColor(event.extendedProps.status)}`,
+                            backgroundColor: `${event.backgroundColor || getEventColor(event.extendedProps?.status)}20`,
+                            borderLeft: `3px solid ${event.backgroundColor || getEventColor(event.extendedProps?.status)}`,
                           }}
                           onClick={(e) => {
                             e.stopPropagation()
-                            router.push(`/dashboard/events/${event.id}`)
+                            router.push(`/frontdesk/events/${event.id}`)
                           }}
                         >
                           <div className="font-medium">{event.title}</div>
                           <div className="text-muted-foreground">{formatTime(new Date(event.start))}</div>
+                          {event.extendedProps?.venue && (
+                            <div className="text-muted-foreground flex items-center gap-1">
+                              <MapPin className="h-2 w-2" />
+                              {event.extendedProps.venue}
+                            </div>
+                          )}
                         </div>
                       ))}
                       {dayEvents.length > 3 && (
@@ -529,15 +676,28 @@ export default function EventCalendarPage() {
                           {hourEvents.map((event) => (
                             <div
                               key={event.id}
-                              className="text-xs p-1 mb-1 rounded truncate cursor-pointer hover:opacity-80"
+                              className="text-xs p-1 mb-1 rounded truncate cursor-pointer hover:opacity-80 group"
                               style={{
-                                backgroundColor: `${getEventColor(event.extendedProps.status)}20`,
-                                borderLeft: `3px solid ${getEventColor(event.extendedProps.status)}`,
+                                backgroundColor: `${event.backgroundColor || getEventColor(event.extendedProps?.status)}20`,
+                                borderLeft: `3px solid ${event.backgroundColor || getEventColor(event.extendedProps?.status)}`,
                               }}
-                              onClick={() => router.push(`/dashboard/events/${event.id}`)}
+                              onClick={() => router.push(`/frontdesk/events/${event.id}`)}
                             >
                               <div className="font-medium">{event.title}</div>
                               <div className="text-muted-foreground">{formatTime(new Date(event.start))}</div>
+                              <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-4 w-4 p-0"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleGoogleCalendarExport(event.id)
+                                  }}
+                                >
+                                  <Download className="h-2 w-2" />
+                                </Button>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -574,12 +734,12 @@ export default function EventCalendarPage() {
                             {hourEvents.map((event) => (
                               <div
                                 key={event.id}
-                                className="p-3 rounded-md cursor-pointer hover:opacity-80 transition-opacity"
+                                className="p-3 rounded-md cursor-pointer hover:opacity-80 transition-opacity group"
                                 style={{
-                                  backgroundColor: `${getEventColor(event.extendedProps.status)}20`,
-                                  borderLeft: `4px solid ${getEventColor(event.extendedProps.status)}`,
+                                  backgroundColor: `${event.backgroundColor || getEventColor(event.extendedProps?.status)}20`,
+                                  borderLeft: `4px solid ${event.backgroundColor || getEventColor(event.extendedProps?.status)}`,
                                 }}
-                                onClick={() => router.push(`/dashboard/events/${event.id}`)}
+                                onClick={() => router.push(`/frontdesk/events/${event.id}`)}
                               >
                                 <div className="flex justify-between items-start">
                                   <div className="flex-1">
@@ -589,13 +749,13 @@ export default function EventCalendarPage() {
                                         <Clock className="h-3 w-3" />
                                         {formatTime(new Date(event.start))} - {formatTime(new Date(event.end))}
                                       </div>
-                                      {event.extendedProps.venue && (
+                                      {event.extendedProps?.venue && (
                                         <div className="flex items-center gap-1">
                                           <MapPin className="h-3 w-3" />
                                           {event.extendedProps.venue}
                                         </div>
                                       )}
-                                      {event.extendedProps.staffCount && (
+                                      {event.extendedProps?.staffCount && (
                                         <div className="flex items-center gap-1">
                                           <Users className="h-3 w-3" />
                                           {event.extendedProps.staffCount} staff
@@ -603,16 +763,30 @@ export default function EventCalendarPage() {
                                       )}
                                     </div>
                                   </div>
-                                  <Badge
-                                    variant="outline"
-                                    className="ml-2"
-                                    style={{
-                                      borderColor: getEventColor(event.extendedProps.status),
-                                      color: getEventColor(event.extendedProps.status),
-                                    }}
-                                  >
-                                    {event.extendedProps.status}
-                                  </Badge>
+                                  <div className="flex items-center gap-2">
+                                    <Badge
+                                      variant="outline"
+                                      style={{
+                                        borderColor:
+                                          event.backgroundColor || getEventColor(event.extendedProps?.status),
+                                        color: event.backgroundColor || getEventColor(event.extendedProps?.status),
+                                      }}
+                                    >
+                                      {event.extendedProps?.status}
+                                    </Badge>
+                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handleGoogleCalendarExport(event.id)
+                                        }}
+                                      >
+                                        <Download className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
                             ))}
@@ -651,6 +825,7 @@ export default function EventCalendarPage() {
                 </SelectContent>
               </Select>
             </div>
+
             <div>
               <Label htmlFor="time-format">Time Format</Label>
               <Select
@@ -666,12 +841,13 @@ export default function EventCalendarPage() {
                 </SelectContent>
               </Select>
             </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="start-time">Start Time</Label>
                 <Input
                   type="time"
-                  value={settings?.start_time || "07:00"}
+                  value={settings?.start_time || "08:00"}
                   onChange={(e) => updateCalendarSettings({ ...settings, start_time: e.target.value })}
                 />
               </div>
@@ -684,6 +860,7 @@ export default function EventCalendarPage() {
                 />
               </div>
             </div>
+
             <div className="flex items-center justify-between">
               <Label htmlFor="show-weekends">Show Weekends</Label>
               <Switch
@@ -691,6 +868,7 @@ export default function EventCalendarPage() {
                 onCheckedChange={(checked) => updateCalendarSettings({ ...settings, show_weekends: checked })}
               />
             </div>
+
             <div className="flex items-center justify-between">
               <Label htmlFor="email-reminders">Email Reminders</Label>
               <Switch
@@ -699,6 +877,22 @@ export default function EventCalendarPage() {
                   updateCalendarSettings({
                     ...settings,
                     notifications: { ...settings?.notifications, email_reminders: checked },
+                  })
+                }
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="reminder-time">Reminder Time (hours before)</Label>
+              <Input
+                type="number"
+                min="1"
+                max="168"
+                value={settings?.notifications?.reminder_time || 24}
+                onChange={(e) =>
+                  updateCalendarSettings({
+                    ...settings,
+                    notifications: { ...settings?.notifications, reminder_time: Number.parseInt(e.target.value) },
                   })
                 }
               />
@@ -737,7 +931,8 @@ export default function EventCalendarPage() {
                           <div key={i} className="text-sm">
                             <div className="font-medium">{item.title}</div>
                             <div className="text-muted-foreground">
-                              {format(new Date(item.start), "MMM d, h:mm a")} - {format(new Date(item.end), "h:mm a")}
+                              {format(new Date(item.start_date), "MMM d, h:mm a")} -{" "}
+                              {format(new Date(item.end_date), "h:mm a")}
                             </div>
                           </div>
                         ))}
@@ -748,6 +943,163 @@ export default function EventCalendarPage() {
               </div>
             )}
           </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Staff Calendar Dialog */}
+      <Dialog open={showStaffView} onOpenChange={setShowStaffView}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Staff Calendar View</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="staff-select">Select Staff Member (Optional)</Label>
+              <Select
+                value={selectedStaffId}
+                onValueChange={(value) => {
+                  setSelectedStaffId(value)
+                  loadStaffCalendar(value || undefined)
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All Staff" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Staff</SelectItem>
+                  {/* Add staff options here when staff data is available */}
+                </SelectContent>
+              </Select>
+            </div>
+            <ScrollArea className="h-[400px]">
+              {staffEvents.length === 0 ? (
+                <div className="text-center py-8">
+                  <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">No staff events found</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {staffEvents.map((event) => (
+                    <Card key={event.id}>
+                      <CardContent className="p-3">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h4 className="font-medium">{event.title}</h4>
+                            <div className="text-sm text-muted-foreground">
+                              {format(new Date(event.start), "MMM d, h:mm a")} - {format(new Date(event.end), "h:mm a")}
+                            </div>
+                            {event.extendedProps?.venue && (
+                              <div className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+                                <MapPin className="h-3 w-3" />
+                                {event.extendedProps.venue}
+                              </div>
+                            )}
+                          </div>
+                          <Badge
+                            variant="outline"
+                            style={{
+                              borderColor: event.backgroundColor,
+                              color: event.backgroundColor,
+                            }}
+                          >
+                            {event.extendedProps?.status}
+                          </Badge>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Venue Calendar Dialog */}
+      <Dialog open={showVenueView} onOpenChange={setShowVenueView}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>{venueCalendarData?.venue?.name} - Venue Calendar</DialogTitle>
+          </DialogHeader>
+          {venueCalendarData && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Capacity</Label>
+                  <p className="text-sm text-muted-foreground">{venueCalendarData.venue.capacity} people</p>
+                </div>
+                <div>
+                  <Label>Status</Label>
+                  <Badge variant={venueCalendarData.venue.status === "available" ? "default" : "destructive"}>
+                    {venueCalendarData.venue.status}
+                  </Badge>
+                </div>
+              </div>
+
+              <div>
+                <Label>Availability</Label>
+                <p className="text-sm text-muted-foreground">
+                  {venueCalendarData.availability.start_time} - {venueCalendarData.availability.end_time}
+                </p>
+              </div>
+
+              <ScrollArea className="h-[400px]">
+                {venueCalendarData.events.length === 0 ? (
+                  <div className="text-center py-8">
+                    <CalendarIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground">No events scheduled for this venue</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {venueCalendarData.events.map((event: any) => (
+                      <Card key={event.id}>
+                        <CardContent className="p-3">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <h4 className="font-medium">{event.title}</h4>
+                              <div className="text-sm text-muted-foreground">
+                                {format(new Date(event.start), "MMM d, h:mm a")} -{" "}
+                                {format(new Date(event.end), "h:mm a")}
+                              </div>
+                              {event.extendedProps?.eventType && (
+                                <div className="text-sm text-muted-foreground mt-1">
+                                  Type: {event.extendedProps.eventType}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge
+                                variant="outline"
+                                style={{
+                                  borderColor: event.backgroundColor,
+                                  color: event.backgroundColor,
+                                }}
+                              >
+                                {event.extendedProps?.status}
+                              </Badge>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() =>
+                                  handleCheckAvailability(
+                                    venueCalendarData.venue.id,
+                                    new Date(event.start),
+                                    new Date(event.end),
+                                  )
+                                }
+                              >
+                                Check Availability
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
