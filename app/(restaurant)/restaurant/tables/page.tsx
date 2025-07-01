@@ -36,7 +36,15 @@ export default function TablesPage() {
     try {
       const response = await getTables()
       if (response?.data && Array.isArray(response.data)) {
-        setTables(response.data)
+        // Ensure each table has a valid status
+        const tablesWithStatus = response.data.map((table) => ({
+          ...table,
+          status: table.status || "available", // Default to 'available' if no status
+          number: table.number || "N/A",
+          capacity: table.capacity || 0,
+          currentGuests: table.currentGuests || 0,
+        }))
+        setTables(tablesWithStatus)
       }
     } catch (error) {
       console.error("Error loading tables:", error)
@@ -50,7 +58,7 @@ export default function TablesPage() {
     if (searchTerm) {
       filtered = filtered.filter(
         (table) =>
-          table.number.toString().includes(searchTerm) ||
+          table.number?.toString().includes(searchTerm) ||
           table.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           table.assignedServer?.toLowerCase().includes(searchTerm.toLowerCase()),
       )
@@ -78,6 +86,7 @@ export default function TablesPage() {
       await loadTables()
     } catch (error) {
       console.error("Error updating table status:", error)
+      toast.error("Failed to update table status")
     }
   }
 
@@ -152,18 +161,18 @@ export default function TablesPage() {
       {filteredTables.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filteredTables.map((table) => (
-            <Card key={table._id}>
+            <Card key={table._id || table.id}>
               <CardContent className="p-6">
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold">Table {table.number}</h3>
-                    <StatusBadge status={table.status} variant={table.status} />
+                    <h3 className="text-lg font-semibold">Table {table.number || "N/A"}</h3>
+                    <StatusBadge status={table.status} variant={table.status as any} />
                   </div>
 
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center justify-between">
                       <span className="text-muted-foreground">Capacity:</span>
-                      <span className="font-medium">{table.capacity} guests</span>
+                      <span className="font-medium">{table.capacity || 0} guests</span>
                     </div>
 
                     {table.location && (
@@ -196,7 +205,10 @@ export default function TablesPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Select value={table.status} onValueChange={(value) => handleStatusUpdate(table._id, value)}>
+                    <Select
+                      value={table.status || "available"}
+                      onValueChange={(value) => handleStatusUpdate(table._id || table.id, value)}
+                    >
                       <SelectTrigger className="w-full">
                         <SelectValue />
                       </SelectTrigger>
@@ -210,13 +222,17 @@ export default function TablesPage() {
                     </Select>
 
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" className="flex-1" asChild>
-                        <Link href={`/restaurant/tables/${table._id}/edit`}>
+                      <Button variant="outline" size="sm" className="flex-1 bg-transparent" asChild>
+                        <Link href={`/restaurant/tables/${table._id || table.id}/edit`}>
                           <Edit className="h-4 w-4 mr-1" />
                           Edit
                         </Link>
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleDelete(table._id, table.number)}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDelete(table._id || table.id, table.number || "N/A")}
+                      >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
