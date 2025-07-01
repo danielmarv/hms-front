@@ -230,7 +230,7 @@ export default function NewOrderPage() {
                       {item.description && <p className="text-sm text-muted-foreground">{item.description}</p>}
                       <p className="text-sm font-medium">${item.price.toFixed(2)}</p>
                     </div>
-                    <Button size="sm" onClick={() => addToOrder(item)} disabled={!item.available}>
+                    <Button size="sm" onClick={() => addToOrder(item)}>
                       <Plus className="h-4 w-4" />
                     </Button>
                   </div>
