@@ -277,7 +277,6 @@ export const useRestaurant = () => {
     }
   }
 
-  // ===== ORDERS =====
   const getOrders = async (filters: OrderFilters = {}) => {
     setLoading(true)
     setError(null)
@@ -334,7 +333,6 @@ export const useRestaurant = () => {
       return null
     }
   }
-
   const updateOrder = async (id: string, order: Partial<Order>) => {
     setLoading(true)
     setError(null)
@@ -439,7 +437,6 @@ export const useRestaurant = () => {
   }
 }
 
-// Export individual hooks for specific functionality if needed
 export const useRestaurantMenuItems = () => {
   const {
     getMenuItems,

@@ -124,7 +124,7 @@ export const useKitchenOrders = () => {
       if (startDate) queryParams.append("startDate", startDate)
       if (endDate) queryParams.append("endDate", endDate)
 
-      const response = await request(`/kitchen/stats?${queryParams.toString()}`, "GET")
+      const response = await request(`/kitchen/orders/stats?${queryParams.toString()}`, "GET")
       setLoading(false)
       return response.data
     } catch (err: any) {
