@@ -26,7 +26,7 @@ import { toast } from "sonner"
 export default function MenuItemDetail() {
   const params = useParams()
   const router = useRouter()
-  const { getMenuItem, toggleAvailability, toggleFeatured, deleteMenuItem, loading } = useMenuItems()
+  const { getMenuItem, getMenuItems, toggleAvailability, toggleFeatured, deleteMenuItem, loading } = useMenuItems()
   const [menuItem, setMenuItem] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [relatedItems, setRelatedItems] = useState<any[]>([])
@@ -44,7 +44,7 @@ export default function MenuItemDetail() {
       if (item) {
         setMenuItem(item)
         // Fetch related items in the same category
-        fetchRelatedItems(item.category)
+        await fetchRelatedItems(item.category)
       }
     } catch (error) {
       console.error("Error fetching menu item:", error)
@@ -56,28 +56,16 @@ export default function MenuItemDetail() {
 
   const fetchRelatedItems = async (category: string) => {
     try {
-      // This would be a separate API call to get items in the same category
-      // For now, we'll use mock data
-      setRelatedItems([
-        {
-          _id: "1",
-          name: "Cheeseburger",
-          price: 11.99,
-          imageUrl: "/placeholder.svg?height=40&width=40",
-        },
-        {
-          _id: "2",
-          name: "Veggie Burger",
-          price: 10.99,
-          imageUrl: "/placeholder.svg?height=40&width=40",
-        },
-        {
-          _id: "3",
-          name: "Chicken Burger",
-          price: 12.49,
-          imageUrl: "/placeholder.svg?height=40&width=40",
-        },
-      ])
+      const result = await getMenuItems({
+        category,
+        limit: 4,
+        sort: "name",
+      })
+      if (result && result.data) {
+        // Filter out the current item
+        const filtered = result.data.filter((item: any) => item._id !== params.id)
+        setRelatedItems(filtered.slice(0, 3)) // Show only 3 related items
+      }
     } catch (error) {
       console.error("Error fetching related items:", error)
     }
@@ -330,7 +318,7 @@ export default function MenuItemDetail() {
                     </>
                   )}
 
-                  {menuItem.spicyLevel && (
+                  {menuItem.spicyLevel && menuItem.spicyLevel > 0 && (
                     <>
                       <Separator className="my-4" />
                       <div className="flex items-center justify-between">
@@ -520,7 +508,11 @@ export default function MenuItemDetail() {
               <CardContent>
                 <div className="space-y-4">
                   {relatedItems.map((item) => (
-                    <div key={item._id} className="flex items-center gap-3">
+                    <div
+                      key={item._id}
+                      className="flex items-center gap-3 cursor-pointer hover:bg-muted/50 p-2 rounded-lg transition-colors"
+                      onClick={() => router.push(`/restaurant/menu/${item._id}`)}
+                    >
                       <img
                         src={item.imageUrl || "/placeholder.svg?height=40&width=40"}
                         alt={item.name}
@@ -528,7 +520,7 @@ export default function MenuItemDetail() {
                       />
                       <div className="flex-1">
                         <div className="font-medium">{item.name}</div>
-                        <div className="text-sm text-muted-foreground">${item.price.toFixed(2)}</div>
+                        <div className="text-sm text-muted-foreground">${item.price?.toFixed(2)}</div>
                       </div>
                     </div>
                   ))}
