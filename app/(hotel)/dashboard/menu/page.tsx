@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useMenuItems } from "@/hooks/use-menu-items"
@@ -49,7 +48,22 @@ export default function MenuPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [activeCategory, setActiveCategory] = useState("All")
   const [searchQuery, setSearchQuery] = useState("")
-  const [filters, setFilters] = useState({
+  type MenuFilters = {
+    page: number
+    limit: number
+    sort: string
+    category?: string
+    search?: string
+    availability?: boolean
+    featured?: boolean
+    isVegetarian?: boolean
+    isVegan?: boolean
+    isGlutenFree?: boolean
+    minPrice?: number
+    maxPrice?: number
+  }
+
+  const [filters, setFilters] = useState<MenuFilters>({
     page: 1,
     limit: 12,
     sort: "name",
@@ -63,9 +77,15 @@ export default function MenuPage() {
     const result = await getMenuItems(filters)
     if (result && result.data) {
       setMenuItems(result.data)
-      setTotalItems(result.total || 0)
-      setTotalPages(result.pagination?.totalPages || 1)
-      setCurrentPage(result.pagination?.page || 1)
+      if ("total" in result && "pagination" in result) {
+        setTotalItems(result.total || 0)
+        setTotalPages(result.pagination?.totalPages || 1)
+        setCurrentPage(result.pagination?.page || 1)
+      } else {
+        setTotalItems(0)
+        setTotalPages(1)
+        setCurrentPage(1)
+      }
     }
   }
 
@@ -124,13 +144,13 @@ export default function MenuPage() {
   }
 
   return (
-    <div className="container mx-auto py-6">
+    <div className="container mx-auto py-6 max-w-7xl">
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Menu Management</h1>
           <p className="text-muted-foreground">Manage your restaurant menu items and categories</p>
         </div>
-        <Link href="/dashboard/menu/new">
+        <Link href="/restaurant/menu/new">
           <Button>
             <PlusCircle className="mr-2 h-4 w-4" />
             Add Menu Item
@@ -138,7 +158,7 @@ export default function MenuPage() {
         </Link>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-[250px_1fr] gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
         {/* Sidebar */}
         <div className="space-y-6">
           <Card>
@@ -151,7 +171,7 @@ export default function MenuPage() {
                   <Button
                     key={category}
                     variant={activeCategory === category ? "default" : "ghost"}
-                    className="w-full justify-start"
+                    className="w-full justify-start text-sm"
                     onClick={() => handleCategoryChange(category)}
                   >
                     {category}
@@ -174,7 +194,9 @@ export default function MenuPage() {
                     setFilters((prev) => ({ ...prev, availability: checked ? true : undefined, page: 1 }))
                   }
                 />
-                <Label htmlFor="available">Available Only</Label>
+                <Label htmlFor="available" className="text-sm">
+                  Available Only
+                </Label>
               </div>
               <div className="flex items-center space-x-2">
                 <Switch
@@ -184,7 +206,9 @@ export default function MenuPage() {
                     setFilters((prev) => ({ ...prev, featured: checked ? true : undefined, page: 1 }))
                   }
                 />
-                <Label htmlFor="featured">Featured Only</Label>
+                <Label htmlFor="featured" className="text-sm">
+                  Featured Only
+                </Label>
               </div>
               <div className="flex items-center space-x-2">
                 <Switch
@@ -194,7 +218,9 @@ export default function MenuPage() {
                     setFilters((prev) => ({ ...prev, isVegetarian: checked ? true : undefined, page: 1 }))
                   }
                 />
-                <Label htmlFor="vegetarian">Vegetarian</Label>
+                <Label htmlFor="vegetarian" className="text-sm">
+                  Vegetarian
+                </Label>
               </div>
               <div className="flex items-center space-x-2">
                 <Switch
@@ -204,7 +230,9 @@ export default function MenuPage() {
                     setFilters((prev) => ({ ...prev, isVegan: checked ? true : undefined, page: 1 }))
                   }
                 />
-                <Label htmlFor="vegan">Vegan</Label>
+                <Label htmlFor="vegan" className="text-sm">
+                  Vegan
+                </Label>
               </div>
               <div className="flex items-center space-x-2">
                 <Switch
@@ -214,17 +242,21 @@ export default function MenuPage() {
                     setFilters((prev) => ({ ...prev, isGlutenFree: checked ? true : undefined, page: 1 }))
                   }
                 />
-                <Label htmlFor="glutenFree">Gluten Free</Label>
+                <Label htmlFor="glutenFree" className="text-sm">
+                  Gluten Free
+                </Label>
               </div>
               <Separator />
               <div className="space-y-2">
-                <Label htmlFor="priceRange">Price Range</Label>
+                <Label htmlFor="priceRange" className="text-sm">
+                  Price Range
+                </Label>
                 <div className="flex items-center gap-2">
                   <Input
                     id="minPrice"
                     type="number"
                     placeholder="Min"
-                    className="w-20"
+                    className="w-16 text-xs"
                     onChange={(e) =>
                       setFilters((prev) => ({
                         ...prev,
@@ -233,12 +265,12 @@ export default function MenuPage() {
                       }))
                     }
                   />
-                  <span>to</span>
+                  <span className="text-xs">to</span>
                   <Input
                     id="maxPrice"
                     type="number"
                     placeholder="Max"
-                    className="w-20"
+                    className="w-16 text-xs"
                     onChange={(e) =>
                       setFilters((prev) => ({
                         ...prev,
@@ -251,7 +283,8 @@ export default function MenuPage() {
               </div>
               <Button
                 variant="outline"
-                className="w-full"
+                size="sm"
+                className="w-full bg-transparent"
                 onClick={() =>
                   setFilters({
                     page: 1,
@@ -267,7 +300,7 @@ export default function MenuPage() {
         </div>
 
         {/* Main Content */}
-        <div className="space-y-6">
+        <div className="space-y-6 min-w-0">
           <div className="flex flex-col sm:flex-row gap-4 justify-between">
             <form onSubmit={handleSearch} className="flex w-full max-w-sm items-center space-x-2">
               <Input
@@ -276,13 +309,13 @@ export default function MenuPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
-              <Button type="submit">
+              <Button type="submit" size="sm">
                 <Search className="h-4 w-4" />
               </Button>
             </form>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="flex gap-2">
+                <Button variant="outline" size="sm" className="flex gap-2 bg-transparent">
                   <Filter className="h-4 w-4" />
                   <span>Sort By</span>
                 </Button>
@@ -299,7 +332,7 @@ export default function MenuPage() {
           </div>
 
           {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               {Array(6)
                 .fill(0)
                 .map((_, i) => (
@@ -343,10 +376,10 @@ export default function MenuPage() {
             </Card>
           ) : (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {menuItems.map((item) => (
-                  <Card key={item._id} className="overflow-hidden">
-                    <div className="relative h-48 bg-muted">
+                  <Card key={item._id} className="overflow-hidden flex flex-col h-full">
+                    <div className="relative h-48 bg-muted flex-shrink-0">
                       {item.imageUrl ? (
                         <img
                           src={item.imageUrl || "/placeholder.svg"}
@@ -358,94 +391,104 @@ export default function MenuPage() {
                           <DollarSign className="h-12 w-12 text-muted-foreground" />
                         </div>
                       )}
-                      <div className="absolute top-2 right-2 flex gap-1">
+                      <div className="absolute top-2 right-2 flex flex-col gap-1">
                         {item.featured && (
-                          <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+                          <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 text-xs">
                             Featured
                           </Badge>
                         )}
-                        {!item.availability && <Badge variant="destructive">Unavailable</Badge>}
+                        {!item.availability && (
+                          <Badge variant="destructive" className="text-xs">
+                            Unavailable
+                          </Badge>
+                        )}
                       </div>
                     </div>
-                    <CardHeader>
-                      <div className="flex justify-between items-center">
-                        <CardTitle className="truncate">{item.name}</CardTitle>
-                        <span className="text-green-600 font-bold">${item.price.toFixed(2)}</span>
+
+                    <CardHeader className="pb-3">
+                      <div className="flex justify-between items-start gap-2">
+                        <CardTitle className="text-lg leading-tight line-clamp-2 min-w-0 flex-1">{item.name}</CardTitle>
+                        <span className="text-green-600 font-bold text-lg flex-shrink-0">${item.price.toFixed(2)}</span>
                       </div>
-                      <CardDescription>{item.category}</CardDescription>
+                      <CardDescription className="text-sm">{item.category}</CardDescription>
                     </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground line-clamp-2">{item.description}</p>
-                      <div className="flex flex-wrap gap-1 mt-2">
+
+                    <CardContent className="flex-1 pb-3">
+                      <p className="text-sm text-muted-foreground line-clamp-3 mb-3">{item.description}</p>
+                      <div className="flex flex-wrap gap-1">
                         {item.isVegetarian && (
-                          <Badge variant="outline" className="bg-green-50">
+                          <Badge variant="outline" className="bg-green-50 text-xs">
                             Vegetarian
                           </Badge>
                         )}
                         {item.isVegan && (
-                          <Badge variant="outline" className="bg-green-50">
+                          <Badge variant="outline" className="bg-green-50 text-xs">
                             Vegan
                           </Badge>
                         )}
                         {item.isGlutenFree && (
-                          <Badge variant="outline" className="bg-amber-50">
+                          <Badge variant="outline" className="bg-amber-50 text-xs">
                             Gluten Free
                           </Badge>
                         )}
-                        {item.preparationTime && (
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-                            <Clock className="h-3 w-3" />
-                            <span>{item.preparationTime} min</span>
-                          </div>
-                        )}
                       </div>
+                      {item.preparationTime && (
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground mt-2">
+                          <Clock className="h-3 w-3" />
+                          <span>{item.preparationTime} min</span>
+                        </div>
+                      )}
                     </CardContent>
-                    <CardFooter className="flex justify-between">
-                      <div className="flex space-x-2">
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="destructive" size="icon">
-                              <Trash className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This will permanently delete the menu item. This action cannot be undone.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleDeleteMenuItem(item._id)}>
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                        <Button variant="outline" size="icon" asChild>
-                          <Link href={`/dashboard/menu/${item._id}`}>
-                            <Edit className="h-4 w-4" />
-                          </Link>
-                        </Button>
+
+                    <CardFooter className="pt-3 flex-col gap-3">
+                      <div className="flex justify-between w-full">
+                        <div className="flex space-x-2">
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="destructive" size="sm">
+                                <Trash className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This will permanently delete the menu item. This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDeleteMenuItem(item._id)}>
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                          <Button variant="outline" size="sm" asChild>
+                            <Link href={`/restaurant/menu/${item._id}`}>
+                              <Edit className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                        </div>
+                        <div className="flex space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleToggleFeatured(item._id)}
+                            className={item.featured ? "text-yellow-600" : ""}
+                          >
+                            <Star className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex space-x-2">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => handleToggleFeatured(item._id)}
-                          className={item.featured ? "text-yellow-600" : ""}
-                        >
-                          <Star className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant={item.availability ? "outline" : "secondary"}
-                          size="sm"
-                          onClick={() => handleToggleAvailability(item._id)}
-                        >
-                          {item.availability ? "Available" : "Unavailable"}
-                        </Button>
-                      </div>
+                      <Button
+                        variant={item.availability ? "outline" : "secondary"}
+                        size="sm"
+                        className="w-full"
+                        onClick={() => handleToggleAvailability(item._id)}
+                      >
+                        {item.availability ? "Available" : "Unavailable"}
+                      </Button>
                     </CardFooter>
                   </Card>
                 ))}
@@ -456,18 +499,18 @@ export default function MenuPage() {
                   <div className="flex items-center gap-2">
                     <Button
                       variant="outline"
-                      size="icon"
+                      size="sm"
                       onClick={() => handlePageChange(currentPage - 1)}
                       disabled={currentPage === 1}
                     >
                       <ChevronLeft className="h-4 w-4" />
                     </Button>
-                    <div className="flex items-center mx-4">
+                    <div className="flex items-center mx-4 text-sm">
                       Page {currentPage} of {totalPages}
                     </div>
                     <Button
                       variant="outline"
-                      size="icon"
+                      size="sm"
                       onClick={() => handlePageChange(currentPage + 1)}
                       disabled={currentPage === totalPages}
                     >
