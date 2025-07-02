@@ -217,7 +217,7 @@ export interface KitchenOrderItem {
     name: string
     price: number
   }>
-  status: "Pending" | "Preparing" | "Ready" | "Served"
+  status: "Pending" | "In Progress" | "Ready" | "Served"
   startedAt?: string
   completedAt?: string
 }
@@ -230,7 +230,7 @@ export interface KitchenOrder {
   room?: string
   items: KitchenOrderItem[]
   priority: "Low" | "Normal" | "High" | "Urgent"
-  status: "Pending" | "Preparing" | "Ready" | "Completed" | "Cancelled"
+  status: "Pending" | "In Progress" | "Ready" | "Completed" | "Cancelled"
   notes?: string
   orderType: "Dine In" | "Takeaway" | "Delivery" | "Room Service"
   waiter?: string

@@ -22,6 +22,7 @@ export default function KitchenPage() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [isOnline, setIsOnline] = useState(true)
   const [filters, setFilters] = useState<KitchenOrderFilters>({
+    status: "Pending", // Default to pending orders
     sort: "-createdAt",
     limit: 50,
   })
@@ -74,7 +75,7 @@ export default function KitchenPage() {
 
     switch (value) {
       case "pending":
-        statusFilter = "New,Preparing"
+        statusFilter = "Pending,In Progress" // Adjusted to match backend expectations
         break
       case "ready":
         statusFilter = "Ready"
@@ -89,7 +90,7 @@ export default function KitchenPage() {
         statusFilter = undefined
         break
       default:
-        statusFilter = "New,Preparing"
+        statusFilter = "Pending,In Progress" // Default to pending orders
     }
 
     setFilters((prev) => ({
@@ -116,7 +117,7 @@ export default function KitchenPage() {
     return orders.filter((order) => {
       switch (status) {
         case "pending":
-          return order.status === "New" || order.status === "Preparing"
+          return order.status === "Pending" || order.status === "In Progress"
         case "ready":
           return order.status === "Ready"
         case "completed":
@@ -295,7 +296,7 @@ export default function KitchenPage() {
               <div className="divide-y max-h-80 overflow-y-auto">
                 {orders
                   .filter(
-                    (order) => (order.status === "New" || order.status === "Preparing") && order.priority === "High",
+                    (order) => (order.status === "Pending" || order.status === "In Progress") && order.priority === "High",
                   )
                   .slice(0, 5)
                   .map((order) => (
@@ -320,7 +321,7 @@ export default function KitchenPage() {
                     </div>
                   ))}
                 {orders.filter(
-                  (order) => (order.status === "New" || order.status === "Preparing") && order.priority === "High",
+                  (order) => (order.status === "Pending" || order.status === "In Progress") && order.priority === "High",
                 ).length === 0 && <div className="p-4 text-center text-muted-foreground">No urgent orders</div>}
               </div>
             </CardContent>

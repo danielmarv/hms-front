@@ -34,7 +34,7 @@ export function KitchenOrderCard({ order, onUpdateStatus, onRefresh }: KitchenOr
     switch (status) {
       case "New":
         return "bg-blue-100 text-blue-800 border-blue-200"
-      case "Preparing":
+      case "In Progress":
         return "bg-yellow-100 text-yellow-800 border-yellow-200"
       case "Ready":
         return "bg-green-100 text-green-800 border-green-200"
@@ -69,13 +69,13 @@ export function KitchenOrderCard({ order, onUpdateStatus, onRefresh }: KitchenOr
 
   const getNextAction = () => {
     switch (order.status) {
-      case "New":
+      case "Pending":
         return (
-          <Button onClick={() => handleUpdateStatus("Preparing")} disabled={isUpdating} className="w-full" size="sm">
+          <Button onClick={() => handleUpdateStatus("In Progress")} disabled={isUpdating} className="w-full" size="sm">
             Start Preparing
           </Button>
         )
-      case "Preparing":
+      case "In Progress":
         return (
           <Button onClick={() => handleUpdateStatus("Ready")} disabled={isUpdating} className="w-full" size="sm">
             Mark as Ready
@@ -103,6 +103,55 @@ export function KitchenOrderCard({ order, onUpdateStatus, onRefresh }: KitchenOr
       hour: "2-digit",
       minute: "2-digit",
     })
+  }
+
+  // Helper function to safely render table information
+  const getTableDisplay = () => {
+    if (!order.table) return null
+
+    if (typeof order.table === "string" || typeof order.table === "number") {
+      return `Table ${order.table}`
+    }
+
+    if (typeof order.table === "object" && order.table !== null) {
+      // Handle table object with number and section
+      const tableObj = order.table as any
+      if (tableObj.number) {
+        return `Table ${tableObj.number}${tableObj.section ? ` (${tableObj.section})` : ""}`
+      }
+      return "Table"
+    }
+
+    return null
+  }
+
+  // Helper function to safely render room information
+  const getRoomDisplay = () => {
+    if (!order.room) return null
+
+    if (typeof order.room === "string" || typeof order.room === "number") {
+      return `Room ${order.room}`
+    }
+
+    if (typeof order.room === "object" && order.room !== null) {
+      const roomObj = order.room as any
+      if (roomObj.number) {
+        return `Room ${roomObj.number}`
+      }
+      return "Room"
+    }
+
+    return null
+  }
+
+  // Helper function to get location display
+  const getLocationDisplay = () => {
+    const tableDisplay = getTableDisplay()
+    const roomDisplay = getRoomDisplay()
+
+    if (tableDisplay) return tableDisplay
+    if (roomDisplay) return roomDisplay
+    return "Takeaway"
   }
 
   return (
@@ -142,8 +191,7 @@ export function KitchenOrderCard({ order, onUpdateStatus, onRefresh }: KitchenOr
           <div className="flex justify-between items-center text-sm">
             <div className="flex items-center gap-2">
               <span className="font-medium">{order.orderType}</span>
-              {order.table && <span className="text-muted-foreground">• Table {order.table}</span>}
-              {order.room && <span className="text-muted-foreground">• Room {order.room}</span>}
+              <span className="text-muted-foreground">• {getLocationDisplay()}</span>
             </div>
             {order.chef && (
               <div className="flex items-center gap-1 text-muted-foreground">
@@ -157,20 +205,20 @@ export function KitchenOrderCard({ order, onUpdateStatus, onRefresh }: KitchenOr
 
           {/* Order Items */}
           <div className="space-y-2">
-            <p className="text-sm font-medium">Items ({order.items.length})</p>
+            <p className="text-sm font-medium">Items ({order.items?.length || 0})</p>
             <div className="space-y-1">
-              {order.items.slice(0, 3).map((item, index) => (
+              {order.items?.slice(0, 3).map((item, index) => (
                 <div key={index} className="flex justify-between items-center text-sm">
                   <span className="flex-1">
                     {item.quantity}x {item.name}
                   </span>
-                  <Badge variant="outline" className={`text-xs ${getStatusColor(item.status)}`}>
-                    {item.status}
+                  <Badge variant="outline" className={`text-xs ${getStatusColor(item.status || "New")}`}>
+                    {item.status || "New"}
                   </Badge>
                 </div>
-              ))}
-              {order.items.length > 3 && (
-                <p className="text-xs text-muted-foreground">+{order.items.length - 3} more items</p>
+              )) || []}
+              {(order.items?.length || 0) > 3 && (
+                <p className="text-xs text-muted-foreground">+{(order.items?.length || 0) - 3} more items</p>
               )}
             </div>
           </div>
