@@ -56,9 +56,9 @@ export default function NewRestaurantOrderPage() {
   const { createOrder, loading: orderLoading } = useRestaurantOrders()
   const { getMenuItems, loading: menuLoading } = useMenuItems()
   const { getTables, loading: tablesLoading } = useTables()
-  const { getGuests, loading: guestsLoading } = useGuests()
-  const { getRooms, loading: roomsLoading } = useRooms()
-  const { getUsers, loading: usersLoading } = useUsers()
+  const { getGuests, isLoading: guestsLoading } = useGuests()
+  const { fetchRooms, isLoading: roomsLoading } = useRooms()
+  const { fetchUsers, isLoading: usersLoading } = useUsers()
 
   // Data states
   const [menuItems, setMenuItems] = useState<any[]>([])
@@ -134,7 +134,7 @@ export default function NewRestaurantOrderPage() {
 
   const loadTables = async () => {
     try {
-      const response = await getTables({ isActive: true })
+      const response = await getTables({ occupied: false })
       console.log("Tables response:", response)
       if (response?.data) {
         setTables(response.data)
@@ -146,7 +146,7 @@ export default function NewRestaurantOrderPage() {
 
   const loadGuests = async () => {
     try {
-      const response = await getGuests({ status: "active", limit: 100 })
+      const response = await getGuests({ limit: 100 })
       if (response?.data) {
         setGuests(response.data)
       }
@@ -157,9 +157,9 @@ export default function NewRestaurantOrderPage() {
 
   const loadRooms = async () => {
     try {
-      const response = await getRooms({ status: "occupied" })
-      if (response?.data) {
-        setRooms(response.data)
+      const roomsData = await fetchRooms({ status: "occupied" })
+      if (roomsData) {
+        setRooms(roomsData)
       }
     } catch (error) {
       console.error("Error loading rooms:", error)
@@ -168,9 +168,9 @@ export default function NewRestaurantOrderPage() {
 
   const loadWaiters = async () => {
     try {
-      const response = await getUsers({ role: "waiter", status: "active" })
-      if (response?.data) {
-        setWaiters(response.data)
+      const waitersData = await fetchUsers({ role: "waiter" })
+      if (waitersData) {
+        setWaiters(waitersData)
       }
     } catch (error) {
       console.error("Error loading waiters:", error)
@@ -316,6 +316,7 @@ export default function NewRestaurantOrderPage() {
           totalPrice: item.totalPrice,
           notes: item.notes,
           modifiers: item.modifiers,
+          status: "pending",
         })),
         subtotal,
         taxRate,
