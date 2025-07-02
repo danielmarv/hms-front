@@ -22,8 +22,7 @@ export default function KitchenPage() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [isOnline, setIsOnline] = useState(true)
   const [filters, setFilters] = useState<KitchenOrderFilters>({
-    status: "New,Preparing",
-    sort: "priority,-createdAt",
+    sort: "-createdAt",
     limit: 50,
   })
 
@@ -52,6 +51,7 @@ export default function KitchenPage() {
     setLoading(true)
     try {
       const result = await getKitchenOrders(filters)
+      console.log("Fetched kitchen orders:", result)
       if (result && result.data) {
         // Handle both success and mock data cases
         setOrders(Array.isArray(result.data) ? result.data : [])

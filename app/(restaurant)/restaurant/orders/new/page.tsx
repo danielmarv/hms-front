@@ -94,10 +94,10 @@ export default function NewRestaurantOrderPage() {
   const [paymentMethod, setPaymentMethod] = useState("Cash")
 
   // Pricing
-  const [taxRate, setTaxRate] = useState(10)
+  const [taxRate, setTaxRate] = useState(0)
   const [discountPercentage, setDiscountPercentage] = useState(0)
   const [discountReason, setDiscountReason] = useState("")
-  const [serviceChargePercentage, setServiceChargePercentage] = useState(10)
+  const [serviceChargePercentage, setServiceChargePercentage] = useState(0)
 
   // Flags
   const [isCorporate, setIsCorporate] = useState(false)
