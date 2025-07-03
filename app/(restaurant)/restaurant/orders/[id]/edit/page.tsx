@@ -86,7 +86,6 @@ export default function OrderDetailPage() {
 
       <div className="grid gap-6 md:grid-cols-3">
         <div className="md:col-span-2 space-y-6">
-          {/* Order Header */}
           <Card>
             <CardHeader>
               <div className="flex justify-between items-start">
