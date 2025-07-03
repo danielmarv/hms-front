@@ -379,7 +379,6 @@ export default function RestaurantOrderDetailPage() {
                 </>
               )}
 
-              {/* Delivery Information */}
               {order.orderType === "Delivery" && (order.deliveryAddress || order.deliveryNotes) && (
                 <>
                   <Separator />
