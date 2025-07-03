@@ -126,8 +126,6 @@ export default function OrderDetailPage() {
               </div>
             </CardContent>
           </Card>
-
-          {/* Order Items */}
           <Card>
             <CardHeader>
               <CardTitle>Order Items</CardTitle>
