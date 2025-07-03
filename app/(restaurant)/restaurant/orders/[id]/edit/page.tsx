@@ -192,7 +192,6 @@ export default function OrderDetailPage() {
         </div>
 
         <div className="space-y-6">
-          {/* Customer Information */}
           {(order.customerName || order.customerPhone || order.deliveryAddress) && (
             <Card>
               <CardHeader>
