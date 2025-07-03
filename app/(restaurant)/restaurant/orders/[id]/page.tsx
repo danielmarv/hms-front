@@ -403,7 +403,6 @@ export default function RestaurantOrderDetailPage() {
                 </>
               )}
 
-              {/* Special Instructions */}
               {order.notes && (
                 <>
                   <Separator />
@@ -421,7 +420,6 @@ export default function RestaurantOrderDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Order Items */}
           <Card>
             <CardHeader>
               <CardTitle>Order Items ({order.items?.length || 0})</CardTitle>
