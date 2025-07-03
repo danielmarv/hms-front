@@ -341,7 +341,6 @@ export default function RestaurantOrderDetailPage() {
                 )}
               </div>
 
-              {/* Customer Information */}
               {(order.customerName || order.customerPhone || order.customerEmail) && (
                 <>
                   <Separator />
