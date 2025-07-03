@@ -126,8 +126,6 @@ export default function OrderDetailPage() {
               </div>
             </CardContent>
           </Card>
-
-          {/* Order Items */}
           <Card>
             <CardHeader>
               <CardTitle>Order Items</CardTitle>
@@ -192,7 +190,6 @@ export default function OrderDetailPage() {
         </div>
 
         <div className="space-y-6">
-          {/* Customer Information */}
           {(order.customerName || order.customerPhone || order.deliveryAddress) && (
             <Card>
               <CardHeader>
@@ -221,7 +218,6 @@ export default function OrderDetailPage() {
             </Card>
           )}
 
-          {/* Order Actions */}
           <Card>
             <CardHeader>
               <CardTitle>Order Actions</CardTitle>
@@ -261,7 +257,6 @@ export default function OrderDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Special Instructions */}
           {order.notes && (
             <Card>
               <CardHeader>

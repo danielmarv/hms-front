@@ -23,7 +23,7 @@ export const useTables = () => {
         }
       })
 
-      const response = await request<ApiResponse<Table[]>>(`/restaurant/tables?${queryParams.toString()}`, "GET")
+      const response = await request(`/restaurant/tables?${queryParams.toString()}`, "GET")
       setLoading(false)
       return response
     } catch (err: any) {
@@ -37,7 +37,7 @@ export const useTables = () => {
     setLoading(true)
     setError(null)
     try {
-      const response = await request<ApiResponse<Table>>(`/restaurant/tables/${id}`, "GET")
+      const response = await request(`/restaurant/tables/${id}`, "GET")
       setLoading(false)
       return response.data
     } catch (err: any) {
@@ -51,7 +51,7 @@ export const useTables = () => {
     setLoading(true)
     setError(null)
     try {
-      const response = await request<ApiResponse<Table>>("/restaurant/tables", "POST", table)
+      const response = await request("/restaurant/tables", "POST", table)
       setLoading(false)
       toast.success("Table created successfully")
       return response.data
@@ -66,7 +66,7 @@ export const useTables = () => {
     setLoading(true)
     setError(null)
     try {
-      const response = await request<ApiResponse<Table>>(`/restaurant/tables/${id}`, "PUT", table)
+      const response = await request(`/restaurant/tables/${id}`, "PUT", table)
       setLoading(false)
       toast.success("Table updated successfully")
       return response.data
@@ -81,10 +81,10 @@ export const useTables = () => {
     setLoading(true)
     setError(null)
     try {
-      const response = await request<ApiResponse<null>>(`/restaurant/tables/${id}`, "DELETE")
+      const response = await request(`/restaurant/tables/${id}`, "DELETE")
       setLoading(false)
       toast.success("Table deleted successfully")
-      return response.success
+      return response
     } catch (err: any) {
       setLoading(false)
       setError(err.message || "Failed to delete table")
@@ -106,12 +106,12 @@ export const useTables = () => {
     setLoading(true)
     setError(null)
     try {
-      const response = await request<ApiResponse<Table>>(`/restaurant/tables/${id}/status`, "PATCH", {
+      const response = await request(`/restaurant/tables/${id}/status`, "PATCH", {
         status,
         ...data,
       })
       setLoading(false)
-      toast.success(response.message || "Table status updated successfully")
+      toast.success("Table status updated successfully")
       return response.data
     } catch (err: any) {
       setLoading(false)
