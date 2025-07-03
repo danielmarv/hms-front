@@ -32,14 +32,14 @@ export function KitchenOrderCard({ order, onUpdateStatus, onRefresh }: KitchenOr
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "New":
-        return "bg-blue-100 text-blue-800 border-blue-200"
-      case "In Progress":
+      case "Pending":
         return "bg-yellow-100 text-yellow-800 border-yellow-200"
+      case "In Progress":
+        return "bg-blue-100 text-blue-800 border-blue-200"
       case "Ready":
         return "bg-green-100 text-green-800 border-green-200"
       case "Completed":
-        return "bg-green-100 text-green-800 border-green-200"
+        return "bg-gray-100 text-gray-800 border-gray-200"
       case "Cancelled":
         return "bg-red-100 text-red-800 border-red-200"
       default:
@@ -170,7 +170,7 @@ export function KitchenOrderCard({ order, onUpdateStatus, onRefresh }: KitchenOr
             <div className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
               <Clock className="h-3 w-3" />
               {formatTime(order.createdAt)}
-              {(order.status === "New" || order.status === "Preparing") && (
+              {(order.status === "Pending" || order.status === "In Progress") && (
                 <span className="flex items-center gap-1 text-orange-600">
                   <Timer className="h-3 w-3" />
                   {getTimeElapsed()}m
@@ -212,8 +212,8 @@ export function KitchenOrderCard({ order, onUpdateStatus, onRefresh }: KitchenOr
                   <span className="flex-1">
                     {item.quantity}x {item.name}
                   </span>
-                  <Badge variant="outline" className={`text-xs ${getStatusColor(item.status || "New")}`}>
-                    {item.status || "New"}
+                  <Badge variant="outline" className={`text-xs ${getStatusColor(item.status || "Pending")}`}>
+                    {item.status || "Pending"}
                   </Badge>
                 </div>
               )) || []}
@@ -253,16 +253,16 @@ export function KitchenOrderCard({ order, onUpdateStatus, onRefresh }: KitchenOr
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            {order.status === "New" && (
-              <DropdownMenuItem onClick={() => handleUpdateStatus("Preparing")}>Start Preparing</DropdownMenuItem>
+            {order.status === "Pending" && (
+              <DropdownMenuItem onClick={() => handleUpdateStatus("In Progress")}>Start Preparing</DropdownMenuItem>
             )}
-            {(order.status === "New" || order.status === "Preparing") && (
+            {(order.status === "Pending" || order.status === "In Progress") && (
               <DropdownMenuItem onClick={() => handleUpdateStatus("Ready")}>Mark as Ready</DropdownMenuItem>
             )}
             {order.status === "Ready" && (
               <DropdownMenuItem onClick={() => handleUpdateStatus("Completed")}>Complete Order</DropdownMenuItem>
             )}
-            {(order.status === "New" || order.status === "Preparing") && (
+            {(order.status === "Pending" || order.status === "In Progress") && (
               <DropdownMenuItem onClick={() => handleUpdateStatus("Cancelled")} className="text-red-600">
                 Cancel Order
               </DropdownMenuItem>
