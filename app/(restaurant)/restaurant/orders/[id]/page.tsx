@@ -436,8 +436,6 @@ export default function RestaurantOrderDetailPage() {
                           {item.description && <p className="text-sm text-muted-foreground">{item.description}</p>}
                         </div>
                       </div>
-
-                      {/* Modifiers */}
                       {item.modifiers && item.modifiers.length > 0 && (
                         <div className="mt-2 ml-8">
                           <p className="text-sm font-medium text-muted-foreground">Modifications:</p>
