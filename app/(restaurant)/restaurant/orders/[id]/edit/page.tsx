@@ -267,7 +267,6 @@ export default function OrderDetailPage() {
             </Card>
           )}
 
-          {/* Order Timeline */}
           <Card>
             <CardHeader>
               <CardTitle>Order Timeline</CardTitle>
