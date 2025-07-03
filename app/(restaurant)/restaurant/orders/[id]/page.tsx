@@ -551,9 +551,7 @@ export default function RestaurantOrderDetailPage() {
           </Card>
         </div>
 
-        {/* Sidebar */}
         <div className="space-y-6">
-          {/* Order Summary */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
