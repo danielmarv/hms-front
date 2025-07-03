@@ -22,7 +22,6 @@ import {
   Receipt,
   Printer,
   Edit,
-  Trash2,
   CheckCircle,
   XCircle,
   AlertTriangle,
@@ -30,17 +29,16 @@ import {
   Calendar,
   ChefHat,
 } from "lucide-react"
-import type { RestaurantOrder } from "@/types"
+import type { Order, OrderItem } from "@/types"
 
 export default function RestaurantOrderDetailPage() {
   const params = useParams()
   const router = useRouter()
   const orderId = params.id as string
 
-  const { getRestaurantOrderById, updateRestaurantOrderStatus, deleteRestaurantOrder, loading, error } =
-    useRestaurantOrders()
+  const { getOrder, updateOrderStatus, loading, error } = useRestaurantOrders()
 
-  const [order, setOrder] = useState<RestaurantOrder | null>(null)
+  const [order, setOrder] = useState<Order | null>(null)
   const [isUpdating, setIsUpdating] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [showNotesDialog, setShowNotesDialog] = useState(false)
@@ -55,9 +53,9 @@ export default function RestaurantOrderDetailPage() {
 
   const fetchOrder = async () => {
     try {
-      const result = await getRestaurantOrderById(orderId)
-      if (result?.data) {
-        setOrder(result.data)
+      const result = await getOrder(orderId)
+      if (result) {
+        setOrder(result)
       }
     } catch (error) {
       console.error("Error fetching order:", error)
@@ -69,9 +67,9 @@ export default function RestaurantOrderDetailPage() {
 
     setIsUpdating(true)
     try {
-      const result = await updateRestaurantOrderStatus(order._id, newStatus, orderNotes)
+      const result = await updateOrderStatus(order._id, newStatus, orderNotes)
       if (result) {
-        setOrder({ ...order, status: newStatus })
+        setOrder({ ...order, status: newStatus as any })
         setShowNotesDialog(false)
         setNotes("")
         setSelectedStatus("")
@@ -80,23 +78,6 @@ export default function RestaurantOrderDetailPage() {
       console.error("Error updating order status:", error)
     } finally {
       setIsUpdating(false)
-    }
-  }
-
-  const handleDelete = async () => {
-    if (!order) return
-
-    setIsUpdating(true)
-    try {
-      const result = await deleteRestaurantOrder(order._id)
-      if (result) {
-        router.push("/restaurant/orders")
-      }
-    } catch (error) {
-      console.error("Error deleting order:", error)
-    } finally {
-      setIsUpdating(false)
-      setShowDeleteDialog(false)
     }
   }
 
@@ -374,7 +355,7 @@ export default function RestaurantOrderDetailPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {order.items?.map((item, index) => (
+                {order.items?.map((item: OrderItem, index: number) => (
                   <div key={index} className="flex justify-between items-start p-4 border rounded-lg">
                     <div className="flex-1">
                       <div className="flex items-center gap-3">
@@ -390,7 +371,7 @@ export default function RestaurantOrderDetailPage() {
                         <div className="mt-2 ml-8">
                           <p className="text-sm font-medium text-muted-foreground">Modifications:</p>
                           <div className="flex flex-wrap gap-1 mt-1">
-                            {item.modifiers.map((modifier, modIndex) => (
+                            {item.modifiers.map((modifier: { name: string; price: number }, modIndex: number) => (
                               <Badge key={modIndex} variant="outline" className="text-xs">
                                 + {modifier.name}
                                 {modifier.price > 0 && ` (+${formatCurrency(modifier.price)})`}
@@ -409,7 +390,9 @@ export default function RestaurantOrderDetailPage() {
                     </div>
 
                     <div className="text-right">
-                      <p className="font-medium">{formatCurrency(item.price * item.quantity)}</p>
+                      <p className="font-medium">
+                        {formatCurrency((item.price || item.unitPrice || 0) * item.quantity)}
+                      </p>
                       {item.status && (
                         <Badge variant="outline" className="mt-1">
                           {item.status}
@@ -455,7 +438,11 @@ export default function RestaurantOrderDetailPage() {
                     <div>
                       <p className="font-medium">Order Ready</p>
                       <p className="text-sm text-muted-foreground">
-                        {order.updatedAt && new Date(order.updatedAt).toLocaleString()}
+                        {order.actualReadyTime
+                          ? new Date(order.actualReadyTime).toLocaleString()
+                          : order.updatedAt
+                            ? new Date(order.updatedAt).toLocaleString()
+                            : ""}
                       </p>
                     </div>
                   </div>
@@ -467,8 +454,25 @@ export default function RestaurantOrderDetailPage() {
                     <div>
                       <p className="font-medium">Order Completed</p>
                       <p className="text-sm text-muted-foreground">
-                        {order.updatedAt && new Date(order.updatedAt).toLocaleString()}
+                        {order.completedAt
+                          ? new Date(order.completedAt).toLocaleString()
+                          : order.updatedAt
+                            ? new Date(order.updatedAt).toLocaleString()
+                            : ""}
                       </p>
+                    </div>
+                  </div>
+                )}
+
+                {order.status === "Cancelled" && order.cancelledAt && (
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                    <div>
+                      <p className="font-medium">Order Cancelled</p>
+                      <p className="text-sm text-muted-foreground">{new Date(order.cancelledAt).toLocaleString()}</p>
+                      {order.cancellationReason && (
+                        <p className="text-xs text-muted-foreground">Reason: {order.cancellationReason}</p>
+                      )}
                     </div>
                   </div>
                 )}
@@ -493,14 +497,28 @@ export default function RestaurantOrderDetailPage() {
                 <span>{formatCurrency(order.subtotal || 0)}</span>
               </div>
 
-              {order.tax && order.tax > 0 && (
+              {order.taxAmount && order.taxAmount > 0 && (
+                <div className="flex justify-between">
+                  <span>Tax {order.taxRate ? `(${order.taxRate}%)` : ""}</span>
+                  <span>{formatCurrency(order.taxAmount)}</span>
+                </div>
+              )}
+
+              {order.tax && order.tax > 0 && !order.taxAmount && (
                 <div className="flex justify-between">
                   <span>Tax</span>
                   <span>{formatCurrency(order.tax)}</span>
                 </div>
               )}
 
-              {order.discount && order.discount > 0 && (
+              {order.discountAmount && order.discountAmount > 0 && (
+                <div className="flex justify-between text-green-600">
+                  <span>Discount {order.discountPercentage ? `(${order.discountPercentage}%)` : ""}</span>
+                  <span>-{formatCurrency(order.discountAmount)}</span>
+                </div>
+              )}
+
+              {order.discount && order.discount > 0 && !order.discountAmount && (
                 <div className="flex justify-between text-green-600">
                   <span>Discount</span>
                   <span>-{formatCurrency(order.discount)}</span>
@@ -514,10 +532,19 @@ export default function RestaurantOrderDetailPage() {
                 </div>
               )}
 
+              {order.serviceChargeAmount && order.serviceChargeAmount > 0 && (
+                <div className="flex justify-between">
+                  <span>
+                    Service Charge {order.serviceChargePercentage ? `(${order.serviceChargePercentage}%)` : ""}
+                  </span>
+                  <span>{formatCurrency(order.serviceChargeAmount)}</span>
+                </div>
+              )}
+
               <Separator />
               <div className="flex justify-between font-bold text-lg">
                 <span>Total</span>
-                <span>{formatCurrency(order.total || 0)}</span>
+                <span>{formatCurrency(order.total || order.totalAmount || 0)}</span>
               </div>
 
               {order.paymentStatus && (
@@ -581,13 +608,6 @@ export default function RestaurantOrderDetailPage() {
                 <Edit className="h-4 w-4 mr-2" />
                 Edit Order
               </Button>
-
-              {(order.status === "Pending" || order.status === "Cancelled") && (
-                <Button variant="destructive" className="w-full" onClick={() => setShowDeleteDialog(true)}>
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete Order
-                </Button>
-              )}
             </CardContent>
           </Card>
 
@@ -612,26 +632,6 @@ export default function RestaurantOrderDetailPage() {
           )}
         </div>
       </div>
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Order</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p>Are you sure you want to delete this order? This action cannot be undone.</p>
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
-                Cancel
-              </Button>
-              <Button variant="destructive" onClick={handleDelete} disabled={isUpdating}>
-                {isUpdating ? "Deleting..." : "Delete Order"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Notes Dialog for Cancellation */}
       <Dialog open={showNotesDialog} onOpenChange={setShowNotesDialog}>
