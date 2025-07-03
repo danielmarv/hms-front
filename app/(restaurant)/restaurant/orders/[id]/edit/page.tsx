@@ -86,7 +86,6 @@ export default function OrderDetailPage() {
 
       <div className="grid gap-6 md:grid-cols-3">
         <div className="md:col-span-2 space-y-6">
-          {/* Order Header */}
           <Card>
             <CardHeader>
               <div className="flex justify-between items-start">
@@ -149,8 +148,6 @@ export default function OrderDetailPage() {
               </div>
             </CardContent>
           </Card>
-
-          {/* Order Summary */}
           <Card>
             <CardHeader>
               <CardTitle>Order Summary</CardTitle>
@@ -230,12 +227,12 @@ export default function OrderDetailPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="preparing">Preparing</SelectItem>
-                    <SelectItem value="ready">Ready</SelectItem>
-                    <SelectItem value="served">Served</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                    <SelectItem value="New">New</SelectItem>
+                    <SelectItem value="In Progress">In Progress</SelectItem>
+                    <SelectItem value="Ready">Ready</SelectItem>
+                    <SelectItem value="Served">Served</SelectItem>
+                    <SelectItem value="Completed">Completed</SelectItem>
+                    <SelectItem value="Cancelled">Cancelled</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -247,10 +244,12 @@ export default function OrderDetailPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="paid">Paid</SelectItem>
+                    <SelectItem value="Pending">Pending</SelectItem>
+                    <SelectItem value="Paid">Paid</SelectItem>
+                    <SelectItem value="Partially Paid">Partially Paid</SelectItem>
                     <SelectItem value="refunded">Refunded</SelectItem>
-                    <SelectItem value="failed">Failed</SelectItem>
+                    <SelectItem value="Complimentary">Complimentary</SelectItem>
+                    <SelectItem value="Charged to Room">Charged to Room</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -268,7 +267,6 @@ export default function OrderDetailPage() {
             </Card>
           )}
 
-          {/* Order Timeline */}
           <Card>
             <CardHeader>
               <CardTitle>Order Timeline</CardTitle>
