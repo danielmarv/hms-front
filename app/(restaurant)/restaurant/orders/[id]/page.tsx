@@ -36,14 +36,16 @@ export default function RestaurantOrderDetailPage() {
   const router = useRouter()
   const orderId = params.id as string
 
-  const { getOrder, updateOrderStatus, loading, error } = useRestaurantOrders()
+  const { getOrder, updateOrderStatus, updatePaymentStatus, loading, error } = useRestaurantOrders()
 
   const [order, setOrder] = useState<Order | null>(null)
   const [isUpdating, setIsUpdating] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [showNotesDialog, setShowNotesDialog] = useState(false)
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false)
   const [notes, setNotes] = useState("")
   const [selectedStatus, setSelectedStatus] = useState("")
+  const [selectedPaymentStatus, setSelectedPaymentStatus] = useState("")
 
   useEffect(() => {
     if (orderId) {
@@ -81,6 +83,24 @@ export default function RestaurantOrderDetailPage() {
     }
   }
 
+  const handlePaymentStatusUpdate = async (newPaymentStatus: string) => {
+    if (!order) return
+
+    setIsUpdating(true)
+    try {
+      const result = await updatePaymentStatus(order._id, newPaymentStatus)
+      if (result) {
+        setOrder({ ...order, paymentStatus: newPaymentStatus as any })
+        setShowPaymentDialog(false)
+        setSelectedPaymentStatus("")
+      }
+    } catch (error) {
+      console.error("Error updating payment status:", error)
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "Pending":
@@ -93,6 +113,23 @@ export default function RestaurantOrderDetailPage() {
         return "bg-gray-100 text-gray-800 border-gray-200"
       case "Cancelled":
         return "bg-red-100 text-red-800 border-red-200"
+      default:
+        return "bg-gray-100 text-gray-800 border-gray-200"
+    }
+  }
+
+  const getPaymentStatusColor = (status: string) => {
+    switch (status) {
+      case "Paid":
+        return "bg-green-100 text-green-800 border-green-200"
+      case "Partially Paid":
+        return "bg-yellow-100 text-yellow-800 border-yellow-200"
+      case "Pending":
+        return "bg-red-100 text-red-800 border-red-200"
+      case "Complimentary":
+        return "bg-blue-100 text-blue-800 border-blue-200"
+      case "Charged to Room":
+        return "bg-purple-100 text-purple-800 border-purple-200"
       default:
         return "bg-gray-100 text-gray-800 border-gray-200"
     }
@@ -134,6 +171,20 @@ export default function RestaurantOrderDetailPage() {
       default:
         return []
     }
+  }
+
+  const getPaymentStatusOptions = () => {
+    if (!order) return []
+
+    const options = [
+      { value: "Pending", label: "Pending" },
+      { value: "Paid", label: "Paid" },
+      { value: "Partially Paid", label: "Partially Paid" },
+      { value: "Complimentary", label: "Complimentary" },
+      { value: "Charged to Room", label: "Charged to Room" },
+    ]
+
+    return options.filter((option) => option.value !== order.paymentStatus)
   }
 
   const formatCurrency = (amount: number) => {
@@ -220,6 +271,7 @@ export default function RestaurantOrderDetailPage() {
   }
 
   const statusOptions = getNextStatusOptions()
+  const paymentOptions = getPaymentStatusOptions()
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -330,6 +382,31 @@ export default function RestaurantOrderDetailPage() {
                 </>
               )}
 
+              {/* Delivery Information */}
+              {order.orderType === "Delivery" && (order.deliveryAddress || order.deliveryNotes) && (
+                <>
+                  <Separator />
+                  <div>
+                    <h4 className="font-medium mb-3 flex items-center gap-2">
+                      <MapPin className="h-4 w-4" />
+                      Delivery Information
+                    </h4>
+                    {order.deliveryAddress && (
+                      <div className="mb-2">
+                        <p className="text-sm font-medium text-muted-foreground">Address</p>
+                        <p>{order.deliveryAddress}</p>
+                      </div>
+                    )}
+                    {order.deliveryNotes && (
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Delivery Notes</p>
+                        <p className="text-sm">{order.deliveryNotes}</p>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
               {/* Special Instructions */}
               {order.notes && (
                 <>
@@ -426,7 +503,11 @@ export default function RestaurantOrderDetailPage() {
                     <div>
                       <p className="font-medium">Preparation Started</p>
                       <p className="text-sm text-muted-foreground">
-                        {order.updatedAt && new Date(order.updatedAt).toLocaleString()}
+                        {order.startedAt
+                          ? new Date(order.startedAt).toLocaleString()
+                          : order.updatedAt
+                            ? new Date(order.updatedAt).toLocaleString()
+                            : ""}
                       </p>
                     </div>
                   </div>
@@ -550,13 +631,17 @@ export default function RestaurantOrderDetailPage() {
               {order.paymentStatus && (
                 <div className="mt-3">
                   <Badge
-                    variant={order.paymentStatus === "Paid" ? "default" : "secondary"}
-                    className="w-full justify-center"
+                    className={`w-full justify-center cursor-pointer ${getPaymentStatusColor(order.paymentStatus)}`}
+                    onClick={() => setShowPaymentDialog(true)}
                   >
                     <CreditCard className="h-4 w-4 mr-2" />
                     {order.paymentStatus}
                   </Badge>
                 </div>
+              )}
+
+              {order.paymentMethod && (
+                <div className="text-center text-sm text-muted-foreground">Payment Method: {order.paymentMethod}</div>
               )}
             </CardContent>
           </Card>
@@ -632,6 +717,43 @@ export default function RestaurantOrderDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Payment Status Dialog */}
+      <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Payment Status</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm text-muted-foreground mb-3">
+                Current status: <span className="font-medium">{order.paymentStatus}</span>
+              </p>
+              <div className="space-y-2">
+                {paymentOptions.map((option) => (
+                  <Button
+                    key={option.value}
+                    variant="outline"
+                    className="w-full justify-start bg-transparent"
+                    onClick={() => {
+                      setSelectedPaymentStatus(option.value)
+                      handlePaymentStatusUpdate(option.value)
+                    }}
+                    disabled={isUpdating}
+                  >
+                    {option.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setShowPaymentDialog(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Notes Dialog for Cancellation */}
       <Dialog open={showNotesDialog} onOpenChange={setShowNotesDialog}>
