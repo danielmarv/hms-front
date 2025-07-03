@@ -449,8 +449,6 @@ export default function RestaurantOrderDetailPage() {
                           </div>
                         </div>
                       )}
-
-                      {/* Item Notes */}
                       {item.notes && (
                         <div className="mt-2 ml-8">
                           <p className="text-sm text-muted-foreground italic">Note: {item.notes}</p>
@@ -474,7 +472,6 @@ export default function RestaurantOrderDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Order Timeline */}
           <Card>
             <CardHeader>
               <CardTitle>Order Timeline</CardTitle>
