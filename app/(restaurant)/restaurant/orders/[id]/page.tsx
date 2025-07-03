@@ -633,7 +633,6 @@ export default function RestaurantOrderDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Actions */}
           <Card>
             <CardHeader>
               <CardTitle>Actions</CardTitle>
