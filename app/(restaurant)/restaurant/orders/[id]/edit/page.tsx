@@ -221,7 +221,6 @@ export default function OrderDetailPage() {
             </Card>
           )}
 
-          {/* Order Actions */}
           <Card>
             <CardHeader>
               <CardTitle>Order Actions</CardTitle>
@@ -261,7 +260,6 @@ export default function OrderDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Special Instructions */}
           {order.notes && (
             <Card>
               <CardHeader>
