@@ -37,78 +37,8 @@ import { useCheckInApi } from "@/hooks/use-checkin-api"
 import { usePayments } from "@/hooks/use-payments"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
-import { format, addDays } from "date-fns"
-
-interface ActivityItem {
-  id: string
-  type: "checkin" | "checkout" | "maintenance" | "payment" | "reservation" | "complaint" | "service"
-  guest?: string
-  guestId?: string
-  room?: string
-  time: string
-  status: "completed" | "pending" | "in-progress" | "cancelled"
-  description?: string
-  amount?: number
-  priority?: "low" | "medium" | "high" | "urgent"
-}
-
-interface TaskItem {
-  id: string
-  title: string
-  description: string
-  priority: "low" | "medium" | "high" | "urgent"
-  time: string
-  assignedTo?: string
-  category: "maintenance" | "housekeeping" | "guest_service" | "admin"
-  dueDate?: string
-}
-
-interface ArrivalItem {
-  id: string
-  guest: string
-  guestId: string
-  room: string
-  roomType: string
-  time: string
-  status: "confirmed" | "checked_in" | "no_show" | "cancelled"
-  vip: boolean
-  specialRequests?: string[]
-  estimatedArrival?: string
-  contactNumber?: string
-}
-
-interface DepartureItem {
-  id: string
-  guest: string
-  guestId: string
-  room: string
-  checkOutTime: string
-  status: "scheduled" | "checked_out" | "late_checkout" | "extended"
-  balanceDue: number
-  vip: boolean
-}
-
-interface ReservationItem {
-  id: string
-  guest: string
-  checkIn: string
-  checkOut: string
-  roomType: string
-  status: "confirmed" | "pending" | "cancelled"
-  totalAmount: number
-  source: "direct" | "booking.com" | "expedia" | "phone" | "walk_in"
-}
-
-interface ServiceRequest {
-  id: string
-  guest: string
-  room: string
-  type: "housekeeping" | "maintenance" | "concierge" | "room_service" | "laundry"
-  description: string
-  priority: "low" | "medium" | "high" | "urgent"
-  status: "pending" | "in_progress" | "completed"
-  requestedAt: string
-}
+import { format } from "date-fns"
+import { useDashboardData } from "@/hooks/use-dashboard-data"
 
 export default function FrontDeskDashboard() {
   const { fetchRooms, fetchRoomStats, roomStats, isLoading: roomsLoading } = useRooms()
@@ -116,17 +46,16 @@ export default function FrontDeskDashboard() {
   const { getMaintenanceRequests, isLoading: maintenanceLoading } = useMaintenanceRequests()
   const { getCheckIns, getCurrentOccupancy } = useCheckInApi()
   const { getPaymentStats } = usePayments()
+  const { dashboardData, isLoading: dashboardLoading, fetchAllDashboardData } = useDashboardData()
 
-  const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([])
-  const [pendingTasks, setPendingTasks] = useState<TaskItem[]>([])
-  const [todayArrivals, setTodayArrivals] = useState<ArrivalItem[]>([])
-  const [todayDepartures, setTodayDepartures] = useState<DepartureItem[]>([])
-  const [upcomingReservations, setUpcomingReservations] = useState<ReservationItem[]>([])
-  const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>([])
   const [maintenanceRequests, setMaintenanceRequests] = useState<any[]>([])
   const [occupancyData, setOccupancyData] = useState<any>(null)
   const [paymentStats, setPaymentStats] = useState<any>(null)
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
+
+  // Extract data from dashboardData
+  const { recentActivity, pendingTasks, todayArrivals, todayDepartures, upcomingReservations, serviceRequests } =
+    dashboardData
 
   useEffect(() => {
     loadDashboardData()
@@ -159,305 +88,12 @@ export default function FrontDeskDashboard() {
         setMaintenanceRequests(maintenanceResponse.data)
       }
 
-      // Generate realistic mock data
-      generateMockData()
+      // Load all dashboard data from backend
+      await fetchAllDashboardData()
     } catch (error) {
       console.error("Error loading dashboard data:", error)
       toast.error("Failed to load dashboard data")
     }
-  }
-
-  const generateMockData = () => {
-    // Generate realistic recent activity
-    const activities: ActivityItem[] = [
-      {
-        id: "1",
-        type: "checkin",
-        guest: "Sarah Johnson",
-        guestId: "guest_001",
-        room: "301",
-        time: format(new Date(Date.now() - 15 * 60 * 1000), "HH:mm"),
-        status: "completed",
-        description: "Standard check-in completed",
-      },
-      {
-        id: "2",
-        type: "payment",
-        guest: "Michael Chen",
-        guestId: "guest_002",
-        room: "205",
-        time: format(new Date(Date.now() - 32 * 60 * 1000), "HH:mm"),
-        status: "completed",
-        amount: 450.0,
-        description: "Payment received for room charges",
-      },
-      {
-        id: "3",
-        type: "maintenance",
-        room: "412",
-        time: format(new Date(Date.now() - 45 * 60 * 1000), "HH:mm"),
-        status: "pending",
-        priority: "high",
-        description: "Air conditioning not working",
-      },
-      {
-        id: "4",
-        type: "checkout",
-        guest: "Emma Wilson",
-        guestId: "guest_003",
-        room: "156",
-        time: format(new Date(Date.now() - 67 * 60 * 1000), "HH:mm"),
-        status: "completed",
-        description: "Express checkout completed",
-      },
-      {
-        id: "5",
-        type: "service",
-        guest: "David Rodriguez",
-        guestId: "guest_004",
-        room: "234",
-        time: format(new Date(Date.now() - 89 * 60 * 1000), "HH:mm"),
-        status: "in-progress",
-        description: "Room service delivery",
-      },
-      {
-        id: "6",
-        type: "complaint",
-        guest: "Lisa Thompson",
-        guestId: "guest_005",
-        room: "178",
-        time: format(new Date(Date.now() - 112 * 60 * 1000), "HH:mm"),
-        status: "pending",
-        priority: "medium",
-        description: "Noise complaint from neighboring room",
-      },
-    ]
-    setRecentActivity(activities)
-
-    // Generate pending tasks
-    const tasks: TaskItem[] = [
-      {
-        id: "task_1",
-        title: "AC Repair - Room 412",
-        description: "Air conditioning unit not cooling properly",
-        priority: "high",
-        time: format(new Date(Date.now() - 45 * 60 * 1000), "HH:mm"),
-        assignedTo: "Maintenance Team",
-        category: "maintenance",
-        dueDate: format(addDays(new Date(), 0), "yyyy-MM-dd"),
-      },
-      {
-        id: "task_2",
-        title: "VIP Guest Arrival Preparation",
-        description: "Prepare suite 501 for VIP guest arrival at 3 PM",
-        priority: "high",
-        time: format(new Date(Date.now() - 30 * 60 * 1000), "HH:mm"),
-        assignedTo: "Housekeeping",
-        category: "guest_service",
-        dueDate: format(new Date(), "yyyy-MM-dd"),
-      },
-      {
-        id: "task_3",
-        title: "Noise Complaint Investigation",
-        description: "Investigate noise complaint from room 178",
-        priority: "medium",
-        time: format(new Date(Date.now() - 112 * 60 * 1000), "HH:mm"),
-        assignedTo: "Front Desk",
-        category: "guest_service",
-        dueDate: format(new Date(), "yyyy-MM-dd"),
-      },
-      {
-        id: "task_4",
-        title: "Late Checkout Processing",
-        description: "Process late checkout for room 289",
-        priority: "medium",
-        time: format(new Date(Date.now() - 25 * 60 * 1000), "HH:mm"),
-        assignedTo: "Front Desk",
-        category: "admin",
-        dueDate: format(new Date(), "yyyy-MM-dd"),
-      },
-      {
-        id: "task_5",
-        title: "Minibar Restock",
-        description: "Restock minibar in rooms 345, 346, 347",
-        priority: "low",
-        time: format(new Date(Date.now() - 180 * 60 * 1000), "HH:mm"),
-        assignedTo: "Housekeeping",
-        category: "housekeeping",
-        dueDate: format(addDays(new Date(), 1), "yyyy-MM-dd"),
-      },
-    ]
-    setPendingTasks(tasks)
-
-    // Generate today's arrivals
-    const arrivals: ArrivalItem[] = [
-      {
-        id: "arr_1",
-        guest: "Robert Anderson",
-        guestId: "guest_006",
-        room: "425",
-        roomType: "Deluxe Suite",
-        time: "15:00",
-        status: "confirmed",
-        vip: true,
-        specialRequests: ["Late checkout", "Extra pillows", "Champagne"],
-        estimatedArrival: "14:30",
-        contactNumber: "+1-555-0123",
-      },
-      {
-        id: "arr_2",
-        guest: "Maria Garcia",
-        guestId: "guest_007",
-        room: "312",
-        roomType: "Standard Room",
-        time: "16:30",
-        status: "confirmed",
-        vip: false,
-        specialRequests: ["Ground floor room"],
-        estimatedArrival: "16:00",
-        contactNumber: "+1-555-0124",
-      },
-      {
-        id: "arr_3",
-        guest: "James Wilson",
-        guestId: "guest_008",
-        room: "189",
-        roomType: "Business Room",
-        time: "18:00",
-        status: "confirmed",
-        vip: false,
-        estimatedArrival: "17:45",
-        contactNumber: "+1-555-0125",
-      },
-      {
-        id: "arr_4",
-        guest: "Jennifer Lee",
-        guestId: "guest_009",
-        room: "267",
-        roomType: "Family Room",
-        time: "14:00",
-        status: "checked_in",
-        vip: false,
-        specialRequests: ["Crib for baby"],
-        contactNumber: "+1-555-0126",
-      },
-    ]
-    setTodayArrivals(arrivals)
-
-    // Generate today's departures
-    const departures: DepartureItem[] = [
-      {
-        id: "dep_1",
-        guest: "Thomas Brown",
-        guestId: "guest_010",
-        room: "145",
-        checkOutTime: "11:00",
-        status: "checked_out",
-        balanceDue: 0,
-        vip: false,
-      },
-      {
-        id: "dep_2",
-        guest: "Amanda Davis",
-        guestId: "guest_011",
-        room: "298",
-        checkOutTime: "12:00",
-        status: "late_checkout",
-        balanceDue: 75.0,
-        vip: true,
-      },
-      {
-        id: "dep_3",
-        guest: "Kevin Martinez",
-        guestId: "guest_012",
-        room: "367",
-        checkOutTime: "11:30",
-        status: "scheduled",
-        balanceDue: 125.5,
-        vip: false,
-      },
-      {
-        id: "dep_4",
-        guest: "Rachel Taylor",
-        guestId: "guest_013",
-        room: "423",
-        checkOutTime: "10:30",
-        status: "extended",
-        balanceDue: 0,
-        vip: true,
-      },
-    ]
-    setTodayDepartures(departures)
-
-    // Generate upcoming reservations
-    const reservations: ReservationItem[] = [
-      {
-        id: "res_1",
-        guest: "Christopher White",
-        checkIn: format(addDays(new Date(), 1), "yyyy-MM-dd"),
-        checkOut: format(addDays(new Date(), 4), "yyyy-MM-dd"),
-        roomType: "Executive Suite",
-        status: "confirmed",
-        totalAmount: 1200.0,
-        source: "direct",
-      },
-      {
-        id: "res_2",
-        guest: "Nicole Johnson",
-        checkIn: format(addDays(new Date(), 1), "yyyy-MM-dd"),
-        checkOut: format(addDays(new Date(), 3), "yyyy-MM-dd"),
-        roomType: "Standard Room",
-        status: "confirmed",
-        totalAmount: 450.0,
-        source: "booking.com",
-      },
-      {
-        id: "res_3",
-        guest: "Daniel Kim",
-        checkIn: format(addDays(new Date(), 2), "yyyy-MM-dd"),
-        checkOut: format(addDays(new Date(), 5), "yyyy-MM-dd"),
-        roomType: "Business Room",
-        status: "pending",
-        totalAmount: 675.0,
-        source: "expedia",
-      },
-    ]
-    setUpcomingReservations(reservations)
-
-    // Generate service requests
-    const services: ServiceRequest[] = [
-      {
-        id: "srv_1",
-        guest: "Sarah Johnson",
-        room: "301",
-        type: "room_service",
-        description: "Dinner order - Grilled salmon with vegetables",
-        priority: "medium",
-        status: "in_progress",
-        requestedAt: format(new Date(Date.now() - 20 * 60 * 1000), "HH:mm"),
-      },
-      {
-        id: "srv_2",
-        guest: "Michael Chen",
-        room: "205",
-        type: "housekeeping",
-        description: "Extra towels and toiletries",
-        priority: "low",
-        status: "pending",
-        requestedAt: format(new Date(Date.now() - 35 * 60 * 1000), "HH:mm"),
-      },
-      {
-        id: "srv_3",
-        guest: "Robert Anderson",
-        room: "425",
-        type: "concierge",
-        description: "Restaurant reservation for 2 at 8 PM",
-        priority: "high",
-        status: "completed",
-        requestedAt: format(new Date(Date.now() - 90 * 60 * 1000), "HH:mm"),
-      },
-    ]
-    setServiceRequests(services)
   }
 
   useEffect(() => {
@@ -570,7 +206,7 @@ export default function FrontDeskDashboard() {
     }
   }
 
-  const isLoading = roomsLoading || guestsLoading || maintenanceLoading
+  const isLoading = roomsLoading || guestsLoading || maintenanceLoading || dashboardLoading
 
   if (isLoading) {
     return (
