@@ -20,6 +20,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useApi } from "@/hooks/use-api"
 import Link from "next/link"
+import { CurrencyInput } from "@/components/ui/currency-input"
 
 // Define the form schema
 const formSchema = z.object({
@@ -129,7 +130,7 @@ export default function NewInventoryItemPage() {
   return (
     <div className="p-4 md:p-6">
       <div className="mb-6 flex items-center">
-        <Button variant="outline" size="sm" asChild className="mr-4">
+        <Button variant="outline" size="sm" asChild className="mr-4 bg-transparent">
           <Link href="/dashboard/inventory">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Inventory
@@ -280,19 +281,17 @@ export default function NewInventoryItemPage() {
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="unitPrice"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Unit Price*</FormLabel>
-                      <FormControl>
-                        <Input type="number" min="0" step="0.01" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
+                <div className="space-y-2">
+                  <CurrencyInput
+                    label="Unit Price*"
+                    value={form.watch("unitPrice")}
+                    onChange={(usdValue) => form.setValue("unitPrice", usdValue)}
+                    required
+                  />
+                  {form.formState.errors.unitPrice && (
+                    <p className="text-sm font-medium text-destructive">{form.formState.errors.unitPrice.message}</p>
                   )}
-                />
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
