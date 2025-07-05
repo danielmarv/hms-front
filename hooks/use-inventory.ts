@@ -110,14 +110,11 @@ export function useInventory() {
       if (stockStatus) queryParams += `&stockStatus=${encodeURIComponent(stockStatus)}`
       if (isActive !== "") queryParams += `&isActive=${isActive}`
 
-      const response = await request<{
-        data: InventoryItem[]
-        pagination: PaginationData
-        total: number
-      }>(`/inventory${queryParams}`, "GET", undefined, false)
+      const response = await request(`/inventory${queryParams}`, "GET", undefined, false)
+      console.log(response)
 
       if (response.data) {
-        setItems(response.data.data)
+        setItems(response.data)
         setPagination(response.data.pagination)
         setTotalItems(response.data.total)
       } else {
@@ -140,7 +137,7 @@ export function useInventory() {
         return { data: null, error: null, isLoading: false }
       }
 
-      return await request<InventoryItem>(`/inventory/${id}`, "GET", undefined, false)
+      return await request(`/inventory/${id}`, "GET", undefined, false)
     },
     [request],
   )
@@ -158,7 +155,7 @@ export function useInventory() {
       if (endDate) queryParams += `&endDate=${encodeURIComponent(endDate)}`
       if (type) queryParams += `&type=${encodeURIComponent(type)}`
 
-      return await request<{ data: StockTransaction[]; pagination: PaginationData; total: number }>(
+      return await request(
         `/inventory/${id}/transactions${queryParams}`,
         "GET",
         undefined,
@@ -171,7 +168,7 @@ export function useInventory() {
   // Create new inventory item
   const createInventoryItem = useCallback(
     async (itemData: Partial<InventoryItem>) => {
-      return await request<InventoryItem>("/inventory", "POST", itemData)
+      return await request("/inventory", "POST", itemData)
     },
     [request],
   )
