@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { CurrencyInput } from "@/components/ui/currency-input"
 import {
   Dialog,
   DialogContent,
@@ -282,17 +283,11 @@ export function CheckOutDetailsPanel({
                         placeholder="e.g., Minibar, Room Service, etc."
                       />
                     </div>
-                    <div>
-                      <Label htmlFor="chargeAmount">Amount</Label>
-                      <Input
-                        id="chargeAmount"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={newCharge.amount || ""}
-                        onChange={(e) => setNewCharge({ ...newCharge, amount: Number.parseFloat(e.target.value) || 0 })}
-                      />
-                    </div>
+                    <CurrencyInput
+                      label="Amount"
+                      value={newCharge.amount}
+                      onChange={(usdValue) => setNewCharge({ ...newCharge, amount: usdValue })}
+                    />
                     <div>
                       <Label htmlFor="chargeCategory">Category</Label>
                       <Select
@@ -417,22 +412,11 @@ export function CheckOutDetailsPanel({
                         </SelectContent>
                       </Select>
                     </div>
-                    <div>
-                      <Label htmlFor="discountAmount">
-                        {newDiscount.type === "percentage" ? "Percentage (%)" : "Amount"}
-                      </Label>
-                      <Input
-                        id="discountAmount"
-                        type="number"
-                        min="0"
-                        step={newDiscount.type === "percentage" ? "0.1" : "0.01"}
-                        max={newDiscount.type === "percentage" ? "100" : undefined}
-                        value={newDiscount.amount || ""}
-                        onChange={(e) =>
-                          setNewDiscount({ ...newDiscount, amount: Number.parseFloat(e.target.value) || 0 })
-                        }
-                      />
-                    </div>
+                    <CurrencyInput
+                      label={newDiscount.type === "percentage" ? "Percentage (%)" : "Amount"}
+                      value={newDiscount.amount}
+                      onChange={(usdValue) => setNewDiscount({ ...newDiscount, amount: usdValue })}
+                    />
                   </div>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setShowAddDiscountDialog(false)}>
@@ -516,52 +500,42 @@ export function CheckOutDetailsPanel({
           <CardDescription>Collect any outstanding balance</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="paymentAmount">Payment Amount</Label>
-                <Input
-                  id="paymentAmount"
-                  type="number"
-                  min="0"
-                  max={totals.balanceDue}
-                  step="0.01"
-                  placeholder="0.00"
-                  value={checkOutData.paymentAmount || ""}
-                  onChange={(e) =>
-                    onCheckOutDataChange({
-                      ...checkOutData,
-                      paymentAmount: Number.parseFloat(e.target.value) || 0,
-                    })
-                  }
-                />
-                <p className="text-xs text-muted-foreground">
-                  Outstanding balance: {formatCurrency(totals.balanceDue)}
-                </p>
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <CurrencyInput
+              label="Payment Amount"
+              value={checkOutData.paymentAmount || 0}
+              onChange={(usdValue) =>
+                onCheckOutDataChange({
+                  ...checkOutData,
+                  paymentAmount: usdValue,
+                })
+              }
+              placeholder="0.00"
+              helperText={`Outstanding balance: ${formatCurrency(totals.balanceDue)}`}
+            />
 
-
-                <div className="space-y-2">
-                  <Label htmlFor="paymentMethod">Payment Method</Label>
-                  <Select
-                    value={checkOutData.paymentMethod || ""}
-                    onValueChange={(value) => onCheckOutDataChange({ ...checkOutData, paymentMethod: value })}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select payment method" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="credit_card">Credit Card</SelectItem>
-                      <SelectItem value="debit_card">Debit Card</SelectItem>
-                      <SelectItem value="cash">Cash</SelectItem>
-                      <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                      <SelectItem value="mobile_money">Mobile Payment</SelectItem>
-                      <SelectItem value="online">Online</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+            <div className="space-y-2">
+              <Label htmlFor="paymentMethod">Payment Method</Label>
+              <Select
+                value={checkOutData.paymentMethod || ""}
+                onValueChange={(value) => onCheckOutDataChange({ ...checkOutData, paymentMethod: value })}
+                required
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select payment method" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="credit_card">Credit Card</SelectItem>
+                  <SelectItem value="debit_card">Debit Card</SelectItem>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                  <SelectItem value="mobile_money">Mobile Payment</SelectItem>
+                  <SelectItem value="online">Online</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+          </div>
 
           {/* Notes */}
           <div className="space-y-2">
