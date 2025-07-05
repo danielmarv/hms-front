@@ -8,7 +8,7 @@ import { Search, UserX, RefreshCw } from "lucide-react"
 import { CheckOutSearchPanel } from "@/components/frontdesk/checkout-search-panel"
 import { CheckOutDetailsPanel } from "@/components/frontdesk/checkout-details-panel"
 import { CheckOutReceiptDialog } from "@/components/frontdesk/checkout-receipt-dialog"
-import { useCheckOutApi } from "@/hooks/use-checkout-api"
+import { useCheckoutApi } from "@/hooks/use-checkout-api"
 import { useCheckInApi } from "@/hooks/use-checkin-api"
 import { usePayments } from "@/hooks/use-payments"
 import { useCurrentHotel } from "@/hooks/use-current-hotel"
@@ -30,7 +30,7 @@ export default function CheckOutPage() {
   const [receiptData, setReceiptData] = useState<any>(null)
 
   // API hooks
-  const { checkOutGuest, addCharges, addDiscount, getGuestFolio, isLoading: checkOutLoading } = useCheckOutApi()
+  const { checkOutGuest, addCharges, addDiscount, getGuestFolio, isLoading: checkOutLoading } = useCheckoutApi()
   const { getCheckIns, isLoading: checkInsLoading } = useCheckInApi()
   const { createPayment } = usePayments()
   const { hotel, configuration, effectiveConfig } = useCurrentHotel()
