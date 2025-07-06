@@ -80,16 +80,16 @@ const navigation = [
     href: "/frontdesk/payments",
     icon: CreditCard,
   },
-  {
-    name: "Messages",
-    href: "/frontdesk/messages",
-    icon: MessageSquare,
-  },
-  {
-    name: "Reports",
-    href: "/frontdesk/reports",
-    icon: ClipboardList,
-  },
+  // {
+  //   name: "Messages",
+  //   href: "/frontdesk/messages",
+  //   icon: MessageSquare,
+  // },
+  // {
+  //   name: "Reports",
+  //   href: "/frontdesk/reports",
+  //   icon: ClipboardList,
+  // },
 ]
 
 interface FrontDeskSidebarProps {
