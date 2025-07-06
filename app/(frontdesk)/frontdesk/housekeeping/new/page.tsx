@@ -11,8 +11,9 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
-import { ArrowLeft, Calendar, Clock, User, AlertTriangle } from "lucide-react"
+import { ArrowLeft, Calendar, Clock, User, AlertTriangle, MapPin, Bed } from "lucide-react"
 import Link from "next/link"
 import { useHousekeeping } from "@/hooks/use-housekeeping"
 import { useRooms } from "@/hooks/use-rooms"
@@ -42,15 +43,42 @@ export default function NewHousekeepingSchedulePage() {
   }, [])
 
   const loadRooms = async () => {
-    const roomsData = await fetchRooms({ limit: 200 })
-    const roomsList = Array.isArray(roomsData) ? roomsData : roomsData?.data || []
-    setRooms(roomsList)
+    try {
+      const roomsData = await fetchRooms({ limit: 200 })
+      console.log("Rooms data:", roomsData)
+
+      // Handle the response structure you provided
+      let roomsList = []
+      if (roomsData?.data && Array.isArray(roomsData.data)) {
+        roomsList = roomsData.data
+      } else if (Array.isArray(roomsData)) {
+        roomsList = roomsData
+      }
+
+      setRooms(roomsList)
+    } catch (error) {
+      console.error("Error loading rooms:", error)
+      toast.error("Failed to load rooms")
+    }
   }
 
   const loadStaff = async () => {
-    const staffData = await fetchUsers({ department: "housekeeping", limit: 100 })
-    const staffList = Array.isArray(staffData) ? staffData : staffData?.data || []
-    setStaff(staffList)
+    try {
+      const staffData = await fetchUsers({ department: "housekeeping", limit: 100 })
+      console.log("Staff data:", staffData)
+
+      let staffList = []
+      if (staffData?.data && Array.isArray(staffData.data)) {
+        staffList = staffData.data
+      } else if (Array.isArray(staffData)) {
+        staffList = staffData
+      }
+
+      setStaff(staffList)
+    } catch (error) {
+      console.error("Error loading staff:", error)
+      toast.error("Failed to load staff")
+    }
   }
 
   const handleInputChange = (field: string, value: string | boolean) => {
@@ -76,16 +104,20 @@ export default function NewHousekeepingSchedulePage() {
       priority: formData.priority,
       notes: formData.notes,
       updateRoomStatus: formData.updateRoomStatus,
-      ...(formData.assigned_to && { assigned_to: formData.assigned_to }),
+      ...(formData.assigned_to && formData.assigned_to !== "unassigned" && { assigned_to: formData.assigned_to }),
     }
 
-    const result = await createSchedule(scheduleData)
-
-    if (result.data) {
-      toast.success("Housekeeping schedule created successfully")
-      router.push("/frontdesk/housekeeping")
-    } else if (result.error) {
-      toast.error(result.error)
+    try {
+      const result = await createSchedule(scheduleData)
+      if (result.data) {
+        toast.success("Housekeeping schedule created successfully")
+        router.push("/frontdesk/housekeeping")
+      } else if (result.error) {
+        toast.error(result.error)
+      }
+    } catch (error) {
+      console.error("Error creating schedule:", error)
+      toast.error("Failed to create schedule")
     }
   }
 
@@ -95,6 +127,31 @@ export default function NewHousekeepingSchedulePage() {
 
   const getSelectedStaff = () => {
     return staff.find((member) => member._id === formData.assigned_to)
+  }
+
+  const getRoomStatusBadge = (status: string) => {
+    const variants = {
+      available: "bg-green-100 text-green-800",
+      occupied: "bg-red-100 text-red-800",
+      cleaning: "bg-blue-100 text-blue-800",
+      maintenance: "bg-orange-100 text-orange-800",
+      out_of_order: "bg-gray-100 text-gray-800",
+    }
+
+    return (
+      <Badge variant="outline" className={variants[status as keyof typeof variants] || variants.available}>
+        {status?.replace("_", " ").toUpperCase()}
+      </Badge>
+    )
+  }
+
+  const getPriorityColor = (priority: string) => {
+    const colors = {
+      high: "text-red-600",
+      medium: "text-orange-600",
+      low: "text-green-600",
+    }
+    return colors[priority as keyof typeof colors] || colors.medium
   }
 
   return (
@@ -134,15 +191,19 @@ export default function NewHousekeepingSchedulePage() {
                       {rooms.map((room) => (
                         <SelectItem key={room._id} value={room._id}>
                           <div className="flex items-center justify-between w-full">
-                            <span>Room {room.number}</span>
-                            <span className="text-xs text-muted-foreground ml-2">
-                              Floor {room.floor} • {room.status}
-                            </span>
+                            <span>Room {room.roomNumber}</span>
+                            <div className="flex items-center gap-2 ml-2">
+                              <span className="text-xs text-muted-foreground">Floor {room.floor}</span>
+                              {getRoomStatusBadge(room.status)}
+                            </div>
                           </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  {rooms.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No rooms available. Please check your room data.</p>
+                  )}
                 </div>
 
                 {/* Date Selection */}
@@ -172,11 +233,15 @@ export default function NewHousekeepingSchedulePage() {
                       <SelectItem value="unassigned">Leave Unassigned</SelectItem>
                       {staff.map((member) => (
                         <SelectItem key={member._id} value={member._id}>
-                          {member.full_name} - {member.email}
+                          <div className="flex flex-col">
+                            <span>{member.full_name}</span>
+                            <span className="text-xs text-muted-foreground">{member.email}</span>
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  {staff.length === 0 && <p className="text-sm text-muted-foreground">No housekeeping staff found.</p>}
                 </div>
 
                 {/* Priority */}
@@ -187,9 +252,24 @@ export default function NewHousekeepingSchedulePage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="low">Low Priority</SelectItem>
-                      <SelectItem value="medium">Medium Priority</SelectItem>
-                      <SelectItem value="high">High Priority</SelectItem>
+                      <SelectItem value="low">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                          Low Priority
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="medium">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-orange-500"></div>
+                          Medium Priority
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="high">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                          High Priority
+                        </div>
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -241,7 +321,7 @@ export default function NewHousekeepingSchedulePage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
+                  <Bed className="h-5 w-5" />
                   Room Details
                 </CardTitle>
               </CardHeader>
@@ -249,21 +329,56 @@ export default function NewHousekeepingSchedulePage() {
                 {(() => {
                   const selectedRoom = getSelectedRoom()
                   return selectedRoom ? (
-                    <div className="space-y-3">
-                      <div>
-                        <p className="text-sm font-medium">Room {selectedRoom.number}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Floor {selectedRoom.floor} • {selectedRoom.building}
-                        </p>
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                          <MapPin className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-medium">Room {selectedRoom.roomNumber}</p>
+                          <p className="text-sm text-muted-foreground">Floor {selectedRoom.floor}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Current Status</p>
-                        <p className="text-sm font-medium capitalize">{selectedRoom.status}</p>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Current Status</p>
+                          <div className="mt-1">{getRoomStatusBadge(selectedRoom.status)}</div>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Room Type</p>
+                          <p className="text-sm font-medium mt-1">{selectedRoom.roomType?.name || "Standard"}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Room Type</p>
-                        <p className="text-sm font-medium">{selectedRoom.room_type?.name || "Standard"}</p>
-                      </div>
+
+                      {selectedRoom.roomType?.basePrice && (
+                        <div>
+                          <p className="text-xs text-muted-foreground">Base Price</p>
+                          <p className="text-sm font-medium">${selectedRoom.roomType.basePrice}</p>
+                        </div>
+                      )}
+
+                      {selectedRoom.amenities && selectedRoom.amenities.length > 0 && (
+                        <div>
+                          <p className="text-xs text-muted-foreground">Amenities</p>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {selectedRoom.amenities.map((amenity: string, index: number) => (
+                              <Badge key={index} variant="secondary" className="text-xs">
+                                {amenity}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {selectedRoom.lastCleaned && (
+                        <div>
+                          <p className="text-xs text-muted-foreground">Last Cleaned</p>
+                          <p className="text-sm font-medium">
+                            {format(new Date(selectedRoom.lastCleaned), "MMM dd, yyyy")}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   ) : null
                 })()}
@@ -280,31 +395,60 @@ export default function NewHousekeepingSchedulePage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                <div>
-                  <p className="text-xs text-muted-foreground">Scheduled Date</p>
-                  <p className="text-sm font-medium">
-                    {formData.schedule_date
-                      ? format(new Date(formData.schedule_date), "MMMM dd, yyyy")
-                      : "Not selected"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Priority Level</p>
-                  <div className="flex items-center gap-2">
-                    {formData.priority === "high" && <AlertTriangle className="h-4 w-4 text-red-500" />}
-                    <p className="text-sm font-medium capitalize">{formData.priority}</p>
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Calendar className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">
+                      {formData.schedule_date
+                        ? format(new Date(formData.schedule_date), "MMMM dd, yyyy")
+                        : "Not selected"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Scheduled Date</p>
                   </div>
                 </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Assigned Staff</p>
-                  <p className="text-sm font-medium">
-                    {(() => {
-                      const selectedStaff = getSelectedStaff()
-                      return selectedStaff ? selectedStaff.full_name : "Unassigned"
-                    })()}
-                  </p>
+
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <AlertTriangle className={`h-4 w-4 ${getPriorityColor(formData.priority)}`} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium capitalize">{formData.priority} Priority</p>
+                    <p className="text-xs text-muted-foreground">Cleaning Priority</p>
+                  </div>
                 </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <User className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">
+                      {(() => {
+                        const selectedStaff = getSelectedStaff()
+                        return selectedStaff ? selectedStaff.full_name : "Unassigned"
+                      })()}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Assigned Staff</p>
+                  </div>
+                </div>
+
+                {formData.notes && (
+                  <div className="p-3 bg-muted rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-1">Special Instructions:</p>
+                    <p className="text-sm">{formData.notes}</p>
+                  </div>
+                )}
+
+                {formData.updateRoomStatus && (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                      ✓ Room status will be updated to "cleaning" when this schedule is created
+                    </p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
