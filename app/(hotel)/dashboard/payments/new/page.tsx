@@ -36,6 +36,10 @@ import { Separator } from "@/components/ui/separator"
 
 import { Skeleton } from "@/components/ui/skeleton"
 
+import { CurrencyInput } from "@/components/ui/currency-input"
+
+import { useCurrency } from "@/hooks/use-currency"
+
 import { toast } from "sonner"
 
 import { ArrowLeft, Save, RefreshCw, User, CreditCard, FileText, AlertCircle, Crown } from "lucide-react"
@@ -50,6 +54,8 @@ export default function NewPaymentPage() {
   const { getInvoices } = useInvoices()
 
   const { getBookings } = useBookings()
+
+  const { formatCurrency } = useCurrency()
 
   // State for fetched data
 
@@ -187,12 +193,6 @@ export default function NewPaymentPage() {
     setPaymentData({ ...paymentData, [name]: value })
   }
 
-  const handleNumberInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-
-    setPaymentData({ ...paymentData, [name]: Number.parseFloat(value) || 0 })
-  }
-
   const handleSelectChange = (name: string, value: string) => {
     setPaymentData({ ...paymentData, [name]: value })
 
@@ -250,7 +250,7 @@ export default function NewPaymentPage() {
       if (response) {
         toast.success("Payment created successfully")
 
-        router.push("/frontdesk/payments")
+        router.push("/dashboard/payments")
       }
     } catch (error) {
       console.error("Error creating payment:", error)
@@ -327,50 +327,12 @@ export default function NewPaymentPage() {
                   </Select>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="amountPaid">Amount *</Label>
-
-                    <Input
-                      id="amountPaid"
-                      name="amountPaid"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={paymentData.amountPaid || ""}
-                      onChange={handleNumberInputChange}
-                      placeholder="0.00"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="currency">Currency</Label>
-
-                    <Select
-                      value={paymentData.currency}
-                      onValueChange={(value) => handleSelectChange("currency", value)}
-                    >
-                      <SelectTrigger id="currency">
-                        <SelectValue placeholder="Select currency" />
-                      </SelectTrigger>
-
-                      <SelectContent>
-                        <SelectItem value="USD">USD - US Dollar</SelectItem>
-
-                        <SelectItem value="EUR">EUR - Euro</SelectItem>
-
-                        <SelectItem value="GBP">GBP - British Pound</SelectItem>
-
-                        <SelectItem value="CAD">CAD - Canadian Dollar</SelectItem>
-
-                        <SelectItem value="AUD">AUD - Australian Dollar</SelectItem>
-
-                        <SelectItem value="JPY">JPY - Japanese Yen</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
+                <CurrencyInput
+                  label="Amount *"
+                  value={paymentData.amountPaid}
+                  onChange={(usdValue) => setPaymentData({ ...paymentData, amountPaid: usdValue })}
+                  required
+                />
 
                 <div className="space-y-2">
                   <Label htmlFor="method">Payment Method *</Label>
@@ -592,9 +554,7 @@ export default function NewPaymentPage() {
                         </div>
 
                         <div className="flex items-center justify-between">
-                          <span className="text-lg font-bold text-green-600">
-                            {charge.currency} {charge.amount.toFixed(2)}
-                          </span>
+                          <span className="text-lg font-bold text-green-600">{formatCurrency(charge.amount)}</span>
 
                           <Button size="sm" variant="outline" onClick={() => handlePayNow(charge)}>
                             Pay Now
@@ -634,7 +594,7 @@ export default function NewPaymentPage() {
                   {paymentHistory.slice(0, 3).map((payment) => (
                     <div key={payment.id} className="flex items-center justify-between text-sm">
                       <div>
-                        <p className="font-medium">${payment.amount.toFixed(2)}</p>
+                        <p className="font-medium">{formatCurrency(payment.amount)}</p>
 
                         <p className="text-muted-foreground text-xs">
                           {payment.method.replace("_", " ")} • {payment.date.toLocaleDateString()}

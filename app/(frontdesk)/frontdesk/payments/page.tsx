@@ -6,6 +6,7 @@ import { usePayments } from "@/hooks/use-payments"
 import { useGuests } from "@/hooks/use-guests"
 import { useInvoices } from "@/hooks/use-invoices"
 import { useBookings } from "@/hooks/use-bookings"
+import { useCurrency } from "@/hooks/use-currency"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -56,6 +57,7 @@ export default function PaymentsPage() {
   const { getGuests } = useGuests()
   const { getInvoices } = useInvoices()
   const { getBookings } = useBookings()
+  const { getDisplayAmounts, formatCurrency } = useCurrency()
 
   const [payments, setPayments] = useState<any[]>([])
   const [pendingChargeGuests, setPendingChargeGuests] = useState<PendingChargeGuest[]>([])
@@ -237,6 +239,17 @@ export default function PaymentsPage() {
     router.push(url)
   }
 
+  // Helper function to render dual currency amounts
+  const renderDualCurrency = (usdAmount: number, className?: string) => {
+    const amounts = getDisplayAmounts(usdAmount)
+    return (
+      <div className={className}>
+        <div className="font-medium">{amounts.formattedUsd}</div>
+        <div className="text-sm text-muted-foreground">{amounts.formattedUgx}</div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -264,7 +277,7 @@ export default function PaymentsPage() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${paymentSummary.totalAmount.toFixed(2)}</div>
+            {renderDualCurrency(paymentSummary.totalAmount, "text-2xl font-bold")}
             <p className="text-xs text-muted-foreground">{paymentSummary.totalPayments} transactions</p>
           </CardContent>
         </Card>
@@ -275,7 +288,7 @@ export default function PaymentsPage() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${paymentSummary.todayAmount.toFixed(2)}</div>
+            {renderDualCurrency(paymentSummary.todayAmount, "text-2xl font-bold")}
             <p className="text-xs text-muted-foreground">{paymentSummary.todayPayments} payments today</p>
           </CardContent>
         </Card>
@@ -286,7 +299,7 @@ export default function PaymentsPage() {
             <AlertTriangle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${paymentSummary.pendingAmount.toFixed(2)}</div>
+            {renderDualCurrency(paymentSummary.pendingAmount, "text-2xl font-bold")}
             <p className="text-xs text-muted-foreground">{pendingChargeGuests.length} guests with pending charges</p>
           </CardContent>
         </Card>
@@ -413,10 +426,7 @@ export default function PaymentsPage() {
                             <div className="text-sm text-muted-foreground">{payment.guest?.email}</div>
                           </div>
                         </TableCell>
-                        <TableCell>
-                          <div className="font-medium">${(payment.amountPaid || 0).toFixed(2)}</div>
-                          <div className="text-sm text-muted-foreground">{payment.currency || "USD"}</div>
-                        </TableCell>
+                        <TableCell>{renderDualCurrency(payment.amountPaid || 0)}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className="capitalize">
                             <CreditCard className="w-3 h-3 mr-1" />
@@ -503,12 +513,10 @@ export default function PaymentsPage() {
                             <div className="text-sm text-muted-foreground">{guest.guestEmail}</div>
                           </div>
                         </TableCell>
-                        <TableCell>
-                          <div className="font-medium text-lg">${guest.totalPending.toFixed(2)}</div>
-                        </TableCell>
+                        <TableCell>{renderDualCurrency(guest.totalPending, "text-lg")}</TableCell>
                         <TableCell>
                           {guest.overdueAmount > 0 ? (
-                            <div className="font-medium text-red-600">${guest.overdueAmount.toFixed(2)}</div>
+                            renderDualCurrency(guest.overdueAmount, "text-red-600 font-medium")
                           ) : (
                             <span className="text-muted-foreground">-</span>
                           )}

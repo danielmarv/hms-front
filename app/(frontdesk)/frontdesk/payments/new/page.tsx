@@ -34,6 +34,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
 
 import { ArrowLeft, Save, RefreshCw, User, CreditCard, FileText, AlertCircle, Crown } from "lucide-react"
+import { CurrencyInput } from "@/components/ui/currency-input"
 
 export default function NewPaymentPage() {
   const router = useRouter()
@@ -323,21 +324,12 @@ export default function NewPaymentPage() {
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="amountPaid">Amount *</Label>
-
-                    <Input
-                      id="amountPaid"
-                      name="amountPaid"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={paymentData.amountPaid || ""}
-                      onChange={handleNumberInputChange}
-                      placeholder="0.00"
-                      required
-                    />
-                  </div>
+                  <CurrencyInput
+                    label="Amount *"
+                    value={paymentData.amountPaid}
+                    onChange={(usdValue) => setPaymentData({ ...paymentData, amountPaid: usdValue })}
+                    required
+                  />
 
                   <div className="space-y-2">
                     <Label htmlFor="currency">Currency</Label>
