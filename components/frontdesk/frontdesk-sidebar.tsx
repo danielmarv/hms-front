@@ -60,11 +60,11 @@ const navigation = [
     href: "/frontdesk/housekeeping",
     icon: Bed,
   },
-  {
-    name: "Guest Services",
-    href: "/frontdesk/services",
-    icon: Phone,
-  },
+  // {
+  //   name: "Guest Services",
+  //   href: "/frontdesk/services",
+  //   icon: Phone,
+  // },
   {
     name: "Room Status",
     href: "/frontdesk/rooms",
