@@ -155,7 +155,6 @@ export default function CheckOutPage() {
 
       toast.success("Guest checked out successfully!")
     } catch (error) {
-      console.error("Checkout failed:", error)
       toast.error("Failed to complete checkout")
     }
   }
