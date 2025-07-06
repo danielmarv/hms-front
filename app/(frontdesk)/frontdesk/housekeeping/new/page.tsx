@@ -26,7 +26,7 @@ export default function NewHousekeepingSchedulePage() {
 
   const { createSchedule, isLoading } = useHousekeeping()
   const { fetchRooms } = useRooms()
-  const { getUsers } = useUsers()
+  const { fetchUsers } = useUsers()
 
   const [formData, setFormData] = useState({
     room: roomId || "",
@@ -61,7 +61,7 @@ export default function NewHousekeepingSchedulePage() {
   }
 
   const loadStaff = async () => {
-    const staffData = await getUsers({ role: "housekeeping", limit: 100 })
+    const staffData = await fetchUsers({ department: "housekeeping", limit: 100 })
     const staffList = Array.isArray(staffData) ? staffData : staffData?.data || []
     setStaff(staffList)
   }
@@ -89,19 +89,6 @@ export default function NewHousekeepingSchedulePage() {
       router.push("/frontdesk/housekeeping")
     } else if (result.error) {
       toast.error(result.error)
-    }
-  }
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "high":
-        return "text-red-600"
-      case "medium":
-        return "text-orange-600"
-      case "low":
-        return "text-green-600"
-      default:
-        return "text-gray-600"
     }
   }
 
@@ -176,7 +163,7 @@ export default function NewHousekeepingSchedulePage() {
                       <SelectValue placeholder="Select staff member" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Unassigned</SelectItem>
+                      <SelectItem value="unassigned">Unassigned</SelectItem>
                       {staff.map((member) => (
                         <SelectItem key={member._id} value={member._id}>
                           {member.full_name}
