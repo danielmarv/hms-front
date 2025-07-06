@@ -30,7 +30,7 @@ export function useUsers() {
   const getAllUsers = useCallback(
     async (page = 1, limit = 10) => {
       setError(null)
-      const result = await request<{ data: User[]; pagination: any; total: number }>(
+      const result = await request(
         `/users?page=${page}&limit=${limit}`,
       )
 
@@ -45,13 +45,21 @@ export function useUsers() {
   )
 
   const fetchUsers = useCallback(
-    async (filters: { role?: string; status?: string } = {}) => {
+    async (filters: { role?: string; status?: string; department?: string } = {}) => {
       setError(null)
 
       try {
         const queryParams = new URLSearchParams()
+
+        // Only add filters that are valid for the backend
         Object.entries(filters).forEach(([key, value]) => {
-          if (value && value !== "all") queryParams.append(key, value)
+          if (value && value !== "all") {
+            // Skip role filter if it's a string (since backend expects ObjectId)
+            if (key === "role" && typeof value === "string" && value.length < 24) {
+              return // Skip this filter
+            }
+            queryParams.append(key, value)
+          }
         })
 
         const queryString = queryParams.toString()
@@ -59,7 +67,7 @@ export function useUsers() {
 
         console.log("Fetching users from endpoint:", endpoint)
 
-        const result = await request<{ success: boolean; data: User[]; pagination?: any; total?: number }>(endpoint)
+        const result = await request(endpoint)
 
         if (result.error) {
           setError(result.error)
@@ -101,7 +109,7 @@ export function useUsers() {
   const getUserById = useCallback(
     async (userId: string) => {
       setError(null)
-      const result = await request<{ success: boolean; data: User }>(`/users/${userId}`)
+      const result = await request(`/users/${userId}`)
 
       if (result.error) {
         setError(result.error)
@@ -123,7 +131,7 @@ export function useUsers() {
       department?: string
     }) => {
       setError(null)
-      const result = await request<{ success: boolean; data: User }>("/users", "POST", userData)
+      const result = await request("/users", "POST", userData)
 
       if (result.error) {
         setError(result.error)
@@ -150,7 +158,7 @@ export function useUsers() {
       },
     ) => {
       setError(null)
-      const result = await request<{ success: boolean; data: User }>(`/users/${userId}`, "PUT", userData)
+      const result = await request(`/users/${userId}`, "PUT", userData)
 
       if (result.error) {
         setError(result.error)
@@ -168,7 +176,7 @@ export function useUsers() {
   const deleteUser = useCallback(
     async (userId: string) => {
       setError(null)
-      const result = await request<{ success: boolean; message: string }>(`/users/${userId}`, "DELETE")
+      const result = await request(`/users/${userId}`, "DELETE")
 
       if (result.error) {
         setError(result.error)
@@ -186,20 +194,20 @@ export function useUsers() {
   const resetPassword = useCallback(
     async (userId: string, data: { newPassword: string }) => {
       setError(null)
-      return await request<{ success: boolean; message: string }>(`/users/${userId}/reset-password`, "POST", data)
+      return await request(`/users/${userId}/reset-password`, "POST", data)
     },
     [request],
   )
 
   const getUserRoles = useCallback(async () => {
     setError(null)
-    return await request<UserRole[]>("/roles")
+    return await request("/roles")
   }, [request])
 
   const getUserHotelCount = useCallback(
     async (userId: string) => {
       setError(null)
-      return await request<{ count: number }>(`/users/${userId}/hotels/count`)
+      return await request(`/users/${userId}/hotels/count`)
     },
     [request],
   )
@@ -207,7 +215,7 @@ export function useUsers() {
   const getUserChainAccess = useCallback(
     async (userId: string) => {
       setError(null)
-      return await request<{ chainCode: string; name: string; accessLevel: string }[]>(`/users/${userId}/chains`)
+      return await request(`/users/${userId}/chains`)
     },
     [request],
   )

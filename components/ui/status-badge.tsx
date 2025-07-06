@@ -1,89 +1,62 @@
-import type * as React from "react"
-import { cva, type VariantProps } from "class-variance-authority"
+import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import { Clock, CheckCircle, XCircle, AlertTriangle, Users, Eye, EyeOff, Star } from "lucide-react"
 
-const statusBadgeVariants = cva(
-  "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors",
-  {
-    variants: {
-      variant: {
-        // Order statuses
-        pending: "bg-blue-50 text-blue-700 border border-blue-200",
-        preparing: "bg-yellow-50 text-yellow-700 border border-yellow-200",
-        ready: "bg-green-50 text-green-700 border border-green-200",
-        served: "bg-purple-50 text-purple-700 border border-purple-200",
-        completed: "bg-gray-50 text-gray-700 border border-gray-200",
-        cancelled: "bg-red-50 text-red-700 border border-red-200",
-
-        // Table statuses
-        available: "bg-green-50 text-green-700 border border-green-200",
-        occupied: "bg-red-50 text-red-700 border border-red-200",
-        reserved: "bg-blue-50 text-blue-700 border border-blue-200",
-        cleaning: "bg-yellow-50 text-yellow-700 border border-yellow-200",
-        maintenance: "bg-gray-50 text-gray-700 border border-gray-200",
-
-        // Priority levels
-        high: "bg-red-50 text-red-700 border border-red-200",
-        medium: "bg-yellow-50 text-yellow-700 border border-yellow-200",
-        low: "bg-green-50 text-green-700 border border-green-200",
-
-        // General statuses
-        active: "bg-green-50 text-green-700 border border-green-200",
-        inactive: "bg-gray-50 text-gray-700 border border-gray-200",
-        featured: "bg-amber-50 text-amber-700 border border-amber-200",
-      },
-    },
-    defaultVariants: {
-      variant: "pending",
-    },
-  },
-)
-
-const statusIcons = {
-  // Order statuses
-  pending: Clock,
-  preparing: Clock,
-  ready: CheckCircle,
-  served: CheckCircle,
-  completed: CheckCircle,
-  cancelled: XCircle,
-
-  // Table statuses
-  available: CheckCircle,
-  occupied: Users,
-  reserved: Clock,
-  cleaning: AlertTriangle,
-  maintenance: XCircle,
-
-  // Priority levels
-  high: AlertTriangle,
-  medium: Clock,
-  low: CheckCircle,
-
-  // General statuses
-  active: Eye,
-  inactive: EyeOff,
-  featured: Star,
-}
-
-export interface StatusBadgeProps
-  extends React.HTMLAttributes<HTMLDivElement>,
-    VariantProps<typeof statusBadgeVariants> {
+interface StatusBadgeProps {
   status: string
-  showIcon?: boolean
+  variant?: string
 }
 
-function StatusBadge({ className, variant, status, showIcon = true, ...props }: StatusBadgeProps) {
-  const badgeVariant = variant || (status as any)
-  const Icon = statusIcons[status as keyof typeof statusIcons] || Clock
+export function StatusBadge({ status, variant }: StatusBadgeProps) {
+  const getStatusColor = (status: string, variant?: string) => {
+    const statusLower = status.toLowerCase()
 
-  return (
-    <div className={cn(statusBadgeVariants({ variant: badgeVariant }), className)} {...props}>
-      {showIcon && <Icon className="w-3 h-3 mr-1" />}
-      {status.charAt(0).toUpperCase() + status.slice(1)}
-    </div>
-  )
+    // Order statuses
+    if (statusLower === "pending" || statusLower === "new") {
+      return "bg-blue-100 text-blue-800"
+    }
+    if (statusLower === "preparing" || statusLower === "in_progress" || statusLower === "cooking") {
+      return "bg-yellow-100 text-yellow-800"
+    }
+    if (statusLower === "ready" || statusLower === "completed") {
+      return "bg-green-100 text-green-800"
+    }
+    if (statusLower === "served") {
+      return "bg-purple-100 text-purple-800"
+    }
+    if (statusLower === "cancelled") {
+      return "bg-red-100 text-red-800"
+    }
+
+    // Table statuses
+    if (statusLower === "available") {
+      return "bg-green-100 text-green-800"
+    }
+    if (statusLower === "occupied") {
+      return "bg-red-100 text-red-800"
+    }
+    if (statusLower === "reserved") {
+      return "bg-blue-100 text-blue-800"
+    }
+    if (statusLower === "cleaning") {
+      return "bg-yellow-100 text-yellow-800"
+    }
+    if (statusLower === "maintenance") {
+      return "bg-orange-100 text-orange-800"
+    }
+
+    // Priority levels
+    if (variant === "high" || statusLower === "high") {
+      return "bg-red-100 text-red-800"
+    }
+    if (variant === "medium" || statusLower === "medium") {
+      return "bg-yellow-100 text-yellow-800"
+    }
+    if (variant === "low" || statusLower === "low") {
+      return "bg-gray-100 text-gray-800"
+    }
+
+    return "bg-gray-100 text-gray-800"
+  }
+
+  return <Badge className={cn("text-xs", getStatusColor(status, variant))}>{status}</Badge>
 }
-
-export { StatusBadge, statusBadgeVariants }
