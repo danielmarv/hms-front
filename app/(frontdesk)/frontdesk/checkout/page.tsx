@@ -118,8 +118,6 @@ export default function CheckOutPage() {
         payment_amount: checkOutData.paymentAmount,
         notes: checkOutData.notes,
       }
-
-      console.log("Processing checkout:", checkOutApiData)
       const checkOutResult = await checkOutGuest(selectedCheckIn.id, checkOutApiData)
 
       // If payment was made, create payment record
