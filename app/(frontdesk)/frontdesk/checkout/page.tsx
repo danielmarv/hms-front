@@ -245,7 +245,6 @@ export default function CheckOutPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Receipt Dialog */}
       <CheckOutReceiptDialog
         open={showReceiptDialog}
         onOpenChange={setShowReceiptDialog}
