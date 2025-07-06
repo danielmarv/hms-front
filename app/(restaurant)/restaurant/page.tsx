@@ -1,424 +1,311 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Progress } from "@/components/ui/progress"
 import {
-  ShoppingCart,
+  Plus,
+  TrendingUp,
+  TrendingDown,
   Users,
-  DollarSign,
   Clock,
   ChefHat,
-  AlertTriangle,
-  Star,
   Utensils,
-  Package,
-  TrendingUp,
+  MapPin,
+  Star,
   RefreshCw,
-  Eye,
-  Calendar,
   BarChart3,
+  PieChart,
+  Activity,
+  AlertTriangle,
+  CheckCircle,
+  Timer,
+  Target,
 } from "lucide-react"
-import Link from "next/link"
-import { workflowCoordinator, triggerRestaurantOrder } from "@/lib/workflow-coordinator"
+import { useRouter } from "next/navigation"
+import { useCurrency } from "@/hooks/use-currency"
 import { useRestaurantOrders } from "@/hooks/use-restaurant-orders"
-import { useMenuItems } from "@/hooks/use-menu-items"
-import { useTables } from "@/hooks/use-tables"
-import { useKitchenOrders } from "@/hooks/use-kitchen-orders"
 import { toast } from "sonner"
-
-// Currency conversion rate (UGX to USD)
-const UGX_TO_USD = 0.00027 // 1 UGX = 0.00027 USD (approximate)
-
-interface OrderItem {
-  id: string
-  table: string
-  items: number
-  total: number
-  status: string
-  time: string
-  priority: string
-}
-
-interface PopularItem {
-  name: string
-  orders: number
-  revenue: number
-  category: string
-}
-
-interface TableItem {
-  number: string
-  status: string
-  guests: number
-  server: string | null
-  time: string | null
-  capacity: number
-}
-
-interface RestaurantStats {
-  totalOrders: number
-  activeOrders: number
-  completedOrders: number
-  totalRevenue: number
-  averageOrderValue: number
-  tablesOccupied: number
-  totalTables: number
-  kitchenQueue: number
-  averageWaitTime: number
-  customerSatisfaction: number
-  todayGrowth: number
-  weeklyGrowth: number
-}
-
-// Helper function to format currency in dual format
-const formatDualCurrency = (amount: number) => {
-  const usd = amount
-  const ugx = amount / UGX_TO_USD
-  return {
-    usd: `$${usd.toFixed(2)}`,
-    ugx: `UGX ${ugx.toLocaleString("en-US", { maximumFractionDigits: 0 })}`,
-  }
-}
+import { format } from "date-fns"
 
 export default function RestaurantDashboard() {
-  const { getOrders, getOrderStats, loading: ordersLoading } = useRestaurantOrders()
-  const { getMenuItems, loading: menuLoading } = useMenuItems()
-  const { getTables, loading: tablesLoading } = useTables()
-  const { getKitchenOrders, getKitchenStats, loading: kitchenLoading } = useKitchenOrders()
+  const router = useRouter()
+  const { getDisplayAmounts } = useCurrency()
+  const { getOrders, getOrderStats, loading } = useRestaurantOrders()
 
-  const [stats, setStats] = useState<RestaurantStats>({
-    totalOrders: 0,
+  const [refreshing, setRefreshing] = useState(false)
+  const [lastRefresh, setLastRefresh] = useState(new Date())
+
+  // Dashboard data
+  const [dashboardData, setDashboardData] = useState({
+    todayRevenue: 0,
+    todayOrders: 0,
+    averageOrderValue: 0,
     activeOrders: 0,
     completedOrders: 0,
-    totalRevenue: 0,
-    averageOrderValue: 0,
+    pendingOrders: 0,
+    cancelledOrders: 0,
     tablesOccupied: 0,
-    totalTables: 0,
-    kitchenQueue: 0,
-    averageWaitTime: 25,
-    customerSatisfaction: 4.6,
-    todayGrowth: 12.5,
-    weeklyGrowth: 8.3,
+    totalTables: 20,
+    popularItems: [] as any[],
+    recentOrders: [] as any[],
+    hourlyRevenue: [] as any[],
+    ordersByType: [] as any[],
+    paymentMethods: [] as any[],
+    customerSatisfaction: 4.5,
+    averageWaitTime: 15,
+    kitchenEfficiency: 85,
+    staffPerformance: [] as any[],
   })
 
-  const [activeOrders, setActiveOrders] = useState<OrderItem[]>([])
-  const [popularItems, setPopularItems] = useState<PopularItem[]>([])
-  const [tableStatus, setTableStatus] = useState<TableItem[]>([])
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
-  const [refreshing, setRefreshing] = useState(false)
+  // Growth indicators
+  const [growthData, setGrowthData] = useState({
+    revenueGrowth: 12.5,
+    orderGrowth: 8.3,
+    customerGrowth: 15.2,
+    efficiencyGrowth: 5.7,
+  })
 
   useEffect(() => {
-    loadRestaurantData()
+    loadDashboardData()
     // Auto-refresh every 30 seconds
-    const interval = setInterval(loadRestaurantData, 30000)
+    const interval = setInterval(loadDashboardData, 30000)
     return () => clearInterval(interval)
   }, [])
 
-  const loadRestaurantData = async () => {
-    setRefreshing(true)
+  const loadDashboardData = async () => {
     try {
-      // Load order statistics
-      const orderStatsResponse = await getOrderStats()
-      if (orderStatsResponse?.data) {
-        setStats((prev) => ({
-          ...prev,
-          totalOrders: orderStatsResponse.data?.totalOrders || 0,
-          totalRevenue: orderStatsResponse.data?.totalRevenue || 0,
-          averageOrderValue: orderStatsResponse.data?.averageOrderValue || 0,
-        }))
-      }
+      setRefreshing(true)
+      const today = new Date()
+      const startOfDay = new Date(today.setHours(0, 0, 0, 0)).toISOString()
+      const endOfDay = new Date(today.setHours(23, 59, 59, 999)).toISOString()
 
-      // Load active orders
-      const ordersResponse = await getOrders({
-        limit: 10,
-        sort: "-createdAt",
+      // Load today's orders and stats
+      const [ordersResponse, statsResponse] = await Promise.all([
+        getOrders({
+          startDate: startOfDay,
+          endDate: endOfDay,
+          limit: 50,
+          sort: "-orderedAt",
+        }),
+        getOrderStats ? getOrderStats(startOfDay, endOfDay) : Promise.resolve(null),
+      ])
+
+      const orders = ordersResponse?.data || []
+
+      // Calculate dashboard metrics
+      const todayRevenue = orders.reduce((sum: number, order: any) => sum + (order.totalAmount || 0), 0)
+      const activeOrders = orders.filter((order: any) =>
+        ["New", "In Progress", "Ready"].includes(order.orderStatus),
+      ).length
+      const completedOrders = orders.filter((order: any) => order.orderStatus === "Completed").length
+      const pendingOrders = orders.filter((order: any) => order.orderStatus === "New").length
+      const cancelledOrders = orders.filter((order: any) => order.orderStatus === "Cancelled").length
+
+      // Mock popular items (in real app, this would come from API)
+      const popularItems = [
+        { name: "Grilled Salmon", orders: 45, revenue: 1350, growth: 12 },
+        { name: "Beef Steak", orders: 38, revenue: 1520, growth: 8 },
+        { name: "Chicken Pasta", orders: 52, revenue: 1040, growth: 15 },
+        { name: "Caesar Salad", orders: 29, revenue: 435, growth: -3 },
+        { name: "Chocolate Cake", orders: 33, revenue: 495, growth: 22 },
+      ]
+
+      // Mock hourly revenue data
+      const hourlyRevenue = Array.from({ length: 24 }, (_, hour) => ({
+        hour,
+        revenue: Math.random() * 500 + 100,
+        orders: Math.floor(Math.random() * 20) + 5,
+      }))
+
+      // Order types distribution
+      const ordersByType = [
+        { type: "Dine In", count: orders.filter((o: any) => o.orderType === "Dine In").length, percentage: 65 },
+        {
+          type: "Room Service",
+          count: orders.filter((o: any) => o.orderType === "Room Service").length,
+          percentage: 20,
+        },
+        { type: "Takeaway", count: orders.filter((o: any) => o.orderType === "Takeaway").length, percentage: 10 },
+        { type: "Delivery", count: orders.filter((o: any) => o.orderType === "Delivery").length, percentage: 5 },
+      ]
+
+      setDashboardData({
+        todayRevenue,
+        todayOrders: orders.length,
+        averageOrderValue: orders.length > 0 ? todayRevenue / orders.length : 0,
+        activeOrders,
+        completedOrders,
+        pendingOrders,
+        cancelledOrders,
+        tablesOccupied: Math.floor(Math.random() * 15) + 8, // Mock data
+        totalTables: 20,
+        popularItems,
+        recentOrders: orders.slice(0, 10),
+        hourlyRevenue,
+        ordersByType,
+        paymentMethods: [
+          { method: "Cash", amount: todayRevenue * 0.4, percentage: 40 },
+          { method: "Card", amount: todayRevenue * 0.45, percentage: 45 },
+          { method: "Room Charge", amount: todayRevenue * 0.15, percentage: 15 },
+        ],
+        customerSatisfaction: 4.5 + Math.random() * 0.4,
+        averageWaitTime: 12 + Math.floor(Math.random() * 8),
+        kitchenEfficiency: 80 + Math.floor(Math.random() * 15),
+        staffPerformance: [
+          { name: "John Smith", orders: 25, rating: 4.8, tips: 120 },
+          { name: "Sarah Johnson", orders: 22, rating: 4.6, tips: 95 },
+          { name: "Mike Wilson", orders: 18, rating: 4.4, tips: 85 },
+        ],
       })
-      if (ordersResponse?.data && Array.isArray(ordersResponse.data)) {
-        setActiveOrders(
-          ordersResponse.data.map((order: any) => ({
-            id: order._id,
-            table: order.table?.number ? `Table ${order.table.number}` : order.deliveryInfo?.room || "Takeaway",
-            items: order.items?.length || 0,
-            total: order.totalAmount || 0,
-            status: order.status,
-            time: new Date(order.createdAt).toLocaleTimeString(),
-            priority: order.priority || "normal",
-          })),
-        )
 
-        setStats((prev) => ({
-          ...prev,
-          activeOrders: Array.isArray(ordersResponse.data)
-            ? ordersResponse.data.filter((o: any) => ["pending", "preparing"].includes(o.status)).length
-            : 0,
-          completedOrders: Array.isArray(ordersResponse.data)
-            ? ordersResponse.data.filter((o: any) => o.status === "completed").length
-            : 0,
-        }))
-      }
-
-      // Load kitchen statistics
-      const kitchenStatsResponse = await getKitchenStats()
-      if (kitchenStatsResponse?.data) {
-        setStats((prev) => ({
-          ...prev,
-          kitchenQueue: kitchenStatsResponse.data?.activeOrders || 0,
-        }))
-      }
-
-      // Load tables data
-      const tablesResponse = await getTables()
-      if (tablesResponse?.data && Array.isArray(tablesResponse.data)) {
-        const tables = tablesResponse.data
-        setTableStatus(
-          tables.slice(0, 8).map((table: any) => ({
-            number: table.number,
-            status: table.status,
-            guests: table.currentGuests || 0,
-            server: table.assignedServer || null,
-            time: table.lastUpdated ? new Date(table.lastUpdated).toLocaleTimeString() : null,
-            capacity: table.capacity || 4,
-          })),
-        )
-
-        setStats((prev) => ({
-          ...prev,
-          totalTables: tables.length,
-          tablesOccupied: tables.filter((t: any) => t.status === "occupied").length,
-        }))
-      }
-
-      // Load popular menu items
-      const menuResponse = await getMenuItems({
-        featured: true,
-        limit: 6,
-        sort: "-popularity",
-      })
-      if (menuResponse?.data && Array.isArray(menuResponse.data)) {
-        setPopularItems(
-          menuResponse.data.map((item: any) => ({
-            name: item.name,
-            orders: item.orderCount || Math.floor(Math.random() * 20) + 5,
-            revenue: (item.orderCount || 5) * item.price,
-            category: item.category || "Main Course",
-          })),
-        )
-      }
-
-      setLastUpdated(new Date())
+      setLastRefresh(new Date())
     } catch (error) {
-      console.error("Error loading restaurant data:", error)
-      toast.error("Failed to load restaurant data")
+      console.error("Error loading dashboard data:", error)
+      toast.error("Failed to load dashboard data")
     } finally {
       setRefreshing(false)
     }
   }
 
-  useEffect(() => {
-    const handleWorkflowEvent = (event: any) => {
-      console.log("Restaurant received workflow event:", event)
-      if (event.type === "order.created" || event.type === "order.updated") {
-        loadRestaurantData()
-      }
+  const formatDualCurrency = (amount: number) => {
+    const displayAmounts = getDisplayAmounts(amount)
+    return {
+      usd: displayAmounts.formattedUsd,
+      ugx: displayAmounts.formattedUgx,
     }
-
-    workflowCoordinator.addEventListener("order.created", handleWorkflowEvent)
-    workflowCoordinator.addEventListener("order.updated", handleWorkflowEvent)
-
-    return () => {
-      workflowCoordinator.removeEventListener("order.created", handleWorkflowEvent)
-      workflowCoordinator.removeEventListener("order.updated", handleWorkflowEvent)
-    }
-  }, [])
-
-  const getOrderStatusBadge = (status: string) => {
-    const statusConfig = {
-      pending: { color: "bg-blue-500", text: "text-white", label: "Pending" },
-      preparing: { color: "bg-yellow-500", text: "text-white", label: "Preparing" },
-      ready: { color: "bg-green-500", text: "text-white", label: "Ready" },
-      served: { color: "bg-purple-500", text: "text-white", label: "Served" },
-      completed: { color: "bg-gray-500", text: "text-white", label: "Completed" },
-      cancelled: { color: "bg-red-500", text: "text-white", label: "Cancelled" },
-    }
-
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending
-    return <Badge className={`${config.color} ${config.text} border-0`}>{config.label}</Badge>
   }
 
-  const getTableStatusBadge = (status: string) => {
-    const statusConfig = {
-      occupied: { color: "bg-red-500", text: "text-white", label: "Occupied", icon: Users },
-      available: { color: "bg-green-500", text: "text-white", label: "Available", icon: Users },
-      reserved: { color: "bg-blue-500", text: "text-white", label: "Reserved", icon: Calendar },
-      cleaning: { color: "bg-yellow-500", text: "text-white", label: "Cleaning", icon: RefreshCw },
-    }
-
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.available
-    const Icon = config.icon
-
-    return (
-      <Badge className={`${config.color} ${config.text} border-0 flex items-center gap-1`}>
-        <Icon className="h-3 w-3" />
-        {config.label}
-      </Badge>
+  const getGrowthIcon = (growth: number) => {
+    return growth >= 0 ? (
+      <TrendingUp className="h-4 w-4 text-green-600" />
+    ) : (
+      <TrendingDown className="h-4 w-4 text-red-600" />
     )
   }
 
-  const handleNewOrder = () => {
-    triggerRestaurantOrder({
-      orderId: `ORD-${Date.now()}`,
-      table: "Table 10",
-      items: [{ name: "Sample Item", quantity: 1, price: 25.0 }],
-      total: 25.0,
-    })
-
-    setTimeout(() => {
-      loadRestaurantData()
-    }, 1000)
+  const getGrowthColor = (growth: number) => {
+    return growth >= 0 ? "text-green-600" : "text-red-600"
   }
-
-  const isLoading = ordersLoading || menuLoading || tablesLoading || kitchenLoading
-
-  if (isLoading && !stats.totalOrders) {
-    return (
-      <div className="p-6 space-y-6">
-        <div className="space-y-2">
-          <Skeleton className="h-8 w-[300px]" />
-          <Skeleton className="h-4 w-[500px]" />
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {[...Array(8)].map((_, i) => (
-            <Card key={i}>
-              <CardHeader className="pb-2">
-                <Skeleton className="h-4 w-[100px]" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-8 w-[60px]" />
-                <Skeleton className="h-3 w-[120px] mt-2" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  const occupancyRate = stats.totalTables > 0 ? (stats.tablesOccupied / stats.totalTables) * 100 : 0
-  const completionRate = stats.totalOrders > 0 ? (stats.completedOrders / stats.totalOrders) * 100 : 0
 
   return (
-    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-red-50 p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Restaurant Dashboard</h1>
-          <p className="text-gray-600">Monitor restaurant operations and manage orders efficiently</p>
-          <p className="text-sm text-gray-500 mt-1">
-            Last updated: {lastUpdated.toLocaleTimeString()} • Auto-refresh every 30s
-          </p>
+          <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
+            Restaurant Dashboard
+          </h1>
+          <p className="text-muted-foreground text-lg">Real-time overview of restaurant operations and performance</p>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
+            <Clock className="h-4 w-4" />
+            <span>Last updated: {format(lastRefresh, "MMM dd, HH:mm:ss")}</span>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={loadRestaurantData} variant="outline" disabled={refreshing}>
-            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+        <div className="flex gap-3">
+          <Button
+            variant="outline"
+            onClick={loadDashboardData}
+            disabled={refreshing}
+            className="border-orange-200 hover:bg-orange-50 bg-transparent"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
             Refresh
           </Button>
-          <Button onClick={handleNewOrder} className="bg-orange-600 hover:bg-orange-700">
-            <ShoppingCart className="mr-2 h-4 w-4" />
+          <Button
+            onClick={() => router.push("/restaurant/orders/new")}
+            className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white shadow-lg"
+          >
+            <Plus className="h-4 w-4 mr-2" />
             New Order
-          </Button>
-          <Button variant="outline" asChild>
-            <Link href="/kitchen">
-              <ChefHat className="mr-2 h-4 w-4" />
-              Kitchen View
-            </Link>
           </Button>
         </div>
       </div>
 
       {/* Key Performance Indicators */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {/* Active Orders */}
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-blue-800">Active Orders</CardTitle>
-            <div className="p-2 bg-blue-500 rounded-lg">
-              <ShoppingCart className="h-4 w-4 text-white" />
-            </div>
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-green-500 to-green-600 text-white">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium opacity-90 flex items-center justify-between">
+              Today's Revenue
+              {getGrowthIcon(growthData.revenueGrowth)}
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-900">{stats.activeOrders}</div>
-            <div className="flex items-center gap-2 mt-1">
-              <p className="text-xs text-blue-700">{stats.totalOrders} total today</p>
-              <Badge variant="outline" className="text-xs bg-blue-200 text-blue-800 border-blue-300">
-                <TrendingUp className="h-3 w-3 mr-1" />+{stats.todayGrowth}%
-              </Badge>
+            <div className="text-2xl font-bold">{formatDualCurrency(dashboardData.todayRevenue).usd}</div>
+            <div className="text-sm opacity-90">{formatDualCurrency(dashboardData.todayRevenue).ugx}</div>
+            <div className={`text-sm opacity-90 ${getGrowthColor(growthData.revenueGrowth)}`}>
+              {growthData.revenueGrowth >= 0 ? "+" : ""}
+              {growthData.revenueGrowth}% from yesterday
             </div>
           </CardContent>
         </Card>
 
-        {/* Revenue Today */}
-        <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-green-800">Revenue Today</CardTitle>
-            <div className="p-2 bg-green-500 rounded-lg">
-              <DollarSign className="h-4 w-4 text-white" />
-            </div>
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-500 to-blue-600 text-white">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium opacity-90 flex items-center justify-between">
+              Today's Orders
+              {getGrowthIcon(growthData.orderGrowth)}
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-900">{formatDualCurrency(stats.totalRevenue).usd}</div>
-            <div className="space-y-1">
-              <p className="text-xs text-green-700">{formatDualCurrency(stats.totalRevenue).ugx}</p>
-              <p className="text-xs text-green-600">Avg: {formatDualCurrency(stats.averageOrderValue).usd}</p>
+            <div className="text-3xl font-bold">{dashboardData.todayOrders}</div>
+            <div className="text-sm opacity-90">Avg: {formatDualCurrency(dashboardData.averageOrderValue).usd}</div>
+            <div className={`text-sm opacity-90 ${getGrowthColor(growthData.orderGrowth)}`}>
+              {growthData.orderGrowth >= 0 ? "+" : ""}
+              {growthData.orderGrowth}% from yesterday
             </div>
           </CardContent>
         </Card>
 
-        {/* Table Occupancy */}
-        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-purple-800">Table Occupancy</CardTitle>
-            <div className="p-2 bg-purple-500 rounded-lg">
-              <Users className="h-4 w-4 text-white" />
-            </div>
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-purple-500 to-purple-600 text-white">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium opacity-90 flex items-center justify-between">
+              Active Orders
+              <Activity className="h-4 w-4" />
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-purple-900">
-              {stats.tablesOccupied}/{stats.totalTables}
+            <div className="text-3xl font-bold">{dashboardData.activeOrders}</div>
+            <div className="text-sm opacity-90">
+              {dashboardData.pendingOrders} pending, {dashboardData.activeOrders - dashboardData.pendingOrders} in
+              progress
             </div>
-            <div className="space-y-2 mt-2">
-              <Progress value={occupancyRate} className="h-2" />
-              <p className="text-xs text-purple-700">{occupancyRate.toFixed(0)}% occupied</p>
+            <div className="flex items-center gap-1 text-sm opacity-90">
+              <Timer className="h-3 w-3" />
+              <span>Avg wait: {dashboardData.averageWaitTime}min</span>
             </div>
           </CardContent>
         </Card>
 
-        {/* Kitchen Performance */}
-        <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-orange-800">Kitchen Queue</CardTitle>
-            <div className="p-2 bg-orange-500 rounded-lg">
-              <ChefHat className="h-4 w-4 text-white" />
-            </div>
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-orange-500 to-red-500 text-white">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium opacity-90 flex items-center justify-between">
+              Table Occupancy
+              <Users className="h-4 w-4" />
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-900">{stats.kitchenQueue}</div>
-            <div className="flex items-center justify-between mt-1">
-              <p className="text-xs text-orange-700">{stats.averageWaitTime} min avg</p>
-              {stats.kitchenQueue > 5 && <AlertTriangle className="h-4 w-4 text-red-500" />}
+            <div className="text-3xl font-bold">
+              {dashboardData.tablesOccupied}/{dashboardData.totalTables}
+            </div>
+            <Progress
+              value={(dashboardData.tablesOccupied / dashboardData.totalTables) * 100}
+              className="mt-2 bg-orange-400"
+            />
+            <div className="text-sm opacity-90 mt-1">
+              {Math.round((dashboardData.tablesOccupied / dashboardData.totalTables) * 100)}% occupied
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Secondary Stats */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+      {/* Performance Summary */}
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card className="border-0 shadow-lg">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Star className="h-4 w-4 text-yellow-500" />
@@ -426,332 +313,369 @@ export default function RestaurantDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-xl font-bold">{stats.customerSatisfaction}/5.0</div>
-            <p className="text-xs text-muted-foreground">Based on reviews</p>
+            <div className="text-2xl font-bold">{dashboardData.customerSatisfaction.toFixed(1)}/5.0</div>
+            <Progress value={dashboardData.customerSatisfaction * 20} className="mt-2" />
+            <div className={`text-sm mt-1 ${getGrowthColor(growthData.customerGrowth)}`}>
+              {growthData.customerGrowth >= 0 ? "+" : ""}
+              {growthData.customerGrowth}% this week
+            </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-0 shadow-lg">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-blue-500" />
-              Completion Rate
+              <ChefHat className="h-4 w-4 text-orange-500" />
+              Kitchen Efficiency
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-xl font-bold">{completionRate.toFixed(0)}%</div>
-            <Progress value={completionRate} className="h-2 mt-2" />
+            <div className="text-2xl font-bold">{dashboardData.kitchenEfficiency}%</div>
+            <Progress value={dashboardData.kitchenEfficiency} className="mt-2" />
+            <div className={`text-sm mt-1 ${getGrowthColor(growthData.efficiencyGrowth)}`}>
+              {growthData.efficiencyGrowth >= 0 ? "+" : ""}
+              {growthData.efficiencyGrowth}% this week
+            </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-0 shadow-lg">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-green-500" />
-              Weekly Growth
+              <CheckCircle className="h-4 w-4 text-green-500" />
+              Completed Orders
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-xl font-bold text-green-600">+{stats.weeklyGrowth}%</div>
-            <p className="text-xs text-muted-foreground">vs last week</p>
+            <div className="text-2xl font-bold">{dashboardData.completedOrders}</div>
+            <div className="text-sm text-muted-foreground">
+              Success rate:{" "}
+              {dashboardData.todayOrders > 0
+                ? Math.round((dashboardData.completedOrders / dashboardData.todayOrders) * 100)
+                : 0}
+              %
+            </div>
+            <div className="text-sm text-green-600 mt-1">{dashboardData.cancelledOrders} cancelled today</div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-0 shadow-lg">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Clock className="h-4 w-4 text-purple-500" />
-              Avg Wait Time
+              <Target className="h-4 w-4 text-blue-500" />
+              Daily Target
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-xl font-bold">{stats.averageWaitTime} min</div>
-            <p className="text-xs text-muted-foreground">Kitchen to table</p>
+            <div className="text-2xl font-bold">{Math.round((dashboardData.todayRevenue / 5000) * 100)}%</div>
+            <Progress value={(dashboardData.todayRevenue / 5000) * 100} className="mt-2" />
+            <div className="text-sm text-muted-foreground mt-1">Target: {formatDualCurrency(5000).usd}</div>
           </CardContent>
         </Card>
       </div>
 
       {/* Main Content Tabs */}
       <Tabs defaultValue="orders" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="orders">Active Orders</TabsTrigger>
-          <TabsTrigger value="tables">Table Status</TabsTrigger>
-          <TabsTrigger value="popular">Popular Items</TabsTrigger>
-          <TabsTrigger value="actions">Quick Actions</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-4 bg-white border border-orange-200">
+          <TabsTrigger value="orders" className="data-[state=active]:bg-orange-100 data-[state=active]:text-orange-700">
+            Orders Overview
+          </TabsTrigger>
+          <TabsTrigger value="tables" className="data-[state=active]:bg-orange-100 data-[state=active]:text-orange-700">
+            Table Status
+          </TabsTrigger>
+          <TabsTrigger
+            value="popular"
+            className="data-[state=active]:bg-orange-100 data-[state=active]:text-orange-700"
+          >
+            Popular Items
+          </TabsTrigger>
+          <TabsTrigger
+            value="analytics"
+            className="data-[state=active]:bg-orange-100 data-[state=active]:text-orange-700"
+          >
+            Quick Actions
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="orders" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ShoppingCart className="h-5 w-5" />
-                Active Orders ({activeOrders.length})
-              </CardTitle>
-              <CardDescription>Orders currently being processed</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ScrollArea className="h-[400px]">
+          <div className="grid gap-4 md:grid-cols-2">
+            {/* Recent Orders */}
+            <Card className="border-0 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Utensils className="h-5 w-5 text-orange-600" />
+                  Recent Orders
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
                 <div className="space-y-3">
-                  {activeOrders.length > 0 ? (
-                    activeOrders.map((order) => (
-                      <div
-                        key={order.id}
-                        className="flex items-center justify-between p-4 border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow"
-                      >
-                        <div className="flex items-center space-x-4">
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <p className="font-medium">#{order.id.slice(-6)}</p>
-                              {order.priority === "high" && <AlertTriangle className="h-4 w-4 text-red-500" />}
-                            </div>
-                            <p className="text-sm text-gray-600">
-                              {order.table} • {order.items} items
-                            </p>
-                            <div className="flex items-center gap-4 text-xs text-gray-500">
-                              <span className="flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                {order.time}
-                              </span>
-                              <span>{formatDualCurrency(order.total).usd}</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          {getOrderStatusBadge(order.status)}
-                          <Button size="sm" variant="outline" asChild>
-                            <Link href={`/restaurant/orders/${order.id}`}>
-                              <Eye className="h-4 w-4 mr-1" />
-                              View
-                            </Link>
-                          </Button>
+                  {dashboardData.recentOrders.slice(0, 5).map((order: any, index: number) => (
+                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div className="flex-1">
+                        <div className="font-medium">{order.orderNumber}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {order.orderType} • {format(new Date(order.orderedAt), "HH:mm")}
                         </div>
                       </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-8 text-gray-500">
-                      <ShoppingCart className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>No active orders</p>
-                      <p className="text-sm">New orders will appear here</p>
+                      <div className="text-right">
+                        <Badge
+                          className={
+                            order.orderStatus === "New"
+                              ? "bg-blue-500 text-white"
+                              : order.orderStatus === "In Progress"
+                                ? "bg-yellow-500 text-white"
+                                : order.orderStatus === "Ready"
+                                  ? "bg-green-500 text-white"
+                                  : "bg-gray-500 text-white"
+                          }
+                        >
+                          {order.orderStatus}
+                        </Badge>
+                        <div className="text-sm font-medium mt-1">{formatDualCurrency(order.totalAmount || 0).usd}</div>
+                      </div>
                     </div>
-                  )}
+                  ))}
                 </div>
-              </ScrollArea>
-            </CardContent>
-          </Card>
+                <Button
+                  variant="outline"
+                  className="w-full mt-4 border-orange-200 hover:bg-orange-50 bg-transparent"
+                  onClick={() => router.push("/restaurant/orders")}
+                >
+                  View All Orders
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Order Status Distribution */}
+            <Card className="border-0 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <PieChart className="h-5 w-5 text-orange-600" />
+                  Order Types Today
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {dashboardData.ordersByType.map((type: any, index: number) => (
+                    <div key={index} className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="font-medium">{type.type}</span>
+                        <span>{type.count} orders</span>
+                      </div>
+                      <Progress value={type.percentage} className="h-2" />
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="tables" className="space-y-4">
-          <Card>
+          <Card className="border-0 shadow-lg">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                Table Status ({stats.tablesOccupied}/{stats.totalTables} occupied)
+                <MapPin className="h-5 w-5 text-orange-600" />
+                Table Status Overview
               </CardTitle>
-              <CardDescription>Current status of restaurant tables</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                {tableStatus.length > 0 ? (
-                  tableStatus.map((table) => (
-                    <div key={table.number} className="p-4 border rounded-lg bg-white shadow-sm space-y-3">
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-semibold">Table {table.number}</h3>
-                        {getTableStatusBadge(table.status)}
-                      </div>
+              <div className="grid grid-cols-5 gap-4">
+                {Array.from({ length: 20 }, (_, i) => i + 1).map((tableNum) => {
+                  const isOccupied = tableNum <= dashboardData.tablesOccupied
+                  const needsCleaning = Math.random() > 0.8
+                  const hasReservation = Math.random() > 0.7
 
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Capacity:</span>
-                          <span className="font-medium">{table.capacity} seats</span>
-                        </div>
-
-                        {table.guests > 0 && (
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Current:</span>
-                            <span className="font-medium">{table.guests} guests</span>
-                          </div>
-                        )}
-
-                        {table.server && (
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Server:</span>
-                            <span className="font-medium">{table.server}</span>
-                          </div>
-                        )}
-
-                        {table.time && (
-                          <div className="flex justify-between text-xs text-gray-500">
-                            <span>Last updated:</span>
-                            <span>{table.time}</span>
-                          </div>
-                        )}
+                  return (
+                    <div
+                      key={tableNum}
+                      className={`p-4 rounded-lg border-2 text-center cursor-pointer transition-all ${
+                        isOccupied
+                          ? "bg-red-100 border-red-300 text-red-700"
+                          : needsCleaning
+                            ? "bg-yellow-100 border-yellow-300 text-yellow-700"
+                            : hasReservation
+                              ? "bg-blue-100 border-blue-300 text-blue-700"
+                              : "bg-green-100 border-green-300 text-green-700"
+                      }`}
+                    >
+                      <div className="font-bold text-lg">T{tableNum}</div>
+                      <div className="text-xs mt-1">
+                        {isOccupied
+                          ? "Occupied"
+                          : needsCleaning
+                            ? "Cleaning"
+                            : hasReservation
+                              ? "Reserved"
+                              : "Available"}
                       </div>
                     </div>
-                  ))
-                ) : (
-                  <div className="col-span-4 text-center py-8 text-gray-500">
-                    <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>No table data available</p>
-                  </div>
-                )}
+                  )
+                })}
+              </div>
+              <div className="flex justify-center gap-6 mt-6 text-sm">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-green-100 border-2 border-green-300 rounded"></div>
+                  <span>Available</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-red-100 border-2 border-red-300 rounded"></div>
+                  <span>Occupied</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-blue-100 border-2 border-blue-300 rounded"></div>
+                  <span>Reserved</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-yellow-100 border-2 border-yellow-300 rounded"></div>
+                  <span>Cleaning</span>
+                </div>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="popular" className="space-y-4">
-          <Card>
+          <Card className="border-0 shadow-lg">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Star className="h-5 w-5" />
+                <Star className="h-5 w-5 text-orange-600" />
                 Popular Items Today
               </CardTitle>
-              <CardDescription>Best selling menu items</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {popularItems.length > 0 ? (
-                  popularItems.map((item, index) => (
-                    <div key={item.name} className="flex items-center justify-between p-3 border rounded-lg bg-white">
-                      <div className="flex items-center space-x-4">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-orange-600 text-white font-bold">
-                          {index + 1}
-                        </div>
-                        <div>
-                          <p className="font-medium">{item.name}</p>
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <span>{item.category}</span>
-                            <span>•</span>
-                            <span>{item.orders} orders</span>
-                          </div>
-                        </div>
+                {dashboardData.popularItems.map((item: any, index: number) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-4 bg-gradient-to-r from-orange-50 to-red-50 rounded-lg"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center font-bold">
+                        {index + 1}
                       </div>
-                      <div className="text-right">
-                        <p className="font-bold">{formatDualCurrency(item.revenue).usd}</p>
-                        <p className="text-xs text-gray-500">{formatDualCurrency(item.revenue).ugx}</p>
+                      <div>
+                        <div className="font-semibold">{item.name}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {item.orders} orders • {formatDualCurrency(item.revenue).usd}
+                        </div>
                       </div>
                     </div>
-                  ))
-                ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    <Star className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>No popular items data</p>
+                    <div className="text-right">
+                      <div className={`flex items-center gap-1 text-sm ${getGrowthColor(item.growth)}`}>
+                        {getGrowthIcon(item.growth)}
+                        <span>
+                          {item.growth >= 0 ? "+" : ""}
+                          {item.growth}%
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted-foreground">vs yesterday</div>
+                    </div>
                   </div>
-                )}
+                ))}
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="actions" className="space-y-4">
-          <Card>
+        <TabsContent value="analytics" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <Card
+              className="border-0 shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
+              onClick={() => router.push("/restaurant/orders/new")}
+            >
+              <CardContent className="p-6 text-center">
+                <Plus className="h-12 w-12 mx-auto mb-4 text-orange-500" />
+                <h3 className="font-semibold mb-2">Create New Order</h3>
+                <p className="text-sm text-muted-foreground">Start a new restaurant order</p>
+              </CardContent>
+            </Card>
+
+            <Card
+              className="border-0 shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
+              onClick={() => router.push("/restaurant/menu")}
+            >
+              <CardContent className="p-6 text-center">
+                <Utensils className="h-12 w-12 mx-auto mb-4 text-blue-500" />
+                <h3 className="font-semibold mb-2">Manage Menu</h3>
+                <p className="text-sm text-muted-foreground">Update menu items and prices</p>
+              </CardContent>
+            </Card>
+
+            <Card
+              className="border-0 shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
+              onClick={() => router.push("/restaurant/tables")}
+            >
+              <CardContent className="p-6 text-center">
+                <MapPin className="h-12 w-12 mx-auto mb-4 text-green-500" />
+                <h3 className="font-semibold mb-2">Table Management</h3>
+                <p className="text-sm text-muted-foreground">Manage table reservations</p>
+              </CardContent>
+            </Card>
+
+            <Card
+              className="border-0 shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
+              onClick={() => router.push("/restaurant/inventory")}
+            >
+              <CardContent className="p-6 text-center">
+                <BarChart3 className="h-12 w-12 mx-auto mb-4 text-purple-500" />
+                <h3 className="font-semibold mb-2">Inventory</h3>
+                <p className="text-sm text-muted-foreground">Track stock and supplies</p>
+              </CardContent>
+            </Card>
+
+            <Card
+              className="border-0 shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
+              onClick={() => router.push("/restaurant/analytics")}
+            >
+              <CardContent className="p-6 text-center">
+                <TrendingUp className="h-12 w-12 mx-auto mb-4 text-red-500" />
+                <h3 className="font-semibold mb-2">Analytics</h3>
+                <p className="text-sm text-muted-foreground">View detailed reports</p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow cursor-pointer">
+              <CardContent className="p-6 text-center">
+                <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-yellow-500" />
+                <h3 className="font-semibold mb-2">Alerts</h3>
+                <p className="text-sm text-muted-foreground">View system notifications</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Staff Performance */}
+          <Card className="border-0 shadow-lg">
             <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-              <CardDescription>Frequently used restaurant functions</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-orange-600" />
+                Staff Performance Today
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <Button
-                  variant="outline"
-                  className="h-24 flex-col gap-2 hover:bg-orange-50 hover:border-orange-200 bg-transparent"
-                  asChild
-                >
-                  <Link href="/restaurant/orders/new">
-                    <div className="p-2 bg-orange-100 rounded-lg">
-                      <ShoppingCart className="h-6 w-6 text-orange-600" />
+              <div className="space-y-4">
+                {dashboardData.staffPerformance.map((staff: any, index: number) => (
+                  <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 bg-gradient-to-r from-orange-400 to-red-400 text-white rounded-full flex items-center justify-center font-bold">
+                        {staff.name
+                          .split(" ")
+                          .map((n: string) => n[0])
+                          .join("")}
+                      </div>
+                      <div>
+                        <div className="font-semibold">{staff.name}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {staff.orders} orders • Rating: {staff.rating}/5.0
+                        </div>
+                      </div>
                     </div>
-                    <span className="font-medium">New Order</span>
-                  </Link>
-                </Button>
-
-                <Button
-                  variant="outline"
-                  className="h-24 flex-col gap-2 hover:bg-blue-50 hover:border-blue-200 bg-transparent"
-                  asChild
-                >
-                  <Link href="/restaurant/menu">
-                    <div className="p-2 bg-blue-100 rounded-lg">
-                      <Utensils className="h-6 w-6 text-blue-600" />
+                    <div className="text-right">
+                      <div className="font-semibold text-green-600">{formatDualCurrency(staff.tips).usd}</div>
+                      <div className="text-xs text-muted-foreground">Tips earned</div>
                     </div>
-                    <span className="font-medium">Manage Menu</span>
-                  </Link>
-                </Button>
-
-                <Button
-                  variant="outline"
-                  className="h-24 flex-col gap-2 hover:bg-green-50 hover:border-green-200 bg-transparent"
-                  asChild
-                >
-                  <Link href="/restaurant/tables">
-                    <div className="p-2 bg-green-100 rounded-lg">
-                      <Users className="h-6 w-6 text-green-600" />
-                    </div>
-                    <span className="font-medium">Table Management</span>
-                  </Link>
-                </Button>
-
-                <Button
-                  variant="outline"
-                  className="h-24 flex-col gap-2 hover:bg-purple-50 hover:border-purple-200 bg-transparent"
-                  asChild
-                >
-                  <Link href="/restaurant/inventory">
-                    <div className="p-2 bg-purple-100 rounded-lg">
-                      <Package className="h-6 w-6 text-purple-600" />
-                    </div>
-                    <span className="font-medium">Check Inventory</span>
-                  </Link>
-                </Button>
-
-                <Button
-                  variant="outline"
-                  className="h-24 flex-col gap-2 hover:bg-indigo-50 hover:border-indigo-200 bg-transparent"
-                  asChild
-                >
-                  <Link href="/restaurant/analytics">
-                    <div className="p-2 bg-indigo-100 rounded-lg">
-                      <BarChart3 className="h-6 w-6 text-indigo-600" />
-                    </div>
-                    <span className="font-medium">Analytics</span>
-                  </Link>
-                </Button>
-
-                <Button
-                  variant="outline"
-                  className="h-24 flex-col gap-2 hover:bg-yellow-50 hover:border-yellow-200 bg-transparent"
-                  asChild
-                >
-                  <Link href="/kitchen">
-                    <div className="p-2 bg-yellow-100 rounded-lg">
-                      <ChefHat className="h-6 w-6 text-yellow-600" />
-                    </div>
-                    <span className="font-medium">Kitchen View</span>
-                  </Link>
-                </Button>
-
-                <Button
-                  variant="outline"
-                  className="h-24 flex-col gap-2 hover:bg-pink-50 hover:border-pink-200 bg-transparent"
-                  asChild
-                >
-                  <Link href="/restaurant/reports">
-                    <div className="p-2 bg-pink-100 rounded-lg">
-                      <Calendar className="h-6 w-6 text-pink-600" />
-                    </div>
-                    <span className="font-medium">Reports</span>
-                  </Link>
-                </Button>
-
-                <Button
-                  variant="outline"
-                  className="h-24 flex-col gap-2 hover:bg-gray-50 hover:border-gray-200 bg-transparent"
-                  onClick={handleNewOrder}
-                >
-                  <div className="p-2 bg-gray-100 rounded-lg">
-                    <RefreshCw className="h-6 w-6 text-gray-600" />
                   </div>
-                  <span className="font-medium">Demo Order</span>
-                </Button>
+                ))}
               </div>
             </CardContent>
           </Card>
