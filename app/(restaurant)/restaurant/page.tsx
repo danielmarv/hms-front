@@ -38,271 +38,303 @@ import { format, subDays, startOfDay, endOfDay } from "date-fns"
 export default function RestaurantDashboard() {
   const router = useRouter()
   const { getDisplayAmounts } = useCurrency()
-  const { getOrders, getOrderStats, loading: ordersLoading } = useRestaurantOrders()
-  const { getMenuItems, loading: menuLoading } = useMenuItems()
-  const { getTables, loading: tablesLoading } = useTables()
-  const { getUsers, loading: usersLoading } = useUsers()
-  const { getPayments, loading: paymentsLoading } = usePayments()
+  const { getOrders, getOrderStats } = useRestaurantOrders()
+  const { getMenuItems } = useMenuItems()
+  const { getTables } = useTables()
+  const { fetchUsers } = useUsers()
+  const { getPayments } = usePayments()
 
+  // Individual state for each data type
+  const [todayOrders, setTodayOrders] = useState<any[]>([])
+  const [yesterdayOrders, setYesterdayOrders] = useState<any[]>([])
+  const [menuItems, setMenuItems] = useState<any[]>([])
+  const [tables, setTables] = useState<any[]>([])
+  const [staff, setStaff] = useState<any[]>([])
+  const [payments, setPayments] = useState<any[]>([])
+  const [orderStats, setOrderStats] = useState<any>(null)
+
+  // Loading states
+  const [loadingOrders, setLoadingOrders] = useState(false)
+  const [loadingMenu, setLoadingMenu] = useState(false)
+  const [loadingTables, setLoadingTables] = useState(false)
+  const [loadingStaff, setLoadingStaff] = useState(false)
+  const [loadingPayments, setLoadingPayments] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+
   const [lastRefresh, setLastRefresh] = useState(new Date())
 
-  // Dashboard data
-  const [dashboardData, setDashboardData] = useState({
-    todayRevenue: 0,
-    yesterdayRevenue: 0,
-    todayOrders: 0,
-    yesterdayOrders: 0,
-    averageOrderValue: 0,
-    activeOrders: 0,
-    completedOrders: 0,
-    pendingOrders: 0,
-    cancelledOrders: 0,
-    tablesOccupied: 0,
-    totalTables: 0,
-    popularItems: [] as any[],
-    recentOrders: [] as any[],
-    ordersByType: [] as any[],
-    paymentMethods: [] as any[],
-    customerSatisfaction: 0,
-    averageWaitTime: 0,
-    kitchenEfficiency: 0,
-    staffPerformance: [] as any[],
-    dailyTarget: 5000,
-  })
-
-  // Growth indicators
-  const [growthData, setGrowthData] = useState({
-    revenueGrowth: 0,
-    orderGrowth: 0,
-    customerGrowth: 0,
-    efficiencyGrowth: 0,
-  })
+  // Date ranges
+  const today = new Date()
+  const yesterday = subDays(today, 1)
+  const todayStart = startOfDay(today).toISOString()
+  const todayEnd = endOfDay(today).toISOString()
+  const yesterdayStart = startOfDay(yesterday).toISOString()
+  const yesterdayEnd = endOfDay(yesterday).toISOString()
 
   useEffect(() => {
-    loadDashboardData()
+    loadAllData()
     // Auto-refresh every 30 seconds
-    const interval = setInterval(loadDashboardData, 30000)
+    const interval = setInterval(loadAllData, 30000)
     return () => clearInterval(interval)
   }, [])
 
-  const loadDashboardData = async () => {
+  const loadAllData = async () => {
+    setRefreshing(true)
+    await Promise.all([
+      fetchTodayOrders(),
+      fetchYesterdayOrders(),
+      fetchMenuItems(),
+      fetchTables(),
+      fetchStaff(),
+      fetchPayments(),
+      fetchOrderStats(),
+    ])
+    setLastRefresh(new Date())
+    setRefreshing(false)
+  }
+
+  const fetchTodayOrders = async () => {
+    setLoadingOrders(true)
     try {
-      setRefreshing(true)
-
-      const today = new Date()
-      const yesterday = subDays(today, 1)
-
-      const todayStart = startOfDay(today).toISOString()
-      const todayEnd = endOfDay(today).toISOString()
-      const yesterdayStart = startOfDay(yesterday).toISOString()
-      const yesterdayEnd = endOfDay(yesterday).toISOString()
-
-      // Load all data in parallel
-      const [
-        todayOrdersResponse,
-        yesterdayOrdersResponse,
-        todayStatsResponse,
-        yesterdayStatsResponse,
-        menuItemsResponse,
-        tablesResponse,
-        staffResponse,
-        paymentsResponse,
-      ] = await Promise.all([
-        getOrders({
-          startDate: todayStart,
-          endDate: todayEnd,
-          limit: 100,
-          sort: "-orderedAt",
-        }),
-        getOrders({
-          startDate: yesterdayStart,
-          endDate: yesterdayEnd,
-          limit: 100,
-          sort: "-orderedAt",
-        }),
-        getOrderStats ? getOrderStats(todayStart, todayEnd) : Promise.resolve(null),
-        getOrderStats ? getOrderStats(yesterdayStart, yesterdayEnd) : Promise.resolve(null),
-        getMenuItems({ limit: 50, sort: "-popularity" }),
-        getTables(),
-        getUsers({ role: "waiter", limit: 20 }),
-        getPayments({
-          startDate: todayStart,
-          endDate: todayEnd,
-          limit: 100,
-        }),
-      ])
-
-      const todayOrders = todayOrdersResponse?.data || []
-      const yesterdayOrders = yesterdayOrdersResponse?.data || []
-      const menuItems = menuItemsResponse?.data || []
-      const tables = tablesResponse?.data || []
-      const staff = staffResponse?.data || []
-      const payments = paymentsResponse?.data || []
-
-      // Calculate today's metrics
-      const todayRevenue = todayOrders.reduce((sum: number, order: any) => sum + (order.totalAmount || 0), 0)
-      const yesterdayRevenue = yesterdayOrders.reduce((sum: number, order: any) => sum + (order.totalAmount || 0), 0)
-
-      const activeOrders = todayOrders.filter((order: any) =>
-        ["New", "In Progress", "Ready"].includes(order.orderStatus),
-      ).length
-      const completedOrders = todayOrders.filter((order: any) => order.orderStatus === "Completed").length
-      const pendingOrders = todayOrders.filter((order: any) => order.orderStatus === "New").length
-      const cancelledOrders = todayOrders.filter((order: any) => order.orderStatus === "Cancelled").length
-
-      // Calculate growth rates
-      const revenueGrowth = yesterdayRevenue > 0 ? ((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100 : 0
-      const orderGrowth =
-        yesterdayOrders.length > 0 ? ((todayOrders.length - yesterdayOrders.length) / yesterdayOrders.length) * 100 : 0
-
-      // Calculate popular items from actual orders
-      const itemCounts = new Map()
-      const itemRevenue = new Map()
-
-      todayOrders.forEach((order: any) => {
-        order.items?.forEach((item: any) => {
-          const itemName = item.name || item.menuItem?.name
-          if (itemName) {
-            itemCounts.set(itemName, (itemCounts.get(itemName) || 0) + (item.quantity || 1))
-            itemRevenue.set(itemName, (itemRevenue.get(itemName) || 0) + item.price * (item.quantity || 1))
-          }
-        })
+      const response = await getOrders({
+        startDate: todayStart,
+        endDate: todayEnd,
+        limit: 100,
+        sort: "-orderedAt",
       })
+      setTodayOrders(response?.data || [])
+    } catch (error) {
+      console.error("Error fetching today's orders:", error)
+      toast.error("Failed to fetch today's orders")
+    } finally {
+      setLoadingOrders(false)
+    }
+  }
 
-      const popularItems = Array.from(itemCounts.entries())
-        .map(([name, orders]) => ({
-          name,
-          orders,
-          revenue: itemRevenue.get(name) || 0,
-          growth: Math.random() * 30 - 10, // This would come from comparing with yesterday's data
-        }))
-        .sort((a, b) => b.orders - a.orders)
-        .slice(0, 5)
-
-      // Calculate order types distribution
-      const orderTypeMap = new Map()
-      todayOrders.forEach((order: any) => {
-        const type = order.orderType || "Dine In"
-        orderTypeMap.set(type, (orderTypeMap.get(type) || 0) + 1)
+  const fetchYesterdayOrders = async () => {
+    try {
+      const response = await getOrders({
+        startDate: yesterdayStart,
+        endDate: yesterdayEnd,
+        limit: 100,
+        sort: "-orderedAt",
       })
+      setYesterdayOrders(response?.data || [])
+    } catch (error) {
+      console.error("Error fetching yesterday's orders:", error)
+    }
+  }
 
-      const ordersByType = Array.from(orderTypeMap.entries()).map(([type, count]) => ({
-        type,
-        count,
-        percentage: todayOrders.length > 0 ? Math.round((count / todayOrders.length) * 100) : 0,
-      }))
+  const fetchMenuItems = async () => {
+    setLoadingMenu(true)
+    try {
+      const response = await getMenuItems({ limit: 50, sort: "-popularity" })
+      setMenuItems(response?.data || [])
+    } catch (error) {
+      console.error("Error fetching menu items:", error)
+      toast.error("Failed to fetch menu items")
+    } finally {
+      setLoadingMenu(false)
+    }
+  }
 
-      // Calculate payment methods distribution
-      const paymentMethodMap = new Map()
-      payments.forEach((payment: any) => {
-        const method = payment.paymentMethod || "Cash"
-        paymentMethodMap.set(method, (paymentMethodMap.get(method) || 0) + (payment.amount || 0))
+  const fetchTables = async () => {
+    setLoadingTables(true)
+    try {
+      const response = await getTables()
+      setTables(response?.data || [])
+    } catch (error) {
+      console.error("Error fetching tables:", error)
+      toast.error("Failed to fetch tables")
+    } finally {
+      setLoadingTables(false)
+    }
+  }
+
+  const fetchStaff = async () => {
+    setLoadingStaff(true)
+    try {
+      const response = await fetchUsers({ department: "restaurant", limit: 20 })
+      setStaff(response || [])
+    } catch (error) {
+      console.error("Error fetching staff:", error)
+      toast.error("Failed to fetch staff")
+    } finally {
+      setLoadingStaff(false)
+    }
+  }
+
+  const fetchPayments = async () => {
+    setLoadingPayments(true)
+    try {
+      const response = await getPayments({
+        startDate: todayStart,
+        endDate: todayEnd,
+        limit: 100,
       })
+      setPayments(response?.data || [])
+    } catch (error) {
+      console.error("Error fetching payments:", error)
+      toast.error("Failed to fetch payments")
+    } finally {
+      setLoadingPayments(false)
+    }
+  }
 
-      const paymentMethods = Array.from(paymentMethodMap.entries()).map(([method, amount]) => ({
-        method,
-        amount,
-        percentage: todayRevenue > 0 ? Math.round((amount / todayRevenue) * 100) : 0,
-      }))
+  const fetchOrderStats = async () => {
+    try {
+      if (getOrderStats) {
+        const response = await getOrderStats(todayStart, todayEnd)
+        setOrderStats(response)
+      }
+    } catch (error) {
+      console.error("Error fetching order stats:", error)
+    }
+  }
 
-      // Calculate table occupancy
-      const occupiedTables = tables.filter((table: any) => table.status === "occupied").length
-      const totalTables = tables.length || 20
+  // Calculated metrics
+  const todayRevenue = todayOrders.reduce((sum: number, order: any) => sum + (order.totalAmount || 0), 0)
+  const yesterdayRevenue = yesterdayOrders.reduce((sum: number, order: any) => sum + (order.totalAmount || 0), 0)
+  const averageOrderValue = todayOrders.length > 0 ? todayRevenue / todayOrders.length : 0
 
-      // Calculate staff performance from today's orders
-      const staffPerformanceMap = new Map()
-      todayOrders.forEach((order: any) => {
-        if (order.waiter) {
-          const waiterId = order.waiter._id || order.waiter.id
-          const waiterName = order.waiter.full_name || order.waiter.name
-          if (!staffPerformanceMap.has(waiterId)) {
-            staffPerformanceMap.set(waiterId, {
-              name: waiterName,
-              orders: 0,
-              revenue: 0,
-              tips: 0,
-              rating: 4.5, // This would come from customer feedback
-            })
-          }
-          const performance = staffPerformanceMap.get(waiterId)
-          performance.orders += 1
-          performance.revenue += order.totalAmount || 0
-          performance.tips += order.tipAmount || 0
+  const activeOrders = todayOrders.filter((order: any) =>
+    ["New", "In Progress", "Ready"].includes(order.orderStatus),
+  ).length
+  const completedOrders = todayOrders.filter((order: any) => order.orderStatus === "Completed").length
+  const pendingOrders = todayOrders.filter((order: any) => order.orderStatus === "New").length
+  const cancelledOrders = todayOrders.filter((order: any) => order.orderStatus === "Cancelled").length
+
+  // Growth calculations
+  const revenueGrowth = yesterdayRevenue > 0 ? ((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100 : 0
+  const orderGrowth =
+    yesterdayOrders.length > 0 ? ((todayOrders.length - yesterdayOrders.length) / yesterdayOrders.length) * 100 : 0
+
+  // Table occupancy
+  const occupiedTables = tables.filter((table: any) => table.status === "occupied").length
+  const totalTables = tables.length || 20
+
+  // Popular items calculation
+  const getPopularItems = () => {
+    const itemCounts = new Map()
+    const itemRevenue = new Map()
+
+    todayOrders.forEach((order: any) => {
+      order.items?.forEach((item: any) => {
+        const itemName = item.name || item.menuItem?.name
+        if (itemName) {
+          itemCounts.set(itemName, (itemCounts.get(itemName) || 0) + (item.quantity || 1))
+          itemRevenue.set(itemName, (itemRevenue.get(itemName) || 0) + item.price * (item.quantity || 1))
         }
       })
+    })
 
-      const staffPerformance = Array.from(staffPerformanceMap.values())
-        .sort((a, b) => b.orders - a.orders)
-        .slice(0, 5)
+    return Array.from(itemCounts.entries())
+      .map(([name, orders]) => ({
+        name,
+        orders,
+        revenue: itemRevenue.get(name) || 0,
+        growth: Math.random() * 30 - 10, // This would come from comparing with yesterday's data
+      }))
+      .sort((a, b) => b.orders - a.orders)
+      .slice(0, 5)
+  }
 
-      // Calculate average wait time from completed orders
-      const completedOrdersWithTimes = todayOrders.filter(
-        (order: any) => order.orderStatus === "Completed" && order.orderedAt && order.completedAt,
-      )
+  // Order types distribution
+  const getOrdersByType = () => {
+    const orderTypeMap = new Map()
+    todayOrders.forEach((order: any) => {
+      const type = order.orderType || "Dine In"
+      orderTypeMap.set(type, (orderTypeMap.get(type) || 0) + 1)
+    })
 
-      const averageWaitTime =
-        completedOrdersWithTimes.length > 0
-          ? completedOrdersWithTimes.reduce((sum: number, order: any) => {
-              const waitTime =
-                (new Date(order.completedAt).getTime() - new Date(order.orderedAt).getTime()) / (1000 * 60)
-              return sum + waitTime
-            }, 0) / completedOrdersWithTimes.length
-          : 0
+    return Array.from(orderTypeMap.entries()).map(([type, count]) => ({
+      type,
+      count,
+      percentage: todayOrders.length > 0 ? Math.round((count / todayOrders.length) * 100) : 0,
+    }))
+  }
 
-      // Calculate kitchen efficiency (orders completed on time)
-      const onTimeOrders = completedOrdersWithTimes.filter((order: any) => {
-        const waitTime = (new Date(order.completedAt).getTime() - new Date(order.orderedAt).getTime()) / (1000 * 60)
-        return waitTime <= 30 // Assuming 30 minutes is the target
-      }).length
+  // Payment methods distribution
+  const getPaymentMethods = () => {
+    const paymentMethodMap = new Map()
+    payments.forEach((payment: any) => {
+      const method = payment.method || "Cash"
+      paymentMethodMap.set(method, (paymentMethodMap.get(method) || 0) + (payment.amountPaid || 0))
+    })
 
-      const kitchenEfficiency =
-        completedOrdersWithTimes.length > 0 ? Math.round((onTimeOrders / completedOrdersWithTimes.length) * 100) : 0
+    return Array.from(paymentMethodMap.entries()).map(([method, amount]) => ({
+      method,
+      amount,
+      percentage: todayRevenue > 0 ? Math.round((amount / todayRevenue) * 100) : 0,
+    }))
+  }
 
-      // Calculate customer satisfaction from order ratings
-      const ordersWithRatings = todayOrders.filter((order: any) => order.rating && order.rating > 0)
-      const customerSatisfaction =
-        ordersWithRatings.length > 0
-          ? ordersWithRatings.reduce((sum: number, order: any) => sum + order.rating, 0) / ordersWithRatings.length
-          : 4.5
+  // Staff performance calculation
+  const getStaffPerformance = () => {
+    const staffPerformanceMap = new Map()
+    todayOrders.forEach((order: any) => {
+      if (order.waiter) {
+        const waiterId = order.waiter._id || order.waiter.id
+        const waiterName = order.waiter.full_name || order.waiter.name
+        if (!staffPerformanceMap.has(waiterId)) {
+          staffPerformanceMap.set(waiterId, {
+            name: waiterName,
+            orders: 0,
+            revenue: 0,
+            tips: 0,
+            rating: 4.5, // This would come from customer feedback
+          })
+        }
+        const performance = staffPerformanceMap.get(waiterId)
+        performance.orders += 1
+        performance.revenue += order.totalAmount || 0
+        performance.tips += order.tipAmount || 0
+      }
+    })
 
-      setDashboardData({
-        todayRevenue,
-        yesterdayRevenue,
-        todayOrders: todayOrders.length,
-        yesterdayOrders: yesterdayOrders.length,
-        averageOrderValue: todayOrders.length > 0 ? todayRevenue / todayOrders.length : 0,
-        activeOrders,
-        completedOrders,
-        pendingOrders,
-        cancelledOrders,
-        tablesOccupied: occupiedTables,
-        totalTables,
-        popularItems,
-        recentOrders: todayOrders.slice(0, 10),
-        ordersByType,
-        paymentMethods,
-        customerSatisfaction,
-        averageWaitTime: Math.round(averageWaitTime),
-        kitchenEfficiency,
-        staffPerformance,
-        dailyTarget: 5000,
-      })
+    return Array.from(staffPerformanceMap.values())
+      .sort((a, b) => b.orders - a.orders)
+      .slice(0, 5)
+  }
 
-      setGrowthData({
-        revenueGrowth: Math.round(revenueGrowth * 100) / 100,
-        orderGrowth: Math.round(orderGrowth * 100) / 100,
-        customerGrowth: Math.random() * 20 - 5, // This would come from customer analytics
-        efficiencyGrowth: Math.random() * 10 - 2, // This would come from historical efficiency data
-      })
+  // Calculate average wait time
+  const getAverageWaitTime = () => {
+    const completedOrdersWithTimes = todayOrders.filter(
+      (order: any) => order.orderStatus === "Completed" && order.orderedAt && order.completedAt,
+    )
 
-      setLastRefresh(new Date())
-    } catch (error) {
-      console.error("Error loading dashboard data:", error)
-      toast.error("Failed to load dashboard data")
-    } finally {
-      setRefreshing(false)
-    }
+    if (completedOrdersWithTimes.length === 0) return 0
+
+    const totalWaitTime = completedOrdersWithTimes.reduce((sum: number, order: any) => {
+      const waitTime = (new Date(order.completedAt).getTime() - new Date(order.orderedAt).getTime()) / (1000 * 60)
+      return sum + waitTime
+    }, 0)
+
+    return Math.round(totalWaitTime / completedOrdersWithTimes.length)
+  }
+
+  // Calculate kitchen efficiency
+  const getKitchenEfficiency = () => {
+    const completedOrdersWithTimes = todayOrders.filter(
+      (order: any) => order.orderStatus === "Completed" && order.orderedAt && order.completedAt,
+    )
+
+    if (completedOrdersWithTimes.length === 0) return 0
+
+    const onTimeOrders = completedOrdersWithTimes.filter((order: any) => {
+      const waitTime = (new Date(order.completedAt).getTime() - new Date(order.orderedAt).getTime()) / (1000 * 60)
+      return waitTime <= 30 // Assuming 30 minutes is the target
+    }).length
+
+    return Math.round((onTimeOrders / completedOrdersWithTimes.length) * 100)
+  }
+
+  // Calculate customer satisfaction
+  const getCustomerSatisfaction = () => {
+    const ordersWithRatings = todayOrders.filter((order: any) => order.rating && order.rating > 0)
+    if (ordersWithRatings.length === 0) return 4.5
+
+    return ordersWithRatings.reduce((sum: number, order: any) => sum + order.rating, 0) / ordersWithRatings.length
   }
 
   const formatDualCurrency = (amount: number) => {
@@ -325,9 +357,18 @@ export default function RestaurantDashboard() {
     return growth >= 0 ? "text-green-600" : "text-red-600"
   }
 
-  const isLoading = ordersLoading || menuLoading || tablesLoading || usersLoading || paymentsLoading
+  const popularItems = getPopularItems()
+  const ordersByType = getOrdersByType()
+  const paymentMethods = getPaymentMethods()
+  const staffPerformance = getStaffPerformance()
+  const averageWaitTime = getAverageWaitTime()
+  const kitchenEfficiency = getKitchenEfficiency()
+  const customerSatisfaction = getCustomerSatisfaction()
+  const dailyTarget = 5000
 
-  if (isLoading && !dashboardData.todayOrders) {
+  const isLoading = loadingOrders || loadingMenu || loadingTables || loadingStaff || loadingPayments
+
+  if (isLoading && todayOrders.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-red-50 p-6 space-y-6">
         <div className="animate-pulse space-y-6">
@@ -359,7 +400,7 @@ export default function RestaurantDashboard() {
         <div className="flex gap-3">
           <Button
             variant="outline"
-            onClick={loadDashboardData}
+            onClick={loadAllData}
             disabled={refreshing}
             className="border-orange-200 hover:bg-orange-50 bg-transparent"
           >
@@ -382,15 +423,15 @@ export default function RestaurantDashboard() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium opacity-90 flex items-center justify-between">
               Today's Revenue
-              {getGrowthIcon(growthData.revenueGrowth)}
+              {getGrowthIcon(revenueGrowth)}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatDualCurrency(dashboardData.todayRevenue).usd}</div>
-            <div className="text-sm opacity-90">{formatDualCurrency(dashboardData.todayRevenue).ugx}</div>
-            <div className={`text-sm opacity-90 ${getGrowthColor(growthData.revenueGrowth)}`}>
-              {growthData.revenueGrowth >= 0 ? "+" : ""}
-              {growthData.revenueGrowth}% from yesterday
+            <div className="text-2xl font-bold">{formatDualCurrency(todayRevenue).usd}</div>
+            <div className="text-sm opacity-90">{formatDualCurrency(todayRevenue).ugx}</div>
+            <div className={`text-sm opacity-90 ${getGrowthColor(revenueGrowth)}`}>
+              {revenueGrowth >= 0 ? "+" : ""}
+              {revenueGrowth.toFixed(1)}% from yesterday
             </div>
           </CardContent>
         </Card>
@@ -399,16 +440,16 @@ export default function RestaurantDashboard() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium opacity-90 flex items-center justify-between">
               Today's Orders
-              {getGrowthIcon(growthData.orderGrowth)}
+              {getGrowthIcon(orderGrowth)}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{dashboardData.todayOrders}</div>
-            <div className="text-sm opacity-90">Avg: {formatDualCurrency(dashboardData.averageOrderValue).usd}</div>
-            <div className="text-xs opacity-75">{formatDualCurrency(dashboardData.averageOrderValue).ugx}</div>
-            <div className={`text-sm opacity-90 ${getGrowthColor(growthData.orderGrowth)}`}>
-              {growthData.orderGrowth >= 0 ? "+" : ""}
-              {growthData.orderGrowth}% from yesterday
+            <div className="text-3xl font-bold">{todayOrders.length}</div>
+            <div className="text-sm opacity-90">Avg: {formatDualCurrency(averageOrderValue).usd}</div>
+            <div className="text-xs opacity-75">{formatDualCurrency(averageOrderValue).ugx}</div>
+            <div className={`text-sm opacity-90 ${getGrowthColor(orderGrowth)}`}>
+              {orderGrowth >= 0 ? "+" : ""}
+              {orderGrowth.toFixed(1)}% from yesterday
             </div>
           </CardContent>
         </Card>
@@ -421,14 +462,13 @@ export default function RestaurantDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{dashboardData.activeOrders}</div>
+            <div className="text-3xl font-bold">{activeOrders}</div>
             <div className="text-sm opacity-90">
-              {dashboardData.pendingOrders} pending, {dashboardData.activeOrders - dashboardData.pendingOrders} in
-              progress
+              {pendingOrders} pending, {activeOrders - pendingOrders} in progress
             </div>
             <div className="flex items-center gap-1 text-sm opacity-90">
               <Timer className="h-3 w-3" />
-              <span>Avg wait: {dashboardData.averageWaitTime}min</span>
+              <span>Avg wait: {averageWaitTime}min</span>
             </div>
           </CardContent>
         </Card>
@@ -442,19 +482,14 @@ export default function RestaurantDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">
-              {dashboardData.tablesOccupied}/{dashboardData.totalTables}
+              {occupiedTables}/{totalTables}
             </div>
             <Progress
-              value={
-                dashboardData.totalTables > 0 ? (dashboardData.tablesOccupied / dashboardData.totalTables) * 100 : 0
-              }
+              value={totalTables > 0 ? (occupiedTables / totalTables) * 100 : 0}
               className="mt-2 bg-orange-400"
             />
             <div className="text-sm opacity-90 mt-1">
-              {dashboardData.totalTables > 0
-                ? Math.round((dashboardData.tablesOccupied / dashboardData.totalTables) * 100)
-                : 0}
-              % occupied
+              {totalTables > 0 ? Math.round((occupiedTables / totalTables) * 100) : 0}% occupied
             </div>
           </CardContent>
         </Card>
@@ -470,11 +505,10 @@ export default function RestaurantDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dashboardData.customerSatisfaction.toFixed(1)}/5.0</div>
-            <Progress value={dashboardData.customerSatisfaction * 20} className="mt-2" />
-            <div className={`text-sm mt-1 ${getGrowthColor(growthData.customerGrowth)}`}>
-              {growthData.customerGrowth >= 0 ? "+" : ""}
-              {growthData.customerGrowth.toFixed(1)}% this week
+            <div className="text-2xl font-bold">{customerSatisfaction.toFixed(1)}/5.0</div>
+            <Progress value={customerSatisfaction * 20} className="mt-2" />
+            <div className="text-sm text-muted-foreground mt-1">
+              Based on {todayOrders.filter((o) => o.rating).length} ratings
             </div>
           </CardContent>
         </Card>
@@ -487,12 +521,9 @@ export default function RestaurantDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dashboardData.kitchenEfficiency}%</div>
-            <Progress value={dashboardData.kitchenEfficiency} className="mt-2" />
-            <div className={`text-sm mt-1 ${getGrowthColor(growthData.efficiencyGrowth)}`}>
-              {growthData.efficiencyGrowth >= 0 ? "+" : ""}
-              {growthData.efficiencyGrowth.toFixed(1)}% this week
-            </div>
+            <div className="text-2xl font-bold">{kitchenEfficiency}%</div>
+            <Progress value={kitchenEfficiency} className="mt-2" />
+            <div className="text-sm text-muted-foreground mt-1">Orders completed on time</div>
           </CardContent>
         </Card>
 
@@ -504,15 +535,11 @@ export default function RestaurantDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dashboardData.completedOrders}</div>
+            <div className="text-2xl font-bold">{completedOrders}</div>
             <div className="text-sm text-muted-foreground">
-              Success rate:{" "}
-              {dashboardData.todayOrders > 0
-                ? Math.round((dashboardData.completedOrders / dashboardData.todayOrders) * 100)
-                : 0}
-              %
+              Success rate: {todayOrders.length > 0 ? Math.round((completedOrders / todayOrders.length) * 100) : 0}%
             </div>
-            <div className="text-sm text-red-600 mt-1">{dashboardData.cancelledOrders} cancelled today</div>
+            <div className="text-sm text-red-600 mt-1">{cancelledOrders} cancelled today</div>
           </CardContent>
         </Card>
 
@@ -524,14 +551,10 @@ export default function RestaurantDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {Math.round((dashboardData.todayRevenue / dashboardData.dailyTarget) * 100)}%
-            </div>
-            <Progress value={(dashboardData.todayRevenue / dashboardData.dailyTarget) * 100} className="mt-2" />
-            <div className="text-sm text-muted-foreground mt-1">
-              Target: {formatDualCurrency(dashboardData.dailyTarget).usd}
-            </div>
-            <div className="text-xs text-muted-foreground">{formatDualCurrency(dashboardData.dailyTarget).ugx}</div>
+            <div className="text-2xl font-bold">{Math.round((todayRevenue / dailyTarget) * 100)}%</div>
+            <Progress value={(todayRevenue / dailyTarget) * 100} className="mt-2" />
+            <div className="text-sm text-muted-foreground mt-1">Target: {formatDualCurrency(dailyTarget).usd}</div>
+            <div className="text-xs text-muted-foreground">{formatDualCurrency(dailyTarget).ugx}</div>
           </CardContent>
         </Card>
       </div>
@@ -567,11 +590,12 @@ export default function RestaurantDashboard() {
                 <CardTitle className="flex items-center gap-2">
                   <Utensils className="h-5 w-5 text-orange-600" />
                   Recent Orders
+                  {loadingOrders && <RefreshCw className="h-4 w-4 animate-spin" />}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {dashboardData.recentOrders.slice(0, 5).map((order: any, index: number) => (
+                  {todayOrders.slice(0, 5).map((order: any, index: number) => (
                     <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <div className="flex-1">
                         <div className="font-medium">{order.orderNumber}</div>
@@ -621,7 +645,7 @@ export default function RestaurantDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {dashboardData.ordersByType.map((type: any, index: number) => (
+                  {ordersByType.map((type: any, index: number) => (
                     <div key={index} className="space-y-2">
                       <div className="flex justify-between text-sm">
                         <span className="font-medium">{type.type}</span>
@@ -643,11 +667,12 @@ export default function RestaurantDashboard() {
               <CardTitle className="flex items-center gap-2">
                 <BarChart3 className="h-5 w-5 text-orange-600" />
                 Payment Methods Today
+                {loadingPayments && <RefreshCw className="h-4 w-4 animate-spin" />}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 md:grid-cols-3">
-                {dashboardData.paymentMethods.map((method: any, index: number) => (
+                {paymentMethods.map((method: any, index: number) => (
                   <div key={index} className="p-4 bg-gradient-to-r from-orange-50 to-red-50 rounded-lg">
                     <div className="font-semibold">{method.method}</div>
                     <div className="text-2xl font-bold text-green-600">{formatDualCurrency(method.amount).usd}</div>
@@ -666,38 +691,30 @@ export default function RestaurantDashboard() {
               <CardTitle className="flex items-center gap-2">
                 <MapPin className="h-5 w-5 text-orange-600" />
                 Table Status Overview
+                {loadingTables && <RefreshCw className="h-4 w-4 animate-spin" />}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-5 gap-4">
-                {Array.from({ length: dashboardData.totalTables || 20 }, (_, i) => i + 1).map((tableNum) => {
-                  const isOccupied = tableNum <= dashboardData.tablesOccupied
-                  const needsCleaning = Math.random() > 0.9
-                  const hasReservation = Math.random() > 0.8
+                {Array.from({ length: totalTables || 20 }, (_, i) => i + 1).map((tableNum) => {
+                  const table = tables.find((t: any) => t.number === tableNum)
+                  const status = table?.status || "available"
 
                   return (
                     <div
                       key={tableNum}
                       className={`p-4 rounded-lg border-2 text-center cursor-pointer transition-all ${
-                        isOccupied
+                        status === "occupied"
                           ? "bg-red-100 border-red-300 text-red-700"
-                          : needsCleaning
+                          : status === "cleaning"
                             ? "bg-yellow-100 border-yellow-300 text-yellow-700"
-                            : hasReservation
+                            : status === "reserved"
                               ? "bg-blue-100 border-blue-300 text-blue-700"
                               : "bg-green-100 border-green-300 text-green-700"
                       }`}
                     >
                       <div className="font-bold text-lg">T{tableNum}</div>
-                      <div className="text-xs mt-1">
-                        {isOccupied
-                          ? "Occupied"
-                          : needsCleaning
-                            ? "Cleaning"
-                            : hasReservation
-                              ? "Reserved"
-                              : "Available"}
-                      </div>
+                      <div className="text-xs mt-1 capitalize">{status}</div>
                     </div>
                   )
                 })}
@@ -730,12 +747,13 @@ export default function RestaurantDashboard() {
               <CardTitle className="flex items-center gap-2">
                 <Star className="h-5 w-5 text-orange-600" />
                 Popular Items Today
+                {loadingMenu && <RefreshCw className="h-4 w-4 animate-spin" />}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {dashboardData.popularItems.length > 0 ? (
-                  dashboardData.popularItems.map((item: any, index: number) => (
+                {popularItems.length > 0 ? (
+                  popularItems.map((item: any, index: number) => (
                     <div
                       key={index}
                       className="flex items-center justify-between p-4 bg-gradient-to-r from-orange-50 to-red-50 rounded-lg"
@@ -847,12 +865,13 @@ export default function RestaurantDashboard() {
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5 text-orange-600" />
                 Staff Performance Today
+                {loadingStaff && <RefreshCw className="h-4 w-4 animate-spin" />}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {dashboardData.staffPerformance.length > 0 ? (
-                  dashboardData.staffPerformance.map((staff: any, index: number) => (
+                {staffPerformance.length > 0 ? (
+                  staffPerformance.map((staff: any, index: number) => (
                     <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                       <div className="flex items-center gap-4">
                         <div className="w-10 h-10 bg-gradient-to-r from-orange-400 to-red-400 text-white rounded-full flex items-center justify-center font-bold">
