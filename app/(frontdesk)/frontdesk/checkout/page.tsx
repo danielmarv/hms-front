@@ -58,7 +58,6 @@ export default function CheckOutPage() {
 
   const loadInitialData = async () => {
     try {
-      console.log("Loading check-ins for checkout...")
       const response = await getCheckIns({ status: "checked_in" })
       if (response.data && Array.isArray(response.data)) {
         setCheckIns(response.data)
