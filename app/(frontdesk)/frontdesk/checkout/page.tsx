@@ -62,13 +62,10 @@ export default function CheckOutPage() {
       const response = await getCheckIns({ status: "checked_in" })
       if (response.data && Array.isArray(response.data)) {
         setCheckIns(response.data)
-        console.log("Loaded", response.data.length, "active check-ins")
       } else {
         setCheckIns([])
-        console.log("No active check-ins found")
       }
     } catch (error) {
-      console.error("Error loading check-ins:", error)
       toast.error("Failed to load check-ins")
     }
   }
