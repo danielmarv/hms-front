@@ -104,7 +104,7 @@ export default function RoomsPage() {
           <p className="text-muted-foreground">Manage hotel rooms and their availability</p>
         </div>
         <Button asChild>
-          <Link href="/dashboard/rooms/new">
+          <Link href="/frontdesk/rooms/new">
             <Plus className="mr-2 h-4 w-4" />
             Add Room
           </Link>
@@ -219,7 +219,7 @@ export default function RoomsPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <Button variant="ghost" size="sm" asChild>
-                          <Link href={`/dashboard/rooms/${room._id}`}>View</Link>
+                          <Link href={`/frontdesk/rooms/${room._id}`}>View</Link>
                         </Button>
                       </TableCell>
                     </TableRow>
