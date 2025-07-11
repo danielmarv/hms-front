@@ -89,16 +89,7 @@ export function useRooms() {
       })
 
       try {
-        const { data, error } = await request<{
-          data?: Room[] | null
-          pagination?: {
-            page: number
-            limit: number
-            totalPages: number
-          }
-          total?: number
-          success?: boolean
-        }>(`/rooms?${queryParams.toString()}`)
+        const { data, error } = await request(`/rooms?${queryParams.toString()}`)
 
         if (data && !error) {
           // Handle case where data might be directly the array or nested in data property
@@ -119,11 +110,8 @@ export function useRooms() {
           }
         }
 
-        // If we get here, something went wrong
-        console.error("Error fetching rooms:", error || "Invalid response format")
         return []
       } catch (err) {
-        console.error("Exception fetching rooms:", err)
         return []
       }
     },
@@ -133,17 +121,14 @@ export function useRooms() {
   const fetchRoomById = useCallback(
     async (id: string) => {
       try {
-        const { data, error } = await request<{ data?: Room; success?: boolean }>(`/rooms/${id}`)
+        const { data, error } = await request(`/rooms/${id}`)
 
         if (error) {
-          console.error("Error fetching room:", error)
           return null
         }
 
-        // Handle case where data might be directly the room or nested in data property
         return data?.data || (data && !("data" in data) ? (data as unknown as Room) : null)
       } catch (err) {
-        console.error("Exception fetching room:", err)
         return null
       }
     },
@@ -153,7 +138,7 @@ export function useRooms() {
   const createRoom = useCallback(
     async (roomData: CreateRoomData) => {
       try {
-        const { data, error } = await request<{ data?: Room; success?: boolean; message?: string }>(
+        const { data, error } = await request(
           "/rooms",
           "POST",
           roomData,
@@ -161,7 +146,6 @@ export function useRooms() {
 
         if (error || data?.success === false) {
           const errorMessage = error || data?.message || "Failed to create room"
-          console.error("Error creating room:", errorMessage)
           return { data: null, error: errorMessage }
         }
 
@@ -170,7 +154,6 @@ export function useRooms() {
           error: null,
         }
       } catch (err) {
-        console.error("Exception creating room:", err)
         return { data: null, error: err instanceof Error ? err.message : "Unknown error" }
       }
     },
@@ -180,7 +163,7 @@ export function useRooms() {
   const updateRoom = useCallback(
     async (id: string, roomData: Partial<Room>) => {
       try {
-        const { data, error } = await request<{ data?: Room; success?: boolean; message?: string }>(
+        const { data, error } = await request(
           `/rooms/${id}`,
           "PUT",
           roomData,
@@ -188,7 +171,6 @@ export function useRooms() {
 
         if (error || data?.success === false) {
           const errorMessage = error || data?.message || "Failed to update room"
-          console.error("Error updating room:", errorMessage)
           return { data: null, error: errorMessage }
         }
 
@@ -197,7 +179,6 @@ export function useRooms() {
           error: null,
         }
       } catch (err) {
-        console.error("Exception updating room:", err)
         return { data: null, error: err instanceof Error ? err.message : "Unknown error" }
       }
     },
@@ -207,17 +188,15 @@ export function useRooms() {
   const deleteRoom = useCallback(
     async (id: string) => {
       try {
-        const { data, error } = await request<{ message?: string; success?: boolean }>(`/rooms/${id}`, "DELETE")
+        const { data, error } = await request(`/rooms/${id}`, "DELETE")
 
         if (error || data?.success === false) {
           const errorMessage = error || data?.message || "Failed to delete room"
-          console.error("Error deleting room:", errorMessage)
           return { success: false, message: errorMessage }
         }
 
         return { success: true, message: data?.message || "Room deleted successfully" }
       } catch (err) {
-        console.error("Exception deleting room:", err)
         return { success: false, message: err instanceof Error ? err.message : "Unknown error" }
       }
     },
@@ -227,7 +206,7 @@ export function useRooms() {
   const updateRoomStatus = useCallback(
     async (id: string, status: RoomStatus) => {
       try {
-        const { data, error } = await request<{ data?: Room; success?: boolean; message?: string }>(
+        const { data, error } = await request(
           `/rooms/${id}/status`,
           "PATCH",
           { status },
@@ -235,7 +214,6 @@ export function useRooms() {
 
         if (error || data?.success === false) {
           const errorMessage = error || data?.message || "Failed to update room status"
-          console.error("Error updating room status:", errorMessage)
           return { data: null, error: errorMessage }
         }
 
@@ -244,7 +222,6 @@ export function useRooms() {
           error: null,
         }
       } catch (err) {
-        console.error("Exception updating room status:", err)
         return { data: null, error: err instanceof Error ? err.message : "Unknown error" }
       }
     },
@@ -253,10 +230,9 @@ export function useRooms() {
 
   const fetchRoomStats = useCallback(async () => {
     try {
-      const { data, error } = await request<{ data?: RoomStats; success?: boolean }>("/rooms/stats")
+      const { data, error } = await request("/rooms/stats")
 
       if (error || data?.success === false) {
-        console.error("Error fetching room stats:", error || "Invalid response format")
         return null
       }
 
@@ -269,7 +245,6 @@ export function useRooms() {
 
       return null
     } catch (err) {
-      console.error("Exception fetching room stats:", err)
       return null
     }
   }, [request])
@@ -277,19 +252,17 @@ export function useRooms() {
   const connectRooms = useCallback(
     async (roomIds: string[]) => {
       try {
-        const { data, error } = await request<{ message?: string; success?: boolean }>("/rooms/connect", "POST", {
+        const { data, error } = await request("/rooms/connect", "POST", {
           roomIds,
         })
 
         if (error || data?.success === false) {
           const errorMessage = error || data?.message || "Failed to connect rooms"
-          console.error("Error connecting rooms:", errorMessage)
           return { success: false, message: errorMessage }
         }
 
         return { success: true, message: data?.message || "Rooms connected successfully" }
       } catch (err) {
-        console.error("Exception connecting rooms:", err)
         return { success: false, message: err instanceof Error ? err.message : "Unknown error" }
       }
     },
@@ -299,20 +272,18 @@ export function useRooms() {
   const disconnectRooms = useCallback(
     async (roomId: string, disconnectFromId: string) => {
       try {
-        const { data, error } = await request<{ message?: string; success?: boolean }>("/rooms/disconnect", "POST", {
+        const { data, error } = await request("/rooms/disconnect", "POST", {
           roomId,
           disconnectFromId,
         })
 
         if (error || data?.success === false) {
           const errorMessage = error || data?.message || "Failed to disconnect rooms"
-          console.error("Error disconnecting rooms:", errorMessage)
           return { success: false, message: errorMessage }
         }
 
         return { success: true, message: data?.message || "Rooms disconnected successfully" }
       } catch (err) {
-        console.error("Exception disconnecting rooms:", err)
         return { success: false, message: err instanceof Error ? err.message : "Unknown error" }
       }
     },
@@ -338,19 +309,17 @@ export function useRooms() {
           }
         })
 
-        const { data, error } = await request<{ data?: Room[]; success?: boolean }>(
+        const { data, error } = await request(
           `/rooms/available?${queryParams.toString()}`,
         )
 
         if (error || data?.success === false) {
-          console.error("Error fetching available rooms:", error || "Invalid response format")
           return []
         }
 
         // Handle case where data might be directly the array or nested in data property
         return Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : []
       } catch (err) {
-        console.error("Exception fetching available rooms:", err)
         return []
       }
     },

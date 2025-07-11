@@ -32,6 +32,7 @@ import {
   MessageSquare,
   Key,
   Bed,
+  Settings2
 } from "lucide-react"
 
 const navigation = [
@@ -80,11 +81,11 @@ const navigation = [
     href: "/frontdesk/payments",
     icon: CreditCard,
   },
-  // {
-  //   name: "Messages",
-  //   href: "/frontdesk/messages",
-  //   icon: MessageSquare,
-  // },
+  {
+    name: "Maintenance",
+    href: "/frontdesk/maintenance",
+    icon: Settings2,
+  },
   // {
   //   name: "Reports",
   //   href: "/frontdesk/reports",

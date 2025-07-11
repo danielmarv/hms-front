@@ -26,13 +26,13 @@ export type RegisterData = {
   phone?: string
 }
 
-// Debug function to check token state
-const debugTokens = () => {
-  if (typeof window !== "undefined") {
-    console.log("LocalStorage accessToken:", localStorage.getItem("accessToken"))
-    console.log("Cookie token:", Cookies.get("token"))
-  }
-}
+// // Debug function to check token state
+// const debugTokens = () => {
+//   if (typeof window !== "undefined") {
+//     console.log("LocalStorage accessToken:", localStorage.getItem("accessToken"))
+//     console.log("Cookie token:", Cookies.get("token"))
+//   }
+// }
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null)
@@ -62,7 +62,7 @@ export function useAuth() {
       expires: 7, // 7 days
     })
 
-    debugTokens()
+    // debugTokens()
   }
 
   // Clear tokens from both localStorage and cookies
@@ -75,11 +75,11 @@ export function useAuth() {
     // Clear cookies
     Cookies.remove("token", { path: "/" })
 
-    debugTokens()
+    // debugTokens()
   }
 
   const checkAuth = useCallback(async () => {
-    debugTokens()
+    // debugTokens()
 
     try {
       const accessToken = localStorage.getItem("accessToken") || Cookies.get("token")
