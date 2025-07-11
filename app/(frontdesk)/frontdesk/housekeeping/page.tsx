@@ -33,7 +33,7 @@ import { useUsers } from "@/hooks/use-users"
 import { format } from "date-fns"
 
 // Define HousekeepingStatus type if not imported from elsewhere
-type HousekeepingStatus = "pending" | "in_progress" | "completed";
+type HousekeepingStatus = "pending" | "in_progress" | "completed"
 
 export default function HousekeepingPage() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -43,7 +43,7 @@ export default function HousekeepingPage() {
   const [selectedDate, setSelectedDate] = useState("")
   const [activeTab, setActiveTab] = useState("all")
 
-  const { schedules, stats, fetchSchedules, updateSchedule, deleteSchedule, getStats, isLoading } = useHousekeeping()
+  const { schedules, stats, fetchSchedules, updateSchedule, deleteSchedule, fetchStats, isLoading } = useHousekeeping()
   console.log("Schedules:", schedules)
   const { rooms, fetchRooms } = useRooms()
   const { users: staff, fetchUsers } = useUsers()
@@ -57,7 +57,7 @@ export default function HousekeepingPage() {
       fetchSchedules(),
       fetchRooms({ limit: 200 }),
       fetchUsers(),
-      getStats(),
+      fetchStats(), // Changed from getStats()
     ])
   }
 
@@ -89,6 +89,8 @@ export default function HousekeepingPage() {
   }
 
   const getStatusBadge = (status: string) => {
+    if (!status) return null
+
     const variants = {
       pending: "secondary",
       in_progress: "default",
@@ -111,7 +113,15 @@ export default function HousekeepingPage() {
     )
   }
 
-  const getPriorityBadge = (priority: string) => {
+  const getPriorityBadge = (priority: string | undefined) => {
+    if (!priority) {
+      return (
+        <Badge variant="outline" className="bg-gray-100 text-gray-800">
+          MEDIUM
+        </Badge>
+      )
+    }
+
     const colors = {
       high: "bg-red-100 text-red-800",
       medium: "bg-orange-100 text-orange-800",
@@ -119,7 +129,7 @@ export default function HousekeepingPage() {
     }
 
     return (
-      <Badge variant="outline" className={colors[priority as keyof typeof colors]}>
+      <Badge variant="outline" className={colors[priority as keyof typeof colors] || "bg-gray-100 text-gray-800"}>
         {priority.toUpperCase()}
       </Badge>
     )
@@ -133,8 +143,10 @@ export default function HousekeepingPage() {
   const filteredSchedules = schedules.filter((schedule) => {
     const scheduleStatus = normalizeStatus(schedule.status)
     const matchesSearch =
-      schedule.room?.number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      schedule.assigned_to?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+      schedule.room?.id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      schedule.room?.roomNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      schedule.assigned_to?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      schedule.assigned_to?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
 
     const matchesRoom = selectedRoom === "all" || schedule.room?._id === selectedRoom
     const matchesStaff = selectedStaff === "all" || schedule.assigned_to?._id === selectedStaff
@@ -175,7 +187,7 @@ export default function HousekeepingPage() {
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats?.total || 0}</div>
+            <div className="text-2xl font-bold">{stats?.total || schedules.length}</div>
             <p className="text-xs text-muted-foreground">All time schedules</p>
           </CardContent>
         </Card>
@@ -185,7 +197,9 @@ export default function HousekeepingPage() {
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats?.pending || 0}</div>
+            <div className="text-2xl font-bold">
+              {stats?.pending || schedules.filter((s) => s.status === "pending").length}
+            </div>
             <p className="text-xs text-muted-foreground">Awaiting cleaning</p>
           </CardContent>
         </Card>
@@ -195,7 +209,10 @@ export default function HousekeepingPage() {
             <AlertCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats?.in_progress || 0}</div>
+            <div className="text-2xl font-bold">
+              {stats?.in_progress ||
+                schedules.filter((s) => s.status === "in_progress" || s.status === "cleaning").length}
+            </div>
             <p className="text-xs text-muted-foreground">Currently cleaning</p>
           </CardContent>
         </Card>
@@ -205,7 +222,14 @@ export default function HousekeepingPage() {
             <CheckCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats?.today?.total || 0}</div>
+            <div className="text-2xl font-bold">
+              {stats?.today?.total ||
+                schedules.filter((s) => {
+                  const today = new Date().toISOString().split("T")[0]
+                  const scheduleDate = new Date(s.schedule_date).toISOString().split("T")[0]
+                  return scheduleDate === today
+                }).length}
+            </div>
             <p className="text-xs text-muted-foreground">Scheduled for today</p>
           </CardContent>
         </Card>
@@ -240,7 +264,7 @@ export default function HousekeepingPage() {
                 <SelectItem value="all">All rooms</SelectItem>
                 {rooms.map((room) => (
                   <SelectItem key={room._id} value={room._id}>
-                    Room {room.name}
+                    Room {room.id || room.name || room.roomNumber}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -253,7 +277,7 @@ export default function HousekeepingPage() {
                 <SelectItem value="all">All staff</SelectItem>
                 {staff.map((member) => (
                   <SelectItem key={member._id} value={member._id}>
-                    {member.full_name}
+                    {member.name || member.full_name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -293,7 +317,7 @@ export default function HousekeepingPage() {
                 Pending ({schedules.filter((s) => s.status === "pending").length})
               </TabsTrigger>
               <TabsTrigger value="in_progress">
-                In Progress ({schedules.filter((s) => s.status === "in_progress").length})
+                In Progress ({schedules.filter((s) => s.status === "in_progress" || s.status === "cleaning").length})
               </TabsTrigger>
               <TabsTrigger value="completed">
                 Completed ({schedules.filter((s) => s.status === "completed").length})
@@ -335,9 +359,9 @@ export default function HousekeepingPage() {
                       <TableRow key={schedule._id}>
                         <TableCell className="font-medium">
                           <div>
-                            <p>Room {schedule.room?.number}</p>
+                            <p>Room { schedule.room?.roomNumber || "N/A"}</p>
                             <p className="text-xs text-muted-foreground">
-                              Floor {schedule.room?.floor} • {schedule.room?.roomType?.name}
+                              Floor {schedule.room?.floor || "1"} • {schedule.room?.roomType?.name || "Standard"}
                             </p>
                           </div>
                         </TableCell>
@@ -346,7 +370,7 @@ export default function HousekeepingPage() {
                           {schedule.assigned_to ? (
                             <div className="flex items-center gap-2">
                               <Users className="h-4 w-4" />
-                              {schedule.assigned_to.full_name}
+                              {schedule.assigned_to.name || schedule.assigned_to.full_name}
                             </div>
                           ) : (
                             <span className="text-muted-foreground">Unassigned</span>
@@ -355,7 +379,7 @@ export default function HousekeepingPage() {
                         <TableCell>{getPriorityBadge(schedule.priority)}</TableCell>
                         <TableCell>{getStatusBadge(schedule.status)}</TableCell>
                         <TableCell>
-                          <div className="max-w-32 truncate" title={schedule.notes}>
+                          <div className="max-w-32 truncate" title={schedule.notes || ""}>
                             {schedule.notes || "-"}
                           </div>
                         </TableCell>
@@ -373,7 +397,7 @@ export default function HousekeepingPage() {
                                   Start Cleaning
                                 </DropdownMenuItem>
                               )}
-                              {schedule.status === "in_progress" && (
+                              {(schedule.status === "in_progress" || schedule.status === "cleaning") && (
                                 <DropdownMenuItem onClick={() => handleStatusUpdate(schedule._id, "completed")}>
                                   <Check className="mr-2 h-4 w-4" />
                                   Mark Complete
