@@ -32,8 +32,7 @@ import { useRooms } from "@/hooks/use-rooms"
 import { useUsers } from "@/hooks/use-users"
 import { format } from "date-fns"
 
-// Define HousekeepingStatus type if not imported from elsewhere
-type HousekeepingStatus = "pending" | "in_progress" | "completed"
+type HousekeepingStatus = "pending" | "in_progress" | "completed" | "cleaning"
 
 export default function HousekeepingPage() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -44,7 +43,6 @@ export default function HousekeepingPage() {
   const [activeTab, setActiveTab] = useState("all")
 
   const { schedules, stats, fetchSchedules, updateSchedule, deleteSchedule, fetchStats, isLoading } = useHousekeeping()
-  console.log("Schedules:", schedules)
   const { rooms, fetchRooms } = useRooms()
   const { users: staff, fetchUsers } = useUsers()
 
@@ -57,7 +55,7 @@ export default function HousekeepingPage() {
       fetchSchedules(),
       fetchRooms({ limit: 200 }),
       fetchUsers(),
-      fetchStats(), // Changed from getStats()
+      fetchStats(),
     ])
   }
 
@@ -143,7 +141,6 @@ export default function HousekeepingPage() {
   const filteredSchedules = schedules.filter((schedule) => {
     const scheduleStatus = normalizeStatus(schedule.status)
     const matchesSearch =
-      schedule.room?.id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       schedule.room?.roomNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       schedule.assigned_to?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       schedule.assigned_to?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
