@@ -60,6 +60,7 @@ export default function NewMaintenanceRequestPage() {
 
   const { createMaintenanceRequest, isLoading } = useMaintenanceRequests()
   const { rooms, fetchRooms } = useRooms()
+  console.log("Available rooms:", rooms)
 
   const [tagInput, setTagInput] = useState("")
   const [tags, setTags] = useState<string[]>([])
@@ -82,9 +83,15 @@ export default function NewMaintenanceRequestPage() {
     },
   })
 
-  useEffect(() => {
-    fetchRooms()
-  }, [])
+    useEffect(() => {
+      loadData()
+    }, [])
+  
+    const loadData = async () => {
+    await Promise.all([
+        fetchRooms()
+    ])
+    }
 
   const onSubmit = async (data: MaintenanceFormData) => {
     try {
