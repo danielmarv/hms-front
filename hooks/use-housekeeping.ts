@@ -73,18 +73,10 @@ export function useHousekeeping() {
         }
       })
 
-      const { data, error } = await request<{
-        data: HousekeepingSchedule[]
-        pagination: {
-          page: number
-          limit: number
-          totalPages: number
-        }
-        total: number
-      }>(`/housekeeping?${queryParams.toString()}`)
+      const { data, error } = await request(`/housekeeping?${queryParams.toString()}`)
 
       if (data && !error) {
-        setSchedules(data.data || [])
+        setSchedules(data)
         setPagination({
           page: data.pagination?.page || 1,
           limit: data.pagination?.limit || 10,
@@ -110,7 +102,7 @@ export function useHousekeeping() {
 
   const fetchScheduleById = useCallback(
     async (id: string) => {
-      const { data, error } = await request<{ data: HousekeepingSchedule }>(`/housekeeping/${id}`)
+      const { data, error } = await request(`/housekeeping/${id}`)
       return error ? null : data?.data
     },
     [request],
@@ -126,7 +118,7 @@ export function useHousekeeping() {
       status: HousekeepingStatus
       updateRoomStatus?: boolean
     }) => {
-      const { data, error } = await request<{ data: HousekeepingSchedule }>("/housekeeping", "POST", scheduleData)
+      const { data, error } = await request("/housekeeping", "POST", scheduleData)
       return { data: error ? null : data?.data, error }
     },
     [request],
@@ -134,7 +126,7 @@ export function useHousekeeping() {
 
   const updateSchedule = useCallback(
     async (id: string, scheduleData: Partial<HousekeepingSchedule>) => {
-      const { data, error } = await request<{ data: HousekeepingSchedule }>(`/housekeeping/${id}`, "PUT", scheduleData)
+      const { data, error } = await request(`/housekeeping/${id}`, "PUT", scheduleData)
       return { data: error ? null : data?.data, error }
     },
     [request],
@@ -142,7 +134,7 @@ export function useHousekeeping() {
 
   const deleteSchedule = useCallback(
     async (id: string) => {
-      const { data, error } = await request<{ message: string }>(`/housekeeping/${id}`, "DELETE")
+      const { data, error } = await request(`/housekeeping/${id}`, "DELETE")
       return { success: !error, message: error || data?.message }
     },
     [request],
@@ -150,7 +142,7 @@ export function useHousekeeping() {
 
   const assignSchedule = useCallback(
     async (id: string, assignedTo: string) => {
-      const { data, error } = await request<{ data: HousekeepingSchedule }>(`/housekeeping/${id}/assign`, "PATCH", {
+      const { data, error } = await request(`/housekeeping/${id}/assign`, "PATCH", {
         assignedTo,
       })
       return { data: error ? null : data?.data, error }
@@ -160,7 +152,7 @@ export function useHousekeeping() {
 
   const bulkCreateSchedules = useCallback(
     async (schedules: Array<Partial<HousekeepingSchedule>>) => {
-      const { data, error } = await request<{ data: HousekeepingSchedule[] }>("/housekeeping/bulk", "POST", {
+      const { data, error } = await request("/housekeeping/bulk", "POST", {
         schedules,
       })
       return { data: error ? null : data?.data, error }
@@ -169,7 +161,7 @@ export function useHousekeeping() {
   )
 
   const fetchStats = useCallback(async () => {
-    const { data, error } = await request<{ data: HousekeepingStats }>("/housekeeping/stats")
+    const { data, error } = await request("/housekeeping/stats")
 
     if (data && !error) {
       setStats(data.data)

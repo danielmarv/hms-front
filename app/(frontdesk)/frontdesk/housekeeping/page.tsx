@@ -41,6 +41,7 @@ export default function HousekeepingPage() {
   const [activeTab, setActiveTab] = useState("all")
 
   const { schedules, stats, fetchSchedules, updateSchedule, deleteSchedule, getStats, isLoading } = useHousekeeping()
+  console.log("Schedules:", schedules)
   const { rooms, fetchRooms } = useRooms()
   const { users: staff, fetchUsers } = useUsers()
 
@@ -52,7 +53,7 @@ export default function HousekeepingPage() {
     await Promise.all([
       fetchSchedules(),
       fetchRooms({ limit: 200 }),
-      fetchUsers({ department: "housekeeping", limit: 100 }),
+      fetchUsers(),
       getStats(),
     ])
   }
