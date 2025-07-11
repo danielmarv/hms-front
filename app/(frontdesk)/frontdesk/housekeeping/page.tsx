@@ -32,6 +32,9 @@ import { useRooms } from "@/hooks/use-rooms"
 import { useUsers } from "@/hooks/use-users"
 import { format } from "date-fns"
 
+// Define HousekeepingStatus type if not imported from elsewhere
+type HousekeepingStatus = "pending" | "in_progress" | "completed";
+
 export default function HousekeepingPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedRoom, setSelectedRoom] = useState("all")
@@ -64,23 +67,23 @@ export default function HousekeepingPage() {
   }
 
   const handleStatusUpdate = async (scheduleId: string, newStatus: string) => {
-    const result = await updateSchedule(scheduleId, { status: newStatus })
-    if (result.data) {
-      toast.success(`Schedule ${newStatus}`)
+    const result = await updateSchedule(scheduleId, { status: newStatus as HousekeepingStatus })
+    if (result && !result.error) {
+      toast.success(result.data?.message || `Schedule ${newStatus}`)
       loadData()
-    } else if (result.error) {
-      toast.error(result.error)
+    } else {
+      toast.error(result.error || "Failed to update schedule")
     }
   }
 
   const handleDelete = async (scheduleId: string) => {
     if (confirm("Are you sure you want to delete this schedule?")) {
       const result = await deleteSchedule(scheduleId)
-      if (result.data) {
-        toast.success("Schedule deleted")
+      if (result.success) {
+        toast.success(result.message || "Schedule deleted")
         loadData()
-      } else if (result.error) {
-        toast.error(result.error)
+      } else {
+        toast.error(result.message || "Failed to delete schedule")
       }
     }
   }
@@ -89,7 +92,7 @@ export default function HousekeepingPage() {
     const variants = {
       pending: "secondary",
       in_progress: "default",
-      completed: "success",
+      completed: "default",
     } as const
 
     const colors = {
@@ -122,16 +125,22 @@ export default function HousekeepingPage() {
     )
   }
 
+  const normalizeStatus = (status: string) => {
+    if (status === "cleaning") return "in_progress"
+    return status
+  }
+
   const filteredSchedules = schedules.filter((schedule) => {
+    const scheduleStatus = normalizeStatus(schedule.status)
     const matchesSearch =
-      schedule.room?.roomNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      schedule.assigned_to?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
+      schedule.room?.number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      schedule.assigned_to?.name?.toLowerCase().includes(searchTerm.toLowerCase())
 
     const matchesRoom = selectedRoom === "all" || schedule.room?._id === selectedRoom
     const matchesStaff = selectedStaff === "all" || schedule.assigned_to?._id === selectedStaff
-    const matchesStatus = selectedStatus === "all" || schedule.status === selectedStatus
+    const matchesStatus = selectedStatus === "all" || scheduleStatus === selectedStatus
     const matchesDate = !selectedDate || format(new Date(schedule.schedule_date), "yyyy-MM-dd") === selectedDate
-    const matchesTab = activeTab === "all" || schedule.status === activeTab
+    const matchesTab = activeTab === "all" || scheduleStatus === activeTab
 
     return matchesSearch && matchesRoom && matchesStaff && matchesStatus && matchesDate && matchesTab
   })
@@ -231,7 +240,7 @@ export default function HousekeepingPage() {
                 <SelectItem value="all">All rooms</SelectItem>
                 {rooms.map((room) => (
                   <SelectItem key={room._id} value={room._id}>
-                    Room {room.roomNumber}
+                    Room {room.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -326,7 +335,7 @@ export default function HousekeepingPage() {
                       <TableRow key={schedule._id}>
                         <TableCell className="font-medium">
                           <div>
-                            <p>Room {schedule.room?.roomNumber}</p>
+                            <p>Room {schedule.room?.number}</p>
                             <p className="text-xs text-muted-foreground">
                               Floor {schedule.room?.floor} • {schedule.room?.roomType?.name}
                             </p>
