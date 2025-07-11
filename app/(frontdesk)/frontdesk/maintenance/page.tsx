@@ -210,7 +210,7 @@ export default function MaintenancePage() {
             Refresh
           </Button>
           <Button asChild>
-            <Link href="/dashboard/maintenance/new">
+            <Link href="/frontdesk/maintenance/new">
               <Plus className="mr-2 h-4 w-4" />
               New Request
             </Link>
@@ -429,7 +429,7 @@ export default function MaintenancePage() {
                         <AlertTriangle className="h-8 w-8 text-muted-foreground" />
                         <p>No maintenance requests found.</p>
                         <Button asChild size="sm">
-                          <Link href="/dashboard/maintenance/new">
+                          <Link href="/frontdesk/maintenance/new">
                             <Plus className="mr-2 h-4 w-4" />
                             Create First Request
                           </Link>
@@ -488,7 +488,7 @@ export default function MaintenancePage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem asChild>
-                              <Link href={`/dashboard/maintenance/${request._id}`}>
+                              <Link href={`/frontdesk/maintenance/${request._id}`}>
                                 <Eye className="mr-2 h-4 w-4" />
                                 View Details
                               </Link>
@@ -522,7 +522,7 @@ export default function MaintenancePage() {
                             )}
 
                             <DropdownMenuItem asChild>
-                              <Link href={`/dashboard/maintenance/${request._id}/edit`}>
+                              <Link href={`/frontdesk/maintenance/${request._id}/edit`}>
                                 <Edit className="mr-2 h-4 w-4" />
                                 Edit
                               </Link>
