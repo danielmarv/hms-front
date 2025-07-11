@@ -114,11 +114,11 @@ export default function NewMaintenanceRequestPage() {
 
       const result = await createMaintenanceRequest(requestData)
 
-      if (result.success) {
+      if (result) {
         toast.success("Maintenance request created successfully")
-        router.push("/dashboard/maintenance")
+        router.push("/frontdesk/maintenance")
       } else {
-        toast.error(result.message || "Failed to create maintenance request")
+        toast.error((result as any).message || "Failed to create maintenance request")
       }
     } catch (error) {
       console.error("Error creating maintenance request:", error)
@@ -279,7 +279,7 @@ export default function NewMaintenanceRequestPage() {
                               <SelectItem value="">No specific room</SelectItem>
                               {rooms.map((room) => (
                                 <SelectItem key={room._id} value={room._id}>
-                                  Room {room.number || room.name} - Floor {room.floor}
+                                  Room {room.roomNumber} - Floor {room.floor}
                                 </SelectItem>
                               ))}
                             </SelectContent>

@@ -107,12 +107,7 @@ export const useMaintenanceRequests = () => {
         }
       })
 
-      const response = await request<{
-        data: MaintenanceRequest[]
-        count: number
-        total: number
-        pagination: { page: number; limit: number; totalPages: number }
-      }>(`/maintenance?${queryParams.toString()}`)
+      const response = await request(`/maintenance?${queryParams.toString()}`)
 
       if (response.data) {
         setMaintenanceRequests(response.data.data || [])
@@ -120,14 +115,13 @@ export const useMaintenanceRequests = () => {
 
       return response
     } catch (error) {
-      console.error("Error fetching maintenance requests:", error)
       return { success: false, message: "Failed to fetch maintenance requests" }
     }
   }
 
   const getMaintenanceRequestById = async (id: string) => {
     try {
-      const response = await request<MaintenanceRequest>(`/maintenance/${id}`)
+      const response = await request(`/maintenance/${id}`)
       return response
     } catch (error) {
       console.error("Error fetching maintenance request:", error)
@@ -137,17 +131,16 @@ export const useMaintenanceRequests = () => {
 
   const createMaintenanceRequest = async (data: Partial<MaintenanceRequest>) => {
     try {
-      const response = await request<MaintenanceRequest>("/maintenance", "POST", data)
+      const response = await request("/maintenance", "POST", data)
 
       if (response.data) {
         toast.success("Maintenance request created successfully")
-        // Refresh the list
+
         await getMaintenanceRequests()
       }
 
       return response
     } catch (error) {
-      console.error("Error creating maintenance request:", error)
       toast.error("Failed to create maintenance request")
       return { success: false, message: "Failed to create maintenance request" }
     }
@@ -155,17 +148,15 @@ export const useMaintenanceRequests = () => {
 
   const updateMaintenanceRequest = async (id: string, data: Partial<MaintenanceRequest>) => {
     try {
-      const response = await request<MaintenanceRequest>(`/maintenance/${id}`, "PUT", data)
+      const response = await request(`/maintenance/${id}`, "PUT", data)
 
       if (response.data) {
         toast.success("Maintenance request updated successfully")
-        // Refresh the list
         await getMaintenanceRequests()
       }
 
       return response
     } catch (error) {
-      console.error("Error updating maintenance request:", error)
       toast.error("Failed to update maintenance request")
       return { success: false, message: "Failed to update maintenance request" }
     }
@@ -177,20 +168,18 @@ export const useMaintenanceRequests = () => {
     additionalData?: { actualCost?: number; resolution?: string },
   ) => {
     try {
-      const response = await request<MaintenanceRequest>(`/maintenance/${id}/status`, "PATCH", {
+      const response = await request(`/maintenance/${id}/status`, "PATCH", {
         status,
         ...additionalData,
       })
 
       if (response.data) {
         toast.success(`Maintenance request ${status}`)
-        // Refresh the list
         await getMaintenanceRequests()
       }
 
       return response
     } catch (error) {
-      console.error("Error updating maintenance status:", error)
       toast.error("Failed to update maintenance status")
       return { success: false, message: "Failed to update maintenance status" }
     }
@@ -198,13 +187,12 @@ export const useMaintenanceRequests = () => {
 
   const assignMaintenanceRequest = async (id: string, assignedTo: string) => {
     try {
-      const response = await request<MaintenanceRequest>(`/maintenance/${id}/assign`, "PATCH", {
+      const response = await request(`/maintenance/${id}/assign`, "PATCH", {
         assignedTo,
       })
 
       if (response.data) {
         toast.success("Maintenance request assigned successfully")
-        // Refresh the list
         await getMaintenanceRequests()
       }
 
@@ -218,7 +206,7 @@ export const useMaintenanceRequests = () => {
 
   const addMaintenanceNote = async (id: string, note: string) => {
     try {
-      const response = await request<MaintenanceRequest>(`/maintenance/${id}/notes`, "POST", {
+      const response = await request(`/maintenance/${id}/notes`, "POST", {
         note,
       })
 
@@ -228,7 +216,6 @@ export const useMaintenanceRequests = () => {
 
       return response
     } catch (error) {
-      console.error("Error adding maintenance note:", error)
       toast.error("Failed to add note")
       return { success: false, message: "Failed to add note" }
     }
@@ -240,14 +227,10 @@ export const useMaintenanceRequests = () => {
       if (filters?.status) queryParams.append("status", filters.status)
       if (filters?.limit) queryParams.append("limit", String(filters.limit))
 
-      const response = await request<{
-        data: MaintenanceRequest[]
-        count: number
-      }>(`/maintenance/room/${roomId}?${queryParams.toString()}`)
+      const response = await request(`/maintenance/room/${roomId}?${queryParams.toString()}`)
 
       return response
     } catch (error) {
-      console.error("Error fetching maintenance by room:", error)
       return { success: false, message: "Failed to fetch room maintenance requests" }
     }
   }
@@ -258,7 +241,7 @@ export const useMaintenanceRequests = () => {
       if (filters?.startDate) queryParams.append("startDate", filters.startDate)
       if (filters?.endDate) queryParams.append("endDate", filters.endDate)
 
-      const response = await request<MaintenanceStats>(`/maintenance/stats?${queryParams.toString()}`)
+      const response = await request(`/maintenance/stats?${queryParams.toString()}`)
 
       if (response.data) {
         setStats(response.data)
@@ -266,7 +249,6 @@ export const useMaintenanceRequests = () => {
 
       return response
     } catch (error) {
-      console.error("Error fetching maintenance stats:", error)
       return { success: false, message: "Failed to fetch maintenance statistics" }
     }
   }
@@ -277,19 +259,7 @@ export const useMaintenanceRequests = () => {
       if (filters?.period) queryParams.append("period", filters.period)
       if (filters?.limit) queryParams.append("limit", String(filters.limit))
 
-      const response = await request<
-        Array<{
-          _id: string
-          total: number
-          pending: number
-          assigned: number
-          in_progress: number
-          completed: number
-          cancelled: number
-          totalCost: number
-          avgResolutionTime: number
-        }>
-      >(`/maintenance/history?${queryParams.toString()}`)
+      const response = await request(`/maintenance/history?${queryParams.toString()}`)
 
       return response
     } catch (error) {
@@ -302,15 +272,13 @@ export const useMaintenanceRequests = () => {
     try {
       const response = await request(`/maintenance/${id}`, "DELETE")
 
-      if (response.success) {
+      if (response) {
         toast.success("Maintenance request deleted successfully")
-        // Refresh the list
         await getMaintenanceRequests()
       }
 
       return response
     } catch (error) {
-      console.error("Error deleting maintenance request:", error)
       toast.error("Failed to delete maintenance request")
       return { success: false, message: "Failed to delete maintenance request" }
     }

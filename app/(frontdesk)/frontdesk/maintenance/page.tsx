@@ -98,14 +98,14 @@ export default function MaintenancePage() {
 
   const handleStatusUpdate = async (id: string, status: string) => {
     const result = await updateMaintenanceStatus(id, status)
-    if (result.success) {
+    if (result) {
       loadData()
     }
   }
 
   const handleAssign = async (id: string, assignedTo: string) => {
     const result = await assignMaintenanceRequest(id, assignedTo)
-    if (result.success) {
+    if (result) {
       loadData()
     }
   }
@@ -113,7 +113,7 @@ export default function MaintenancePage() {
   const handleDelete = async (id: string) => {
     if (confirm("Are you sure you want to delete this maintenance request?")) {
       const result = await deleteMaintenanceRequest(id)
-      if (result.success) {
+      if (result) {
         loadData()
       }
     }
@@ -330,7 +330,7 @@ export default function MaintenancePage() {
                 <SelectItem value="all">All Rooms</SelectItem>
                 {rooms.map((room) => (
                   <SelectItem key={room._id} value={room._id}>
-                    Room {room.number || room.name}
+                    Room {room.roomNumber}
                   </SelectItem>
                 ))}
               </SelectContent>
