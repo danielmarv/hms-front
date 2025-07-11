@@ -4,6 +4,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useRooms } from "@/hooks/use-rooms"
+import { useMaintenanceRequests } from "@/hooks/use-maintenance"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,7 +19,6 @@ import { AlertTriangle, ArrowLeft, Save, X } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { toast } from "sonner"
 import Link from "next/link"
 
 const maintenanceSchema = z.object({
@@ -58,6 +58,7 @@ export default function NewMaintenanceRequestPage() {
 
   // Use the rooms hook properly
   const { rooms, isLoading: roomsLoading, fetchRooms } = useRooms()
+  const { createMaintenanceRequest, isLoading: isCreating } = useMaintenanceRequests()
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [tagInput, setTagInput] = useState("")
@@ -86,27 +87,6 @@ export default function NewMaintenanceRequestPage() {
     fetchRooms()
   }, [fetchRooms])
 
-  const createMaintenanceRequest = async (data: any) => {
-    try {
-      const response = await fetch("/api/maintenance", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      })
-
-      if (!response.ok) {
-        throw new Error("Failed to create maintenance request")
-      }
-
-      const result = await response.json()
-      return { success: true, data: result }
-    } catch (error) {
-      return { success: false, message: error instanceof Error ? error.message : "Unknown error" }
-    }
-  }
-
   const onSubmit = async (data: MaintenanceFormData) => {
     setIsSubmitting(true)
     try {
@@ -120,14 +100,11 @@ export default function NewMaintenanceRequestPage() {
 
       const result = await createMaintenanceRequest(formData)
 
-      if (result.success) {
-        toast.success("Maintenance request created successfully")
-        router.push("/frontdesk/maintenance")
-      } else {
-        toast.error(result.message || "Failed to create maintenance request")
+      if (result) {
+        router.push("/dashboard/maintenance")
       }
     } catch (error) {
-      toast.error("An error occurred while creating the request")
+      // Error handling is already done in the hook
     } finally {
       setIsSubmitting(false)
     }
@@ -157,7 +134,7 @@ export default function NewMaintenanceRequestPage() {
         title="New Maintenance Request"
         description="Create a new maintenance request"
         action={
-          <Link href="/frontdesk/maintenance">
+          <Link href="/dashboard/maintenance">
             <Button variant="outline">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Maintenance
@@ -444,12 +421,12 @@ export default function NewMaintenanceRequestPage() {
                   <CardTitle>Actions</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  <Button type="submit" className="w-full" disabled={isSubmitting || isCreating}>
                     <Save className="h-4 w-4 mr-2" />
-                    {isSubmitting ? "Creating..." : "Create Request"}
+                    {isSubmitting || isCreating ? "Creating..." : "Create Request"}
                   </Button>
 
-                  <Link href="/frontdesk/maintenance" className="block">
+                  <Link href="/dashboard/maintenance" className="block">
                     <Button variant="outline" className="w-full bg-transparent">
                       Cancel
                     </Button>
