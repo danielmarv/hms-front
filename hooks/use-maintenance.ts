@@ -110,7 +110,7 @@ export const useMaintenanceRequests = () => {
       const response = await request(`/maintenance?${queryParams.toString()}`)
 
       if (response.data) {
-        setMaintenanceRequests(response.data.data || [])
+        setMaintenanceRequests(response.data || [])
       }
 
       return response

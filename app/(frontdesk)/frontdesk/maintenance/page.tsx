@@ -61,6 +61,7 @@ export default function MaintenancePage() {
     deleteMaintenanceRequest,
     isLoading,
   } = useMaintenanceRequests()
+  console.log("Maintenance Requests:", maintenanceRequests)
 
   const { rooms, fetchRooms } = useRooms()
   const { users, fetchUsers } = useUsers()
