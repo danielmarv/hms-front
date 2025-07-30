@@ -63,9 +63,8 @@ export function useUsers() {
         })
 
         const queryString = queryParams.toString()
-        const endpoint = queryString ? `/users?${queryString}` : "/users"
+        const endpoint = queryString ? `/users?${queryString}` :"/users"
 
-        console.log("Fetching users from endpoint:", endpoint)
 
         const result = await request(endpoint)
 

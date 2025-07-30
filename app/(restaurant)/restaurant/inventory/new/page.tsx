@@ -113,7 +113,7 @@ export default function NewInventoryItemPage() {
 
   const categories = [
     "Food",
-    "Beverages",
+    "Beverage",
     "Cleaning",
     "Toiletries",
     "Linen",

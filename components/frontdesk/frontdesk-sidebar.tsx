@@ -31,6 +31,8 @@ import {
   Phone,
   MessageSquare,
   Key,
+  Bed,
+  Settings2
 } from "lucide-react"
 
 const navigation = [
@@ -55,10 +57,15 @@ const navigation = [
     icon: Calendar,
   },
   {
-    name: "Guest Services",
-    href: "/frontdesk/services",
-    icon: Phone,
+    name: "Housekeeping",
+    href: "/frontdesk/housekeeping",
+    icon: Bed,
   },
+  // {
+  //   name: "Guest Services",
+  //   href: "/frontdesk/services",
+  //   icon: Phone,
+  // },
   {
     name: "Room Status",
     href: "/frontdesk/rooms",
@@ -75,15 +82,15 @@ const navigation = [
     icon: CreditCard,
   },
   {
-    name: "Messages",
-    href: "/frontdesk/messages",
-    icon: MessageSquare,
+    name: "Maintenance",
+    href: "/frontdesk/maintenance",
+    icon: Settings2,
   },
-  {
-    name: "Reports",
-    href: "/frontdesk/reports",
-    icon: ClipboardList,
-  },
+  // {
+  //   name: "Reports",
+  //   href: "/frontdesk/reports",
+  //   icon: ClipboardList,
+  // },
 ]
 
 interface FrontDeskSidebarProps {
@@ -180,7 +187,7 @@ export function FrontDeskSidebar({ user }: FrontDeskSidebarProps) {
       {/* Mobile Sidebar */}
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>
-          <Button variant="outline" size="icon" className="fixed left-4 top-4 z-40 lg:hidden">
+          <Button variant="outline" size="icon" className="fixed left-4 top-4 z-40 lg:hidden bg-transparent">
             <Menu className="h-4 w-4" />
           </Button>
         </SheetTrigger>

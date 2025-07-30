@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { CurrencyInput } from "@/components/ui/currency-input"
 import { UserCheck, Phone, Mail, FileText, Receipt } from "lucide-react"
 
 interface CheckInDetailsPanelProps {
@@ -208,26 +209,18 @@ export function CheckInDetailsPanel({
           <div className="space-y-4">
             <h4 className="font-medium">Payment Collection</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="depositAmount">Payment Amount ($)</Label>
-                <Input
-                  id="depositAmount"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={checkInData.depositAmount || ""}
-                  onChange={(e) =>
-                    onCheckInDataChange({
-                      ...checkInData,
-                      depositAmount: Number.parseFloat(e.target.value) || 0,
-                    })
-                  }
-                />
-                <p className="text-xs text-muted-foreground">
-                  Amount paid by guest towards their bill (Total: ${totals.totalCharges.toFixed(2)})
-                </p>
-              </div>
+              <CurrencyInput
+                label="Payment Amount ($)"
+                value={checkInData.depositAmount || 0}
+                onChange={(usdValue) =>
+                  onCheckInDataChange({
+                    ...checkInData,
+                    depositAmount: usdValue,
+                  })
+                }
+                placeholder="0.00"
+                helperText={`Amount paid by guest towards their bill (Total: $${totals.totalCharges.toFixed(2)})`}
+              />
 
               {checkInData.depositAmount > 0 && (
                 <div className="space-y-2">

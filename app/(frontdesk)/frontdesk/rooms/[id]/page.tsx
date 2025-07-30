@@ -23,7 +23,7 @@ import { toast } from "sonner"
 import { ArrowLeft, Edit, Trash2, CheckCircle, XCircle, AlertTriangle, Clock, Plus } from "lucide-react"
 import { useRooms } from "@/hooks/use-rooms"
 import { useHousekeeping } from "@/hooks/use-housekeeping"
-import { useMaintenance } from "@/hooks/use-maintenance"
+import { useMaintenanceRequests } from "@/hooks/use-maintenance"
 
 export default function RoomDetailPage() {
   const params = useParams()
@@ -36,52 +36,80 @@ export default function RoomDetailPage() {
   const [activeTab, setActiveTab] = useState("details")
 
   const { fetchSchedules } = useHousekeeping()
-  const { fetchRequests } = useMaintenance()
-  const [housekeepingSchedules, setHousekeepingSchedules] = useState([])
-  const [maintenanceRequests, setMaintenanceRequests] = useState([])
+  const { getMaintenanceRequests } = useMaintenanceRequests()
+  const [housekeepingSchedules, setHousekeepingSchedules] = useState<any[]>([])
+  const [maintenanceRequests, setMaintenanceRequests] = useState<any[]>([])
 
   useEffect(() => {
     const loadRoomData = async () => {
       setIsLoading(true)
-      const roomData = await fetchRoomById(roomId)
-      if (roomData) {
-        setRoom(roomData)
+      try {
+        const roomData = await fetchRoomById(roomId)
+        if (roomData) {
+          setRoom(roomData)
 
-        // Load related housekeeping schedules
-        const schedules = await fetchSchedules({ room: roomId, limit: 5 })
-        setHousekeepingSchedules(schedules || [])
+          // Load related housekeeping schedules
+          try {
+            const schedules = await fetchSchedules({ room: roomId, limit: 5 })
+            setHousekeepingSchedules(Array.isArray(schedules) ? schedules : schedules?.data || [])
+          } catch (error) {
+            console.error("Error loading housekeeping schedules:", error)
+            setHousekeepingSchedules([])
+          }
 
-        // Load related maintenance requests
-        const requests = await fetchRequests({ room: roomId, limit: 5 })
-        setMaintenanceRequests(requests || [])
-      } else {
-        toast.error("Room not found")
-        router.push("/dashboard/rooms")
+          // Load related maintenance requests
+          try {
+            const requests = await getMaintenanceRequests({ room: roomId, limit: 5 })
+            setMaintenanceRequests(Array.isArray(requests) ? requests : requests?.data || [])
+          } catch (error) {
+            console.error("Error loading maintenance requests:", error)
+            setMaintenanceRequests([])
+          }
+        } else {
+          toast.error("Room not found")
+          router.push("/frontdesk/rooms")
+        }
+      } catch (error) {
+        console.error("Error loading room data:", error)
+        toast.error("Failed to load room data")
+        router.push("/frontdesk/rooms")
       }
       setIsLoading(false)
     }
 
-    loadRoomData()
+    if (roomId) {
+      loadRoomData()
+    }
   }, [roomId])
 
-  const handleStatusChange = async (newStatus) => {
-    const result = await updateRoomStatus(roomId, newStatus)
-    if (result.data) {
-      setRoom({ ...room, status: newStatus })
-      toast.success(`Room status updated to ${newStatus}`)
+  const handleStatusChange = async (newStatus: string) => {
+    try {
+      const result = await updateRoomStatus(roomId, newStatus)
+      if (result.data) {
+        setRoom({ ...room, status: newStatus })
+        toast.success(`Room status updated to ${newStatus}`)
+      }
+    } catch (error) {
+      console.error("Error updating room status:", error)
+      toast.error("Failed to update room status")
     }
   }
 
   const handleDeleteRoom = async () => {
-    const result = await deleteRoom(roomId)
-    if (result.success) {
-      toast.success("Room deleted successfully")
-      router.push("/dashboard/rooms")
+    try {
+      const result = await deleteRoom(roomId)
+      if (result.success) {
+        toast.success("Room deleted successfully")
+        router.push("/frontdesk/rooms")
+      }
+    } catch (error) {
+      console.error("Error deleting room:", error)
+      toast.error("Failed to delete room")
     }
   }
 
   // Function to get badge variant based on status
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case "available":
         return (
@@ -104,7 +132,7 @@ export default function RoomDetailPage() {
       case "cleaning":
         return (
           <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
-            <Clock className="mr-1 h-3 w-3" /> Cleaningg
+            <Clock className="mr-1 h-3 w-3" /> Cleaning
           </Badge>
         )
       case "reserved":
@@ -129,7 +157,7 @@ export default function RoomDetailPage() {
       <div className="space-y-6">
         <div className="flex items-center">
           <Button variant="ghost" size="sm" className="mr-2" asChild>
-            <Link href="/dashboard/rooms">
+            <Link href="/frontdesk/rooms">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back
             </Link>
@@ -159,7 +187,7 @@ export default function RoomDetailPage() {
         <h2 className="text-2xl font-bold mb-2">Room Not Found</h2>
         <p className="text-muted-foreground mb-4">The room you're looking for doesn't exist or has been removed.</p>
         <Button asChild>
-          <Link href="/dashboard/rooms">
+          <Link href="/frontdesk/rooms">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Rooms
           </Link>
@@ -173,7 +201,7 @@ export default function RoomDetailPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center">
           <Button variant="ghost" size="sm" className="mr-2" asChild>
-            <Link href="/dashboard/rooms">
+            <Link href="/frontdesk/rooms">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back
             </Link>
@@ -187,7 +215,7 @@ export default function RoomDetailPage() {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" asChild>
-            <Link href={`/dashboard/rooms/${roomId}/edit`}>
+            <Link href={`/frontdesk/rooms/${roomId}/edit`}>
               <Edit className="mr-2 h-4 w-4" />
               Edit
             </Link>
@@ -242,7 +270,7 @@ export default function RoomDetailPage() {
                   </div>
                   <div>
                     <h3 className="text-sm font-medium text-muted-foreground">Price per Night</h3>
-                    <p className="mt-1">${room.roomType?.basePice || room.roomType?.basePrice || "N/A"}</p>
+                    <p className="mt-1">${room.roomType?.basePrice || room.roomType?.basePice || "N/A"}</p>
                   </div>
                   <div>
                     <h3 className="text-sm font-medium text-muted-foreground">Location</h3>
@@ -265,7 +293,7 @@ export default function RoomDetailPage() {
                     <h3 className="text-sm font-medium text-muted-foreground">Amenities</h3>
                     <div className="mt-1 flex flex-wrap gap-2">
                       {room.amenities && room.amenities.length > 0 ? (
-                        room.amenities.map((amenity, index) => (
+                        room.amenities.map((amenity: string, index: number) => (
                           <Badge key={index} variant="outline">
                             {amenity}
                           </Badge>
@@ -280,7 +308,7 @@ export default function RoomDetailPage() {
                     <div className="mt-1">
                       {room.connected_rooms && room.connected_rooms.length > 0 ? (
                         <div className="flex flex-wrap gap-2">
-                          {room.connected_rooms.map((connectedRoom) => (
+                          {room.connected_rooms.map((connectedRoom: any) => (
                             <Badge key={connectedRoom._id} variant="outline">
                               Room {connectedRoom.number} ({connectedRoom.status})
                             </Badge>
@@ -360,20 +388,20 @@ export default function RoomDetailPage() {
                 <CardDescription>Recent housekeeping schedules for this room</CardDescription>
               </div>
               <Button asChild>
-                <Link href={`/dashboard/housekeeping/new?roomId=${roomId}`}>
+                <Link href={`/frontdesk/housekeeping/new?roomId=${roomId}`}>
                   <Plus className="mr-2 h-4 w-4" />
                   Schedule Cleaning
                 </Link>
               </Button>
             </CardHeader>
             <CardContent>
-              {housekeepingSchedules.length === 0 ? (
+              {!Array.isArray(housekeepingSchedules) || housekeepingSchedules.length === 0 ? (
                 <div className="text-center py-6">
                   <p className="text-muted-foreground">No housekeeping schedules found for this room.</p>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {housekeepingSchedules.map((schedule) => (
+                  {housekeepingSchedules.map((schedule: any) => (
                     <div key={schedule._id} className="border rounded-md p-4">
                       <div className="flex justify-between items-start">
                         <div>
@@ -399,7 +427,7 @@ export default function RoomDetailPage() {
                   ))}
                   <div className="text-center pt-2">
                     <Button variant="link" asChild>
-                      <Link href={`/dashboard/housekeeping?room=${roomId}`}>View All Housekeeping Records</Link>
+                      <Link href={`/frontdesk/housekeeping?room=${roomId}`}>View All Housekeeping Records</Link>
                     </Button>
                   </div>
                 </div>
@@ -416,54 +444,54 @@ export default function RoomDetailPage() {
                 <CardDescription>Maintenance history and current issues</CardDescription>
               </div>
               <Button asChild>
-                <Link href={`/dashboard/maintenance/new?roomId=${roomId}`}>
+                <Link href={`/frontdesk/maintenance/new?roomId=${roomId}`}>
                   <Plus className="mr-2 h-4 w-4" />
                   Report Issue
                 </Link>
               </Button>
             </CardHeader>
             <CardContent>
-              {maintenanceRequests.length === 0 ? (
+              {!Array.isArray(maintenanceRequests) || maintenanceRequests.length === 0 ? (
                 <div className="text-center py-6">
                   <p className="text-muted-foreground">No maintenance requests found for this room.</p>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {maintenanceRequests.map((request) => (
+                  {maintenanceRequests.map((request: any) => (
                     <div key={request._id} className="border rounded-md p-4">
                       <div className="flex justify-between items-start">
                         <div>
-                          <p className="font-medium">{request.title}</p>
+                          <p className="font-medium">{request.title || request.description}</p>
                           <p className="text-sm text-muted-foreground">
                             Reported on {new Date(request.createdAt).toLocaleDateString()} by{" "}
-                            {request.reported_by?.name || "Unknown"}
+                            {request.reportedBy?.full_name || request.reported_by?.name || "Unknown"}
                           </p>
                         </div>
                         <Badge
                           variant={
-                            request.status === "resolved"
+                            request.status === "completed" || request.status === "resolved"
                               ? "outline"
-                              : request.status === "in_progress"
+                              : request.status === "in-progress" || request.status === "assigned"
                                 ? "secondary"
                                 : request.status === "pending"
                                   ? "default"
                                   : "destructive"
                           }
                         >
-                          {request.status.replace("_", " ")}
+                          {request.status.replace("_", " ").replace("-", " ")}
                         </Badge>
                       </div>
                       <p className="text-sm mt-2">{request.description}</p>
-                      {request.status === "resolved" && request.resolved_at && (
+                      {(request.status === "completed" || request.status === "resolved") && request.completedDate && (
                         <p className="text-xs text-muted-foreground mt-2">
-                          Resolved on {new Date(request.resolved_at).toLocaleDateString()}
+                          Resolved on {new Date(request.completedDate).toLocaleDateString()}
                         </p>
                       )}
                     </div>
                   ))}
                   <div className="text-center pt-2">
                     <Button variant="link" asChild>
-                      <Link href={`/dashboard/maintenance?room=${roomId}`}>View All Maintenance Records</Link>
+                      <Link href={`/frontdesk/maintenance?room=${roomId}`}>View All Maintenance Records</Link>
                     </Button>
                   </div>
                 </div>

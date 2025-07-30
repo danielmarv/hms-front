@@ -47,6 +47,7 @@ import {
 export default function InventoryPage() {
   const router = useRouter()
   const { items, loading, error, pagination, totalItems, fetchInventoryItems, deleteInventoryItem } = useInventory()
+  console.log(items)
 
   const [search, setSearch] = useState("")
   const [category, setCategory] = useState("")

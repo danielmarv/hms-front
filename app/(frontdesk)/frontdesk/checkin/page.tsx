@@ -275,8 +275,7 @@ export default function CheckInPage() {
         // Ensure we have room rate information
         room_rate: selectedRoom.roomType?.basePrice || selectedRoom.roomType?.rate || 100,
         total_room_charges: (selectedRoom.roomType?.basePrice || 100) * (checkInData.numberOfNights || 1),
-        tax_rate:
-          effectiveConfig?.financial?.taxRates?.[0]?.rate || configuration?.financial?.taxRates?.[0]?.rate || 0,
+        tax_rate: effectiveConfig?.financial?.taxRates?.[0]?.rate || configuration?.financial?.taxRates?.[0]?.rate || 0,
         tax_amount:
           (selectedRoom.roomType?.basePrice || 100) *
           (checkInData.numberOfNights || 1) *

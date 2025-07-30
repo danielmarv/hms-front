@@ -16,6 +16,8 @@ import { DatePicker } from "@/components/ui/date-picker"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Switch } from "@/components/ui/switch"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { CurrencyInput } from "@/components/ui/currency-input"
+import { useCurrency } from "@/hooks/use-currency"
 import { toast } from "sonner"
 import { ArrowLeft, Plus, Trash2, Save } from "lucide-react"
 import { addDays } from "date-fns"
@@ -24,6 +26,7 @@ export default function NewInvoicePage() {
   const router = useRouter()
   const { createInvoice, isLoading } = useInvoices()
   const { guests, getGuests } = useGuests()
+  const { formatCurrency } = useCurrency()
 
   const [invoiceData, setInvoiceData] = useState({
     guest: "",
@@ -384,14 +387,6 @@ export default function NewInvoicePage() {
     setCompanyDetails({ ...companyDetails, [name]: value })
   }
 
-  // Format currency
-  const formatCurrency = (amount: number, currency = "USD") => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency,
-    }).format(amount)
-  }
-
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -552,14 +547,10 @@ export default function NewInvoicePage() {
                           />
                         </TableCell>
                         <TableCell>
-                          <Input
-                            type="number"
-                            min="0"
-                            step="0.01"
+                          <CurrencyInput
                             value={item.unitPrice}
-                            onChange={(e) =>
-                              handleItemChange(index, "unitPrice", Number.parseFloat(e.target.value) || 0)
-                            }
+                            onChange={(usdValue) => handleItemChange(index, "unitPrice", usdValue)}
+                            showConversion={false}
                           />
                         </TableCell>
                         <TableCell>
@@ -580,7 +571,7 @@ export default function NewInvoicePage() {
                   </TableBody>
                 </Table>
               </div>
-              <Button type="button" variant="outline" className="mt-4" onClick={addItem}>
+              <Button type="button" variant="outline" className="mt-4 bg-transparent" onClick={addItem}>
                 <Plus className="mr-2 h-4 w-4" />
                 Add Item
               </Button>
@@ -635,7 +626,7 @@ export default function NewInvoicePage() {
                     </TableBody>
                   </Table>
                 </div>
-                <Button type="button" variant="outline" className="mt-4" onClick={addTax}>
+                <Button type="button" variant="outline" className="mt-4 bg-transparent" onClick={addTax}>
                   <Plus className="mr-2 h-4 w-4" />
                   Add Tax
                 </Button>
@@ -675,15 +666,23 @@ export default function NewInvoicePage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="discountValue">Value</Label>
-                      <Input
-                        id="discountValue"
-                        type="number"
-                        min="0"
-                        step={newDiscount.type === "percentage" ? "0.01" : "1"}
-                        value={newDiscount.value || ""}
-                        onChange={(e) => handleDiscountChange("value", Number.parseFloat(e.target.value) || 0)}
-                        placeholder={newDiscount.type === "percentage" ? "10" : "100"}
-                      />
+                      {newDiscount.type === "percentage" ? (
+                        <Input
+                          id="discountValue"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={newDiscount.value || ""}
+                          onChange={(e) => handleDiscountChange("value", Number.parseFloat(e.target.value) || 0)}
+                          placeholder="10"
+                        />
+                      ) : (
+                        <CurrencyInput
+                          value={newDiscount.value}
+                          onChange={(usdValue) => handleDiscountChange("value", usdValue)}
+                          showConversion={false}
+                        />
+                      )}
                     </div>
                     <div className="flex items-end">
                       <Button type="button" onClick={addDiscount} className="w-full">
